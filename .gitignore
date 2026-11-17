@@ -1,0 +1,57 @@
+# Gerado pelo Python ao executar/compilar — nunca precisa ir pro repositório
+__pycache__/
+*.pyc
+
+# Gerado pelo instalador em cada compilação (pasta temporária de build, apagada e refeita sempre)
+_cb/
+_cb_cache/
+
+# O programa compilado: cada máquina gera o seu; nunca distribua pelo repositório sem revisar antes.
+# Não existe mais nenhum .sha256/.bat ao lado dele (removido de propósito: ver MODELO_DE_AMEACAS.md, adendo 20).
+*.exe
+
+# Logs de execução real do instalador/compilador (datados, específicos de cada máquina)
+logs/instalacao-*.log
+logs/instalacao_detalhada.log
+logs_de_compilacao/
+testes/resultados/
+
+# Cofre de teste e arquivos de apoio que os testes criam/usam (nunca o cofre de verdade de alguém)
+*.dat
+*.bak1
+*.bak2
+*.bak3
+*.bak4
+*.bak5
+*.lock
+*.diag
+avisos_vistos.json
+
+# Chave de acesso e planilhas: podem conter senhas reais de quem está usando/testando o cofre —
+# NUNCA sobem para o git, mesmo que alguém esqueça e crie um desses na pasta do projeto por engano.
+*.key
+*.xlsx
+*.xlsm
+*.csv
+
+# Relatórios que os scripts opcionais de ferramentas_windows_opcionais/ salvam na Área de Trabalho
+# do computador de quem rodou (nunca ficam dentro do projeto, mas por garantia caso copiados aqui)
+relatorio_seguranca.txt
+relatorio_nucleo.txt
+modelo_placa_mae.txt
+
+# Pacotes binários reais baixados por 3 - BAIXAR PACOTES - so para instalar sem internet.bat (grandes; cada um verificado por hash
+# na hora da instalação). Mantemos no git só o LEIA-ME.txt e o SHA256.txt; os binários, não.
+pacotes/*.whl
+pacotes/*.tar.gz
+pacotes/*.exe
+pacotes/*.zip
+pacotes/zig*/
+
+# Ambientes e caches comuns de Python, por precaução
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+pacotes/

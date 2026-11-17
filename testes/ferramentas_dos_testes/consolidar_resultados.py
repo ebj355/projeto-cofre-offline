@@ -1,0 +1,62 @@
+"""Junta os resultados individuais (testes/resultados/resultado_*.txt) em três relatórios, para ler tudo de uma vez:
+  - resumo_testes.md     : tabela legível (um teste por linha, com contagem de [OK]/[FALHOU] e as linhas que falharam);
+  - resumo_testes.json   : o mesmo em formato de máquina (para comparar uma rodada com a outra);
+  - resultados.sarif     : formato SARIF 2.1.0 (só as falhas), aceito por ferramentas de revisão de código.
+Uso: python testes/ferramentas_dos_testes/consolidar_resultados.py        Sai com código 1 se algum teste falhou.
+Não altera nenhum resultado individual; se a pasta não puder ser gravada, imprime o resumo na tela e segue."""
+import datetime, glob, json, os, re, sys
+
+PASTA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "resultados")
+RUIM = re.compile(r"\[FALHOU\]|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]")
+OK = re.compile(r"\[OK\]|^\s*\[\s*ok\s*\]", re.I)
+IGNORAR = ("resultado_rodar_todos_windows.txt",)          # é só a junção dos outros
+
+
+def analisa(caminho):
+    """Lê um resultado e devolve {nome, ok, falhou, linhas_ruins, estado}."""
+    with open(caminho, encoding="utf-8", errors="replace") as f:
+        linhas = f.read().splitlines()
+    ruins = [l.strip()[:200] for l in linhas if RUIM.search(l)]
+    n_ok = sum(1 for l in linhas if OK.search(l))
+    nome = os.path.basename(caminho)[len("resultado_"):-len(".txt")]
+    return {"nome": nome, "arquivo": os.path.basename(caminho), "ok": n_ok, "falhou": len(ruins),
+            "linhas_ruins": ruins[:20], "estado": "FALHOU" if ruins else "ok"}
+
+
+def main():
+    arqs = [a for a in sorted(glob.glob(os.path.join(PASTA, "resultado_*.txt"))) if os.path.basename(a) not in IGNORAR]
+    itens = [analisa(a) for a in arqs]
+    quando = datetime.datetime.now().isoformat(timespec="seconds")
+    ruins = [i for i in itens if i["estado"] == "FALHOU"]
+    total_ok = sum(i["ok"] for i in itens)
+    md = ["# Resumo dos testes", "", "Gerado em %s | %d resultado(s) | %d verificações [OK] | %d teste(s) com falha" % (
+        quando, len(itens), total_ok, len(ruins)), "", "| Teste | Estado | [OK] | Falhas |", "|---|---|---:|---:|"]
+    for i in itens:
+        md.append("| %s | %s | %d | %d |" % (i["nome"], "**FALHOU**" if i["estado"] == "FALHOU" else "ok", i["ok"], i["falhou"]))
+    if ruins:
+        md += ["", "## O que falhou"]
+        for i in ruins:
+            md += ["", "### " + i["nome"]] + ["- `%s`" % l.replace("`", "'") for l in i["linhas_ruins"]]
+    md += ["", "Detalhes completos (saída inteira, tracebacks): `testes/resultados/log_depuracao.txt` (pasta logs, na raiz do projeto)."]
+    sarif = {"version": "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+             "runs": [{"tool": {"driver": {"name": "testes-cofre-de-senhas", "rules": [{"id": "TESTE-FALHOU"}]}},
+                       "results": [{"ruleId": "TESTE-FALHOU", "level": "error",
+                                    "message": {"text": "%s: %s" % (i["nome"], l)},
+                                    "locations": [{"physicalLocation": {"artifactLocation": {"uri": "testes/resultados/" + i["arquivo"]}}}]}
+                                   for i in ruins for l in i["linhas_ruins"]]}]}
+    print("\n".join(md[:4]))
+    try:
+        os.makedirs(PASTA, exist_ok=True)
+        with open(os.path.join(PASTA, "resumo_testes.md"), "w", encoding="utf-8") as f:
+            f.write("\n".join(md) + "\n")
+        with open(os.path.join(PASTA, "resumo_testes.json"), "w", encoding="utf-8") as f:
+            json.dump({"gerado_em": quando, "testes": itens}, f, ensure_ascii=False, indent=1)
+        with open(os.path.join(PASTA, "resultados.sarif"), "w", encoding="utf-8") as f:
+            json.dump(sarif, f, ensure_ascii=False, indent=1)
+    except OSError as ex:
+        print("(não foi possível gravar os relatórios: %s)" % ex)
+    return 1 if ruins else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

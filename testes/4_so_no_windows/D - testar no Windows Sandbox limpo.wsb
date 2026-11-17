@@ -1,0 +1,14 @@
+<Configuration>
+  <VGpu>Default</VGpu>
+  <Networking>Default</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\Users\Recuperacao\Downloads\CofreSenhas-Instalador</HostFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\CofreSenhas-Instalador-FONTE</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>cmd /c xcopy "C:\Users\WDAGUtilityAccount\Desktop\CofreSenhas-Instalador-FONTE" "C:\Users\WDAGUtilityAccount\Desktop\CofreSenhas-TesteLimpo\" /E /I /Y &amp; explorer.exe "C:\Users\WDAGUtilityAccount\Desktop\CofreSenhas-TesteLimpo"</Command>
+  </LogonCommand>
+</Configuration>

@@ -1,0 +1,20 @@
+# Versões FIXAS, as mesmas testadas com este cofre. O instalador instala exatamente estas, com hash
+# (pip --require-hashes), e inclui também as dependências indiretas abaixo.
+cryptography==50.0.1
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+openpyxl==3.1.5
+defusedxml==0.7.1
+fido2==2.2.1
+# dependências indiretas
+cffi==2.1.1
+pycparser==3.12
+et-xmlfile==2.0.0
+
+# Só para compilar o CofreSenhas.exe (1 - INSTALAR O COFRE - compila e instala.bat / instalar_cofre.ps1)
+nuitka==4.3.5
+ordered-set==4.1.0
+zstandard==0.25.0
+ziglang==0.16.0
+setuptools==84.2.1
+wheel==0.48.0
