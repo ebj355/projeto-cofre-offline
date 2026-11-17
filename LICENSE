@@ -1,0 +1,68 @@
+LICENÇA DE USO PESSOAL E ESTUDO
+Cofre de Senhas (offline) - https://github.com/ebj355/projeto-cofre-offline
+
+Copyright (c) 2026 ebj355. Todos os direitos reservados, exceto o que esta
+licença permite expressamente.
+
+Este software é "código visível" (source-available): o código pode ser lido
+e estudado por qualquer pessoa, mas NÃO é software livre nem de código aberto
+(open source). O uso comercial e a revenda dependem de autorização do autor.
+
+1. O QUE É PERMITIDO (gratuito, não exclusivo, intransferível)
+
+   Você pode, sem pedir autorização:
+   a) ler, estudar e auditar o código;
+   b) compilar e usar o programa para uso pessoal e não comercial, seu ou da
+      sua família;
+   c) fazer as cópias necessárias para esse uso e para backup;
+   d) modificar o código para o seu uso pessoal, sem distribuir o resultado.
+
+2. O QUE É PROIBIDO SEM AUTORIZAÇÃO ESCRITA DO AUTOR
+
+   a) vender, alugar, licenciar, sublicenciar ou cobrar de qualquer forma pelo
+      software, por versões modificadas ou por qualquer produto ou serviço que
+      o contenha;
+   b) usar o software em atividade comercial ou profissional que gere receita,
+      em empresa, órgão ou organização, ou como parte de outro produto ou
+      serviço;
+   c) distribuir ou publicar o código, o programa compilado ou versões
+      modificadas, em qualquer meio. Exceção: o que os termos do próprio GitHub
+      permitem, como visualizar o repositório e criar um fork dentro do GitHub,
+      respeitando esta licença;
+   d) remover ou alterar os avisos de autoria e esta licença, ou apresentar o
+      software como obra sua;
+   e) usar o nome do autor para divulgar ou endossar outro produto.
+
+3. USO COMERCIAL E REDISTRIBUIÇÃO
+
+   Quem quiser usar o software comercialmente, redistribuí-lo ou vendê-lo deve
+   pedir autorização ao autor, pelo perfil https://github.com/ebj355. A
+   autorização pode ser condicionada a pagamento e será dada por escrito.
+
+4. BIBLIOTECAS DE TERCEIROS
+
+   As bibliotecas usadas (listadas em requirements.txt) continuam sob as suas
+   próprias licenças. Esta licença não se aplica a elas.
+
+5. SEM GARANTIA
+
+   O software é fornecido "como está", sem garantia de qualquer tipo, expressa
+   ou implícita. O autor não responde por perda de dados, perda de acesso ao
+   cofre ou qualquer dano decorrente do uso. Veja a seção 24 do README.
+
+6. VIOLAÇÃO
+
+   Qualquer descumprimento encerra automaticamente as permissões desta
+   licença. O autor pode exigir a cessação do uso e buscar as medidas previstas
+   em lei, inclusive indenização.
+
+7. CONTRIBUIÇÕES
+
+   Quem enviar sugestões ou código ao projeto autoriza o autor a usá-los,
+   modificá-los e incluí-los no software, sem pagamento.
+
+8. LEI APLICÁVEL
+
+   Esta licença segue as leis da República Federativa do Brasil, em especial a
+   Lei de Software (Lei 9.609/1998) e a Lei de Direitos Autorais (Lei
+   9.610/1998).
