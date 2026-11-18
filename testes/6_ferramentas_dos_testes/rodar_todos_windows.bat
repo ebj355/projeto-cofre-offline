@@ -1,5 +1,5 @@
 @echo off
-rem Roda as CINCO baterias de teste do Windows real, uma depois da outra, sem parar entre elas, chamando o .bat
+rem Roda as CINCO baterias de teste do Windows real, UMA VEZ cada, uma depois da outra, sem parar entre elas, chamando o .bat
 rem de CADA UMA (nucleo, instalador, nativo, interface, pentest). Cada bateria grava o seu PROPRIO resultado,
 rem exatamente como se tivesse sido chamada sozinha - nada aqui muda o comportamento dela.
 rem
@@ -23,17 +23,16 @@ rem    python.exe. Com caminho completo isso nao acontece.
 chcp 65001 >nul
 setlocal EnableExtensions
 cd /d "%~dp0"
-rem Roda a bateria 3 vezes seguidas (RODADAS). BATERIA NOVA SUBSTITUI A ANTIGA: apaga os resultados/logs/resumos da rodada anterior (testes\resultados) antes de comecar,
+rem Roda a bateria UMA vez (RODADAS=1). BATERIA NOVA SUBSTITUI A ANTIGA: apaga os resultados/logs/resumos da rodada anterior (testes\resultados) antes de comecar,
 rem para nunca misturar arquivos de "ontem" com os de "hoje". Documentos que estavam ali por engano vao para a pasta certa.
 rem O log de depuracao (testes\resultados\log_depuracao.txt) e recriado do zero; cada executor acrescenta nele a saida completa de cada teste.
 if not exist "%~dp0..\resultados" mkdir "%~dp0..\resultados"
 set "DRIVE=%~1"
 py -3.13 "%~dp0limpar_resultados.py" 2>nul
 set "FALHAS=0"
-set "RODADAS=3"
+set "RODADAS=1"
 for /L %%R in (1,1,%RODADAS%) do (
   echo.
-  echo ######## RODADA %%R de %RODADAS% ########
   call :rodada %%R
 )
 goto :fim
@@ -44,7 +43,7 @@ echo  Cofre de Senhas - bateria COMPLETA no Windows real
 echo  1/5 nucleo                2/5 instalador (SO/atributos do instalador)
 echo  3/5 nativo (atributos/ACL/DPAPI)   4/5 interface (automatico)
 echo  5/5 pentest (injecao, forca bruta, DoS, vazamento de memoria, etc.)
-echo  Sao 3 RODADAS seguidas: pode levar 1 hora e meia ou mais. Precisa de internet.
+echo  Roda UMA vez cada bateria. Precisa de internet.
 echo ============================================================
 echo.
 
@@ -103,7 +102,7 @@ type "%~dp0..\resultados\resultado_teste_gui_windows.txt" >> "%TUDO%" 2>nul
 echo. >> "%TUDO%"
 echo ====== 5/5 pentest (RODAR ESTA PASTA - testes de ataque simulado.bat) ====== >> "%TUDO%"
 type "%~dp0..\resultados\resultado_pentest_windows.txt" >> "%TUDO%" 2>nul
-rem guarda os arquivos desta rodada em testes\resultados\rodada_N (a proxima rodada sobrescreve os de cima)
+rem guarda uma copia dos arquivos desta rodada em testes\resultados\rodada_N
 if not exist "%~dp0..\resultados\rodada_%~1" mkdir "%~dp0..\resultados\rodada_%~1"
 copy /y "%~dp0..\resultados\*.txt" "%~dp0..\resultados\rodada_%~1\" >nul 2>nul
 copy /y "%~dp0..\resultados\*.json" "%~dp0..\resultados\rodada_%~1\" >nul 2>nul
@@ -112,15 +111,15 @@ exit /b 0
 
 :fim
 echo ============================================================
-echo  3 rodadas concluidas. Cada rodada fica guardada em testes\resultados\rodada_1, rodada_2 e rodada_3.
+echo  Rodada concluida. Uma copia fica guardada em testes\resultados\rodada_1.
 if "%FALHAS%"=="0" (
-  echo  TUDO PASSOU nas 5 baterias, nas 3 rodadas.
+  echo  TUDO PASSOU nas 5 baterias.
 ) else (
-  echo  Pelo menos uma etapa terminou com erro: confira o resultado abaixo mesmo assim (o numero acima
-  echo  nem sempre e exato - o que vale e o conteudo do arquivo).
+  echo  Pelo menos uma etapa terminou com erro: confira o resultado abaixo mesmo assim ^(o numero acima
+  echo  nem sempre e exato - o que vale e o conteudo do arquivo^).
 )
 echo.
-echo  Resultado da ultima rodada (as 5 baterias juntas): testes\resultados\resultado_rodar_todos_windows.txt
+echo  Resultado (as 5 baterias juntas): testes\resultados\resultado_rodar_todos_windows.txt
 echo  Resumo: resumo_testes.md  ^|  Log de depuracao completo: testes\resultados\log_depuracao.txt
 echo ============================================================
 echo Pressione uma tecla para fechar esta janela.
