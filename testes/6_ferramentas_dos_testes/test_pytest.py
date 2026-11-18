@@ -1,10 +1,10 @@
 """Ponte para o PYTEST: cada arquivo teste_*.py do projeto vira um caso do pytest (rodando em processo separado, com os
-mesmos parâmetros do rodar_todos.py). Uso:  pytest testes/ferramentas_dos_testes/test_pytest.py -v   (ou  -k trava  para escolher um)
+mesmos parâmetros do rodar_todos.py). Uso:  pytest testes/6_ferramentas_dos_testes/test_pytest.py -v   (ou  -k trava  para escolher um)
 Os testes de interface (gui/) precisam de tela: no Linux usam o xvfb-run; sem ele são pulados."""
 import glob, os, shutil, subprocess, sys
 import pytest
 
-AQUI = os.path.dirname(os.path.abspath(__file__))        # testes/ferramentas_dos_testes
+AQUI = os.path.dirname(os.path.abspath(__file__))        # testes/6_ferramentas_dos_testes
 RAIZ_TESTES = os.path.dirname(AQUI)                       # testes/ (onde ficam nucleo/ e gui/)
 sys.path.insert(0, AQUI)
 import rodar_todos                                      # reaproveita a escolha do Python que tem tkinter

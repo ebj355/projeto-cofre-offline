@@ -1,8 +1,8 @@
 # Ferramentas COMPARTILHADAS pelos testes
 
-**Para que serve esta pasta:** Não são testes do cofre: são os executores (`rodar_*`), os ajudantes (`_resultado`, `_util_mem`), a limpeza, a cobertura e os relatórios. Também os documentos do plano de testes.
+**Para que serve esta pasta:** Não são testes do cofre: são os executores (`rodar_*`), os ajudantes (`_resultado`, `_util_mem`), a limpeza, a cobertura e os relatórios.
 
-_Gerado por `testes/ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
+_Gerado por `testes/6_ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
 
 | Arquivo | Para que serve |
 |---|---|
@@ -15,5 +15,5 @@ _Gerado por `testes/ferramentas_dos_testes/gerar_indices.py` (não edite à mão
 | `limpar_artefatos_testes.py` | Apaga as pastas temporárias que os testes deixam para trás (cofres de mentira em %TEMP%/tmp) quando um teste é interrompido no meio. Só toca em pastas com os PREFIXOS que os nossos testes usam e que tenham mais de N minutos |
 | `limpar_resultados.py` | Apaga os resultados da bateria ANTERIOR (testes/resultados/) e guarda cada coisa na pasta certa. Roda sozinho no começo do Testar_Tudo / rodar_todos: bateria nova SUBSTITUI a antiga (nunca mistura 'ontem' com 'hoje'). |
 | `rodar_todos.py` | Executa TODOS os testes do cofre e mostra um resumo. Uso (na pasta do projeto): |
-| `rodar_todos_windows.bat` | Roda as 5 baterias no Windows em sequência e junta os resultados (é o que o 2 - TESTAR TUDO - roda todos os testes.bat da raiz chama). Fica em ferramentas_dos_testes/ porque usa todas as pastas. |
+| `rodar_todos_windows.bat` | Roda as 6 baterias no Windows em sequência e junta os resultados diretamente em testes/resultados/ (é o que o 2 - TESTAR TUDO - roda todos os testes.bat da raiz chama). |
 | `test_pytest.py` | Ponte OPCIONAL para o pytest (cada teste vira um caso do pytest). Não é usada pelo Testar_Tudo. |

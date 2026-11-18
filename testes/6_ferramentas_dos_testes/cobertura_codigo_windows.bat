@@ -14,13 +14,12 @@ set "PYTHONDONTWRITEBYTECODE=1"
 echo.
 echo  Cobertura de codigo do Cofre de Senhas - aguarde (pode levar 15-30 minutos)...
 where py >nul 2>nul || (echo  Python nao encontrado. Instale o Python 3.13 e rode de novo. & pause & exit /b 9)
+if not exist "%RAIZ%\requirements-test.txt" (echo  requirements-test.txt nao encontrado na raiz do projeto. & pause & exit /b 9)
+if not exist "%RAIZ%\pacotes\*.whl" (echo  Dependencias offline nao encontradas em pacotes\. Rode primeiro 3 - BAIXAR PACOTES. & pause & exit /b 9)
 if exist "%VENV%" rmdir /s /q "%VENV%"
 py -3.13 -m venv "%VENV%" || (echo  Falhou criar o ambiente Python 3.13. & pause & exit /b 9)
-if exist "%RAIZ%\pacotes\*.whl" (
-  "%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml coverage
-) else (
-  "%VENV%\Scripts\python.exe" -m pip install --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml coverage
-)
+"%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q -r "%RAIZ%\requirements-test.txt"
+if errorlevel 1 (echo  Falhou instalar as dependencias de cobertura offline. & pause & exit /b 9)
 "%VENV%\Scripts\python.exe" -u -X utf8 "%~dp0cobertura_codigo.py" %*
 set "RC=%ERRORLEVEL%"
 rmdir /s /q "%VENV%" 2>nul

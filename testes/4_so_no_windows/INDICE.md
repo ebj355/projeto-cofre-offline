@@ -2,7 +2,7 @@
 
 **Para que serve esta pasta:** Conferem o que o Linux só consegue simular: atributos de arquivo, permissões (ACL), DPAPI, SMBIOS, instalador, Windows Sandbox.
 
-_Gerado por `testes/ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
+_Gerado por `testes/6_ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
 
 | Arquivo | Para que serve |
 |---|---|

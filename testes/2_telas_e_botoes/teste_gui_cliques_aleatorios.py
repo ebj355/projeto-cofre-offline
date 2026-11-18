@@ -1,7 +1,7 @@
 """'Teste do macaco': 700 ações ALEATÓRIAS (cliques, teclas, abas, busca, bloquear, redimensionar) para achar travadas; confere erros, memória, widgets e que o cofre continua íntegro."""
 import os as _os, sys as _sys, tempfile as _tf, subprocess as _sp
 _RAIZ = _os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))
-_TESTES = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "ferramentas_dos_testes")   # testes/ferramentas_dos_testes/ (para achar _util_mem)
+_TESTES = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "6_ferramentas_dos_testes")   # testes/6_ferramentas_dos_testes/ (para achar _util_mem)
 def _foto(arq):
     """Captura a tela (só onde existe o ImageMagick 'import'); sem ele, ignora."""
     try: _sp.run(["import", "-window", "root", arq], check=False)

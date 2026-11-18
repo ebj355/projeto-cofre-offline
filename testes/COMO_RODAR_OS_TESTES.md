@@ -1,16 +1,24 @@
-> **Para saber o que cada arquivo faz, abra o `INDICE.md` da pasta (1_motor_do_cofre, 2_telas_e_botoes, 3_ataques_simulados, 4_so_no_windows, ferramentas_dos_testes) e o `LEIA PRIMEIRO - mapa do projeto.md` na raiz.**
+> **Para saber o que cada arquivo faz, abra o `INDICE.md` de cada pasta numerada (1 a 6) e o `LEIA PRIMEIRO - mapa do projeto.md` na raiz.**
 
 # Testes do Cofre de Senhas
 
 Tudo que é teste está nesta pasta. Os testes trabalham em pastas temporárias: **nunca tocam no seu `cofre.dat`**.
 
+## Preparar para rodar sem internet
+
+1. Em um computador com internet, execute na raiz `3 - BAIXAR PACOTES - so para instalar sem internet.bat`.
+2. Copie o projeto inteiro, inclusive `pacotes\`, para o computador sem internet. Os binários de `pacotes\` são ignorados pelo Git e não vêm em uma clonagem nova.
+3. Se o computador não tiver Python 3.13, execute `pacotes\python-3.13.17-*.exe`. As baterias instalam dependências com `--no-index` e não tentam baixar nada.
+4. Pester é carregado do pacote local. Nmap está em `pacotes\nmap-7.993-setup.exe`, mas requer instalação manual e pode precisar de privilégios/Npcap.
+5. `pip-audit` é deliberadamente marcado como `PULADO` offline: o executável está no wheelhouse, mas sem consulta a uma base atual não é seguro afirmar que a auditoria está em dia. Com internet, use `COFRE_ONLINE_AUDIT=1` antes de abrir o BAT da auditoria.
+
 ## Rodar tudo
 
 ```
-python testes/ferramentas_dos_testes/rodar_todos.py              # núcleo + interface
-python testes/ferramentas_dos_testes/rodar_todos.py --rapido     # só o núcleo (sem janelas)
-python testes/ferramentas_dos_testes/rodar_todos.py --so gui     # só a interface
-python testes/ferramentas_dos_testes/rodar_todos.py --filtro fido -v
+python testes/6_ferramentas_dos_testes/rodar_todos.py              # núcleo + interface
+python testes/6_ferramentas_dos_testes/rodar_todos.py --rapido     # só o núcleo (sem janelas)
+python testes/6_ferramentas_dos_testes/rodar_todos.py --so gui     # só a interface
+python testes/6_ferramentas_dos_testes/rodar_todos.py --filtro fido -v
 ```
 
 No Linux sem tela, a interface roda dentro do `xvfb-run`. No Windows, durante os testes de interface aparecem janelas
@@ -25,26 +33,27 @@ Linhas `Traceback` em testes marcados `ok` são ruído do modo `-W error` (aviso
 | `2_telas_e_botoes/` | Interface (Tk): abrir/criar, editar, copiar, pessoas, importação, FIDO, alerta de tentativas, bloqueio, olho, navegação, energia, "macaco", segurança extra, acessibilidade por teclado, fluidez/glitches visuais. `RODAR ESTA PASTA - testes das telas e botoes.bat` roda só esta bateria no **Windows real** |
 | `4_so_no_windows/` | `A - testar o instalador.bat`: roda no **Windows real** só os testes do instalador/SO (sintaxe do `instalar_cofre.ps1`, import do programa, Pester) - a bateria do núcleo **não** roda mais aqui, veja `1_motor_do_cofre/`. `B - testar atributos e permissoes do Windows.bat`: atributos, ACL, SMBIOS, DPAPI, PC autorizado, DLLs |
 | `3_ataques_simulados/` | Pentest dedicado (14 `teste_pentest_*.py`): injeção de código, SSRF, força bruta/spraying, DoS, vazamento de memória (forense de RAM), bypass de contador/autodestruição, engenharia reversa, fuzzing adversarial/Unicode, SAST (bandit/flake8), dependências (pip-audit), canal lateral de tempo, exfiltração pela rede e link simbólico (achado real, corrigido), além da documentação explícita do que é fora de escopo. `rodar_pentest.py` roda só esta bateria; `RODAR ESTA PASTA - testes de ataque simulado.bat` roda no **Windows real**. Relatório: `resultados/relatorio_pentest.md` |
-| `resultados/` | Onde **todo** `resultado_*.txt` é gravado (de qualquer um dos `.bat` acima ou do `rodar_todos_windows.bat`) - uma pasta só para ver tudo, nunca sobrescrevendo (cada bateria tem seu próprio nome de arquivo) |
-| `ferramentas_dos_testes/` | O que **organiza** os testes, sem ser um teste em si: `rodar_todos.py` e `rodar_todos_windows.bat` (executores que chamam as 5 baterias), `test_pytest.py` (ponte opcional para o pytest), `_util_mem.py` (medida de memória usada por vários testes do núcleo), este `LEIA-ME.md` e o `PLANO_DE_TESTES.md` |
+| `resultados/` | Onde **todo** `resultado_*.txt` é gravado (de qualquer um dos `.bat` acima ou do `rodar_todos_windows.bat`) - uma pasta só para ver tudo, nunca sobrescrevendo (cada bateria tem seu próprio nome de arquivo). Não cria subpastas por rodada. |
+| `5_ferramentas_externas/` | Ferramentas externas: Bandit, pip-audit e Nmap. |
+| `6_ferramentas_dos_testes/` | O que **organiza** os testes, sem ser um teste em si: `rodar_todos.py` e `rodar_todos_windows.bat` (executores que chamam as 6 baterias), `test_pytest.py` (ponte opcional para o pytest), `_util_mem.py`, limpeza e relatórios. |
 | `PECA_DE_TESTE_cofre_versao_4_antiga.py` | Versão antiga do formato, usada pelo teste de migração (fica em `1_motor_do_cofre/`, junto do teste que a usa) |
 
 ## Antes de entregar uma versão
 
-1. `python testes/ferramentas_dos_testes/rodar_todos.py` sem nenhum `FALHOU`.
-2. `testes\ferramentas_dos_testes\rodar_todos_windows.bat` no Windows (ou os `.bat` de `1_motor_do_cofre\`, `4_so_no_windows\` e `2_telas_e_botoes\` em separado), sem `[FALHOU]`.
+1. `python testes/6_ferramentas_dos_testes/rodar_todos.py` sem nenhum `FALHOU`.
+2. `testes\6_ferramentas_dos_testes\rodar_todos_windows.bat` no Windows (ou os `.bat` de `1_motor_do_cofre\`, `4_so_no_windows\` e `2_telas_e_botoes\` em separado), sem `[FALHOU]`.
 3. Instalar e abrir dando dois cliques no `CofreSenhas.exe` (é o único arquivo do programa na pasta), criar um item, fechar e reabrir.
 
 
 ## Testes do instalador (Windows)
-`testes\4_so_no_windows\instalador.Tests.ps1` é uma suíte **Pester** (3, 4 ou 5) das funções auxiliares do `instalar_cofre.ps1` (conferência do hash digitado, arquitetura, sistema de arquivos, espaço em disco, certificado, limpeza de caminhos e log). O `A - testar o instalador.bat` roda a suíte sozinho se o Pester existir. Carregar o instalador com `. .\instalar_cofre.ps1` só define as funções, não instala nada. **Ainda não foi executada em Windows real.**
+`testes\4_so_no_windows\instalador.Tests.ps1` é uma suíte **Pester** das funções auxiliares do `instalar_cofre.ps1` (conferência do hash digitado, arquitetura, sistema de arquivos, espaço em disco, certificado, limpeza de caminhos e log). O `A - testar o instalador.bat` carrega o Pester 5.7.1 empacotado em `pacotes\powershell-modules`. Carregar o instalador com `. .\instalar_cofre.ps1` só define as funções, não instala nada. **Ainda não foi executada em Windows real.**
 
 ## Queda de energia, concorrência, memória e fuzzing
 - `teste_queda_e_memoria.py`: mata (SIGKILL) o programa no meio de gravações repetidas e confere que o cofre abre sempre e nada confirmado se perde; duas instâncias gravando no mesmo arquivo (a gravação concorrente é detectada e recusada); e a checagem de **memória livre antes do Argon2** (recusa sem gastar tentativa).
 - `teste_fuzz_importacao.py`: CSV/XLSX hostis (bytes nulos, campos de MB, UTF-16 com BOM trocado, UTF-8 inválido, zip bomb, 200 mutações aleatórias): nunca pode estourar erro não tratado. Este teste encontrou e corrigiu um defeito real (campo CSV maior que 128 mil caracteres dava `csv.Error` sem tratamento).
 - `teste_checksum_v5.py`: setor zerado/0xFF, cabeçalho apagado, corte, lixo no fim, arquivo vazio e setores trocados: nunca gasta tentativa nem apaga, e a cópia restaura.
-- Análise estática: `pip install bandit flake8` e `bandit -r cofre_senhas.py` / `flake8 --select=E9,F cofre_senhas.py` (resultado comentado no `MODELO_DE_AMEACAS.md`).
-- **pytest:** `pip install pytest` e `pytest testes/ferramentas_dos_testes/test_pytest.py -v` (ou `-k trava`): `test_pytest.py` roda cada `teste_*.py` como um caso, no mesmo formato do `rodar_todos.py`.
+- Análise estática: Bandit e Flake8 são instalados do `pacotes\` preparado por `3 - BAIXAR PACOTES`; o BAT de Bandit cria `testes\_venv_ferramentas` sem rede.
+- **pytest:** o BAT correspondente usa o mesmo ambiente offline (`testes\_venv_ferramentas`): `03_PYTEST_PROJETO.bat` roda `test_pytest.py`, cada `teste_*.py` como um caso. A ponte repete as baterias 1 e 2.
 - `teste_queda_pontos_exatos.py` (queda de energia em cada `fsync`/`os.replace`) e `teste_fuzz_cabecalho.py` (cada byte do cabeçalho v5 e da seção FIDO): nada gasta tentativa, nada se perde.
 - `2_telas_e_botoes/teste_gui_fontes.py`: fontes nomeadas podem ser preparadas mais de uma vez.
 - `teste_host_e_politica.py`: pasta temporária privada no pendrive (rastros no host) e política opcional de exigir NTFS.
@@ -75,12 +84,12 @@ Linhas `Traceback` em testes marcados `ok` são ruído do modo `-W error` (aviso
 ## Log de depuração, resumos e limpeza (2026-11-16)
 Além de um `resultado_<teste>.txt` por teste, a pasta `testes/resultados/` guarda:
 - `testes/resultados/log_depuracao.txt` — saída COMPLETA (com tracebacks), horário, duração e comando de cada teste; recriado do zero a cada rodada. É o arquivo para abrir quando algo falha.
-- `resumo_testes.md` / `resumo_testes.json` / `resultados.sarif` — gerados por `testes/ferramentas_dos_testes/consolidar_resultados.py` (tabela legível, JSON comparável e SARIF só com falhas).
-- `limpeza_artefatos.txt` — relatório de `testes/ferramentas_dos_testes/limpar_artefatos_testes.py`, que apaga pastas temporárias órfãs (prefixos dos nossos testes, mais velhas que 5 min).
+- `resumo_testes.md` / `resumo_testes.json` / `resultados.sarif` — gerados por `testes/6_ferramentas_dos_testes/consolidar_resultados.py` (tabela legível, JSON comparável e SARIF só com falhas).
+- `limpeza_artefatos.txt` — relatório de `testes/6_ferramentas_dos_testes/limpar_artefatos_testes.py`, que apaga pastas temporárias órfãs (prefixos dos nossos testes, mais velhas que 5 min).
 Os testes novos criam pastas temporárias por `_resultado.pasta_temporaria()`, que as apaga ao terminar mesmo se o teste falhar.
 Observação do Linux: `teste_pentest_vazamento_memoria.py` (conta cópias de um texto na memória do processo) oscila conforme o alocador do Python; no Windows o resultado é o que vale.
 
 ## Soak e cobertura (2026-11-16)
 - `1_motor_do_cofre/teste_nucleo_soak_longa_duracao.py`: 1.000 ciclos seguidos (descritores, threads, memória, instâncias de Cofre). Roda sem `-X dev` (o modo dev o deixaria 50x mais lento).
 - `2_telas_e_botoes/teste_gui_soak_longa_duracao.py`: 60 ciclos por padrão (cada um custa ~3 s); `COFRE_SOAK_CICLOS=1000` para a corrida longa.
-- `ferramentas_dos_testes/cobertura_codigo.py` / `cobertura_codigo_windows.bat`: cobertura de código com ramificações (resultado em `resultados/cobertura_codigo.txt` e `cobertura_html/`). Não faz parte do Testar_Tudo.
+- `6_ferramentas_dos_testes/cobertura_codigo.py` / `cobertura_codigo_windows.bat`: cobertura de código com ramificações (`resultados/cobertura_codigo.txt`, `cobertura_codigo.json` e `cobertura_html.zip`, todos diretamente em `resultados/`, sem subpastas persistentes). Não faz parte do Testar_Tudo.

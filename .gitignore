@@ -15,6 +15,7 @@ logs/instalacao-*.log
 logs/instalacao_detalhada.log
 logs_de_compilacao/
 testes/resultados/
+testes/_venv_ferramentas/
 
 # Cofre de teste e arquivos de apoio que os testes criam/usam (nunca o cofre de verdade de alguém)
 *.dat

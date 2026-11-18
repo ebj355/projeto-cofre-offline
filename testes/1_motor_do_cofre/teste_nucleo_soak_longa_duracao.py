@@ -13,7 +13,7 @@ da senha (essa é medida em outros testes). Quantidade de ciclos: variável COFR
 import gc, importlib.util, os, sys, threading, time, tracemalloc
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "ferramentas_dos_testes"))
+sys.path.insert(0, os.path.join(AQUI, "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)          # grava resultados/resultado_nucleo_soak_longa_duracao.txt
 
 spec = importlib.util.spec_from_file_location("c", os.path.abspath(os.path.join(AQUI, "..", "..", "cofre_senhas.py")))

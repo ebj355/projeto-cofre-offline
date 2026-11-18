@@ -1,0 +1,24 @@
+IMAGENS DE APRESENTAÇÃO DO COFRE
+
+Esta pasta contém cinco mockups originais para apresentação, cada um em JPG
+(1920 x 1080) e em SVG editável. Não são capturas reais do programa; usam somente
+dados inventados ou mascarados.
+
+Imagens:
+  01-apresentacao               visão geral do produto
+  02-desbloqueio-seguro         fluxo ilustrativo de desbloqueio
+  03-painel-do-cofre            painel com contas fictícias
+  04-protecao-e-fatores         camadas de proteção configuráveis
+  05-cuidado-com-os-dados       práticas seguras de uso e backup
+
+Para apresentação, use os arquivos JPG. Edite os SVGs para adaptar as
+ilustrações.
+
+SEGURANÇA
+  - Nunca coloque senhas, chaves de acesso, códigos de recuperação, nomes reais
+    de contas ou dados de clientes em imagens de demonstração.
+  - Os campos de segredo aparecem ocultos; as contas mostradas são fictícias.
+  - As telas são ilustrações conceituais, não uma promessa de que cada detalhe
+    corresponde exatamente a um controle ou versão atual do aplicativo.
+  - Para demonstrar o produto real, use um cofre descartável com dados
+    fictícios, feche-o ao terminar e confira os arquivos antes de compartilhar.

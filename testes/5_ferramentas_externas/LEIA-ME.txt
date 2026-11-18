@@ -15,7 +15,8 @@ COMO USAR
 O QUE CADA ARQUIVO FAZ
 - 01_BANDIT_CODIGO.bat: analisa estaticamente o cofre_senhas.py.
 - 02_PIP_AUDIT_DEPENDENCIAS.bat: procura vulnerabilidades conhecidas nas
-  bibliotecas do requirements.txt (precisa de internet).
+  bibliotecas do requirements.txt. Por padrao pula offline; com internet,
+  defina COFRE_ONLINE_AUDIT=1 antes de abrir o BAT.
 - 03_PYTEST_PROJETO.bat: roda a ponte pytest. So no menu: ela repete as
   baterias 1 e 2, entao nao entra no TESTAR TUDO.
 - 04_NMAP_PORTAS_LOCAIS.bat: verifica as 100 portas TCP mais comuns SOMENTE
@@ -25,14 +26,22 @@ O QUE CADA ARQUIVO FAZ
 
 RESULTADOS
 - Resumo: testes\resultados\resultado_ferramentas_externas_windows.txt
-- Relatorios completos: testes\resultados\ferramentas_externas\
+- Relatorios completos: diretamente em testes\resultados\
 - [OK] = sem alertas | [ALERTA] = ha achados para revisar (nao conta como
-  falha) | [PULADO] = a ferramenta nao esta instalada (nao conta como falha).
+  falha) | [PULADO] = ferramenta ausente ou sem base de CVEs atual (nao conta como falha).
 
-REQUISITOS
-- Python acessivel pelo comando py (tenta 3.13 e depois 3.12).
-- Bandit, pip-audit e pytest instalados nessa mesma versao do Python.
-- Nmap instalado e no PATH para o teste 04.
+REQUISITOS / MODO OFFLINE
+- Rode 3 - BAIXAR PACOTES enquanto houver internet e copie o projeto inteiro,
+  incluindo pacotes\, para o computador offline.
+- Os .bat criam/atualizam testes\_venv_ferramentas usando somente os wheels de
+  pacotes\ e requirements-test.txt; nao alteram o Python do sistema.
+- Se nao houver Python 3.13 instalado, execute o instalador python-3.13.17-*.exe
+  de pacotes\ antes dos testes.
+- Pester e importado de pacotes\powershell-modules.
+- O Nmap fica em pacotes\nmap-7.993-setup.exe, mas precisa ser instalado
+  manualmente (pode exigir permissao e Npcap). Sem ele o teste 04 e pulado.
+- pip-audit esta empacotado, mas precisa de internet para dados atuais de CVEs;
+  sem rede a auditoria e marcada como [PULADO], nunca como "limpa".
 
 LIMITES IMPORTANTES
 - Bandit e pip-audit analisam codigo e bibliotecas; alertas precisam de

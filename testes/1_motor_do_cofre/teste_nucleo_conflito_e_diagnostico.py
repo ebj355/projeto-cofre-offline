@@ -6,7 +6,7 @@
 Roda no Linux e no Windows."""
 import os, sys, base64, tempfile
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ferramentas_dos_testes"))
+sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)
 import openpyxl, cofre_senhas as c
 f = []

@@ -9,7 +9,7 @@ janelas modais, tela de integridade e aviso do pendrive. Roda no Linux com xvfb-
  G) aviso 'Salvando… não retire o pendrive' só em unidade removível (e nunca derruba a gravação)."""
 import os, re, sys, tempfile, time, shutil
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ferramentas_dos_testes"))
+sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)          # grava resultados/resultado_gui_resiliencia_uso.txt
 import tkinter as tk, cofre_senhas as c
 from tkinter import messagebox

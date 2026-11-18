@@ -51,7 +51,7 @@ Gerenciador de senhas **100% local** para Windows. É um único programa, sem nu
 
 **Telas limpas:** a tela de desbloqueio mostra só o título, os campos, o botão e o selo de tentativas restantes; textos longos ficam atrás do botão **?**. Operações pesadas (derivação Argon2id, abrir, criar e salvar) rodam em **threads separadas** e a janela continua respondendo; trocar de tela monta a nova antes de apagar a antiga (sem piscar).
 
-Na tela de criação, o texto é curto: os detalhes ficam atrás do botão **?** (abre uma janelinha). Na tela de desbloqueio só aparecem a senha e o botão; o botão **Avançado ▾** mostra o estado da proteção.
+Na tela de criação, as escolhas aparecem em três etapas: senha mestra, modo de abertura e proteção contra tentativas. Cada modo explica o que será exigido e o resumo do próximo passo informa quando a chave de acesso será mostrada uma única vez. Os detalhes técnicos ficam atrás do botão **?**. Na tela de desbloqueio só aparecem a senha e o botão; o botão **Avançado ▾** mostra o estado da proteção.
 
 A **chave FIDO** soma um fator a mais em qualquer um dos modos (pode ser marcada já na criação):
 
@@ -449,7 +449,7 @@ Para o cofre de verdade (ou para distribuir), use sempre `1 - INSTALAR O COFRE -
 - **Arquivo de dados:** continua `cofre.dat` (nome neutro configurável não foi implementado; o conteúdo é só ruído cifrado). Os arquivos de apoio ficam ocultos/protegidos (5.4).
 - **Chave de acesso fora do computador:** salve o `.key` num pendrive separado (ou YubiKey/FIDO): a pasta do computador não guarda o segundo fator.
 - **Iniciar a compilação:** dê dois cliques em **`1 - INSTALAR O COFRE - compila e instala.bat`** (aceita a letra do pendrive: `1 - INSTALAR O COFRE - compila e instala.bat H`). Ele confere a pasta, avisa *Modo OFFLINE/ONLINE* pelos `pacotes\`, mostra o SHA-256 do `cofre_senhas.py`, grava o registro em `logs_compilacao\compilar-AAAAMMDD-HHMMSS.log` e chama o instalador, que pergunta **portátil × no computador** antes de tudo. **Não testado em Windows real.**
-- **Pacotes offline:** a pasta `pacotes\` do projeto já traz as bibliotecas, o Nuitka e o Zig (Windows x64, Python 3.13), cada um com hash em `SHA256.txt`. Com ela cheia o instalador avisa *Modo OFFLINE* e **não baixa nada** (só o Python 3.13 precisa estar instalado). Em ARM64, apague a pasta para o instalador baixar o pacote certo. `3 - BAIXAR PACOTES - so para instalar sem internet.bat` atualiza a pasta.
+- **Pacotes offline:** rode `3 - BAIXAR PACOTES - so para instalar sem internet.bat` com internet uma vez. Ele prepara `pacotes\` com as bibliotecas, Nuitka, Zig, instalador do Python 3.13, ferramentas listadas em `requirements-test.txt`, Pester e instalador do Nmap; atualiza `SHA256.txt` e verifica hashes/assinaturas conhecidos. Copie a pasta inteira do projeto para o computador offline. O instalador usa o Python empacotado se nenhum compatível estiver instalado; para executar testes, instale o Python de `pacotes\` se necessário. Os binários não são versionados pelo Git, então uma clonagem nova precisa receber a pasta `pacotes\` preparada.
 - **Por que a compilação demora:** não é o PowerShell. O tempo vai para a compilação em C do Nuitka e para a escrita lenta do pendrive (FAT32). As opções já estão otimizadas (sem compressão, `--lto=no`, `--jobs` pela memória). Um instalador em `.exe` não aceleraria a compilação e esconderia o que roda; por isso o instalador continua legível em PowerShell.
 
 ### 5.4 Onde ficam os dados
@@ -509,11 +509,13 @@ CofreSenhas-Instalador/  (= cofre-de-senhas/ no GitHub)
 │   --- o que o usuário final realmente precisa (ver 5. e 7.) ---
 ├── LEIA PRIMEIRO - mapa do projeto.md     # para que serve cada pasta e cada arquivo (comece por aqui)
 ├── 1 - INSTALAR O COFRE - compila e instala.bat    # ÚNICO instalador: dois cliques (confere, registra e chama o instalar_cofre.ps1)
-├── 2 - TESTAR TUDO - roda todos os testes.bat      # roda as 5 baterias de teste no Windows e junta os resultados
+├── 2 - TESTAR TUDO - roda todos os testes.bat      # roda as 6 baterias de teste no Windows e junta os resultados
 ├── 3 - BAIXAR PACOTES - so para instalar sem internet.bat   # baixa (com hash conferido) as bibliotecas para pacotes\
 ├── cofre_senhas.py          # o programa inteiro (um arquivo, fácil de auditar e conferir pelo SHA-256)
 ├── instalar_cofre.ps1       # instalador (pergunta onde instalar, Python, bibliotecas com hash, compilação)
-├── requirements.txt         # versões e hashes exatos de cada biblioteca e do compilador
+├── requirements.txt         # dependencias de runtime e compilacao
+├── requirements-test.txt    # runtime + ferramentas de teste com versoes fixas
+├── baixar_pacotes_offline.ps1 # prepara o wheelhouse completo para testes e instalacao
 ├── .gitignore
 │
 ├── docs/                    # MANUAL_COMPLETO.md (este), MODELO_DE_AMEACAS.md, HISTORICO_* (relatório de 13/11, lista de mudanças, SHA-256 do programa)
@@ -522,7 +524,7 @@ CofreSenhas-Instalador/  (= cofre-de-senhas/ no GitHub)
 ├── logs_de_compilacao/      # um log por compilação feita pelo "1 - INSTALAR O COFRE" (ficam de fora do git)
 ├── testes/                  # COMO_RODAR_OS_TESTES.md, PLANO_DE_TESTES.md e as pastas:
 │                            #   1_motor_do_cofre/ (sem tela), 2_telas_e_botoes/ (Tk), 3_ataques_simulados/ (pentest),
-│                            #   4_so_no_windows/ (instalador/ACL no Windows real), ferramentas_dos_testes/ (executores),
+│                            #   4_so_no_windows/ (instalador/ACL no Windows real), 5_ferramentas_externas/, 6_ferramentas_dos_testes/,
 │                            #   resultados/ (TUDO que os testes geram: resultado de cada teste, resumo, log de depuração)
 └── ferramentas_windows_opcionais/  # scripts OPCIONAIS que cuidam do seu PC (não do cofre): verificar/aplicar/desfazer segurança e procurar rootkit
 ```
@@ -545,10 +547,10 @@ O programa é **um único arquivo** de propósito: é mais fácil de auditar, de
 ## 9. Testes automáticos
 
 ```powershell
-python testes\ferramentas_dos_testes\rodar_todos.py            # tudo (núcleo + interface)
-python testes\ferramentas_dos_testes\rodar_todos.py --rapido   # só o núcleo, sem janelas
-python testes\ferramentas_dos_testes\rodar_todos.py --so gui   # só a interface
-python testes\ferramentas_dos_testes\rodar_todos.py --filtro fido
+python testes\6_ferramentas_dos_testes\rodar_todos.py            # tudo (núcleo + interface)
+python testes\6_ferramentas_dos_testes\rodar_todos.py --rapido   # só o núcleo, sem janelas
+python testes\6_ferramentas_dos_testes\rodar_todos.py --so gui   # só a interface
+python testes\6_ferramentas_dos_testes\rodar_todos.py --filtro fido
 ```
 
 **Log de depuração e relatórios (novo):** a cada `2 - TESTAR TUDO - roda todos os testes.bat`, a pasta `testes\resultados\` ganha um `resultado_*.txt` por teste, e ali mesmo ganha o **`log_depuracao.txt`** (ambiente, horário, duração, estado e a **saída completa com tracebacks** de cada teste; recriado do zero a cada rodada). Em `testes\resultados\` ficam também **`resumo_testes.md`** (tabela legível, uma linha por teste), `resumo_testes.json` (para comparar uma rodada com outra) e `resultados.sarif` (só as falhas, formato aceito por ferramentas de revisão). **Cada bateria nova substitui a anterior:** no começo, `limpar_resultados.py` apaga os `resultado_*`, resumos, `.sarif`, logs e cobertura antigos de `testes\resultados\` (e leva documentos que estavam lá para a pasta certa); a pasta só guarda resultados da última rodada. **Respeito ao PC:** os testes rodam em prioridade baixa, esperam haver RAM livre antes de começar algo pesado e fazem uma pausa entre si (a concorrência usa menos processos se a memória estiver curta). No fim, `limpar_artefatos_testes.py` apaga sobras de testes interrompidos em `%TEMP%` (grava `limpeza_artefatos.txt`). Tudo isso é conveniência: se falhar, o resultado das baterias não muda.
@@ -561,9 +563,9 @@ No Windows, cada bateria tem sua própria pasta e seu próprio `.bat`, e **todo*
 - Para rodar a bateria de **interface** (os ~35 `2_telas_e_botoes\teste_gui_*.py`), dê dois cliques em `testes\2_telas_e_botoes\RODAR ESTA PASTA - testes das telas e botoes.bat` e leia `testes\resultados\resultado_teste_gui_windows.txt` que ele cria (cada janela abre e fecha sozinha por alguns segundos; é automático, não precisa clicar em nada).
 - Para rodar a bateria de **pentest** (injeção, força bruta/spraying, DoS, vazamento de memória, engenharia reversa, fuzzing adversarial, SAST, dependências, canal lateral de tempo, exfiltração pela rede, link simbólico — veja `testes\3_ataques_simulados\` e o relatório `testes\resultados\relatorio_pentest.md`), dê dois cliques em `testes\3_ataques_simulados\RODAR ESTA PASTA - testes de ataque simulado.bat` e leia `testes\resultados\resultado_pentest_windows.txt`.
 
-Para rodar as **cinco de uma vez só** (sem precisar abrir cada `.bat` manualmente), dê dois cliques em `testes\ferramentas_dos_testes\rodar_todos_windows.bat` (ou `rodar_todos_windows.bat H` para incluir o pendrive H: no teste nativo) — ele chama as cinco, nessa ordem, em sequência, sem parar para pedir tecla entre elas, e no final junta os cinco resultados num só arquivo, em `testes\resultados\resultado_rodar_todos_windows.txt` (não precisa entrar em `testes\ferramentas_dos_testes\`, `testes\1_motor_do_cofre\`, `testes\4_so_no_windows\`, `testes\2_telas_e_botoes\` nem `testes\3_ataques_simulados\` para ver o que aconteceu; leva uns 20-30 min ao todo).
+Para rodar as **seis baterias de uma vez só** (sem precisar abrir cada `.bat` manualmente), dê dois cliques em `testes\6_ferramentas_dos_testes\rodar_todos_windows.bat` (ou `rodar_todos_windows.bat H` para incluir o pendrive H: no teste nativo) — ele chama núcleo, instalador, teste nativo, interface, pentest e ferramentas externas, nessa ordem. Cada resultado e relatório fica diretamente em `testes\resultados\`, sem subpastas por rodada; o arquivo conjunto é `resultado_rodar_todos_windows.txt`.
 
-O teste do Windows cria um ambiente Python **temporário** ao lado de cada `.bat` (apagado no fim, precisa de internet), prefere o Python 3.13 (o mesmo do instalador), roda em UTF-8 e **sem** o modo `-X dev` (uma sonda separada, dentro de `A - testar o instalador.bat`, mostra se o modo dev do Python do PC trava sozinho, sem o cofre). Na primeira rodada real ele achou um erro de sintaxe no instalador (`$cache:` dentro de texto) e o defeito das fontes, ambos corrigidos.
+Os testes Windows criam ambientes Python **temporários** ao lado dos executores e os instalam somente do wheelhouse local (`--no-index`); a bateria de ferramentas externas mantém um ambiente local dentro de `testes\`. Rode a etapa 3 para preparar os pacotes e instale o Python do projeto se necessário. Os testes rodam em UTF-8 e **sem** o modo `-X dev` (uma sonda separada, dentro de `A - testar o instalador.bat`, mostra se o modo dev do Python do PC trava sozinho, sem o cofre). O `pip-audit` é empacotado, mas sua consulta é pulada offline por depender de dados de vulnerabilidade atuais; Nmap requer instalação manual do pacote local.
 
 Cada teste trabalha numa **pasta temporária** e termina com `TODOS OK`. O código de saída é 0 em caso de sucesso e 1 em caso de falha, o que permite usar os testes em integração contínua.
 
@@ -585,7 +587,7 @@ Os `teste_*.py` do núcleo (sem janela) listados abaixo ficam todos dentro de `t
 | `4_so_no_windows/instalador.Tests.ps1` | Pester: funções auxiliares do instalador (hash digitado, arquitetura, sistema de arquivos, espaço, certificado, log) |
 | `teste_checksum_v5.py` | Danos de mídia (setor zerado ou 0xFF, cabeçalho apagado, arquivo cortado, lixo ou zeros no fim, arquivo vazio, setores trocados): o programa recusa abrir, **não gasta tentativa, não apaga nada, deixa o arquivo como estava** e a cópia `.bak1` restaura os itens |
 | `teste_modo_consulta.py` | Pendrive protegido (toda escrita bloqueada): a abertura normal falha sem gastar tentativa; o modo consulta abre, lê e não grava nada (arquivo idêntico, nenhum arquivo criado); salvar é recusado e desfeito; senha errada nunca destrói nesse modo |
-| `test_pytest.py` | Ponte para o **pytest**: cada `teste_*.py` vira um caso (`pip install pytest`, depois `pytest testes/ferramentas_dos_testes/test_pytest.py -v`; `-k trava` escolhe um). A interface usa `xvfb-run` no Linux |
+| `test_pytest.py` | Ponte opcional para o **pytest**: cada `teste_*.py` vira um caso (`pip install pytest`, depois `pytest testes/6_ferramentas_dos_testes/test_pytest.py -v`; `-k trava` escolhe um). A interface usa `xvfb-run` no Linux |
 | `teste_queda_pontos_exatos.py` | Derruba o processo (`os._exit`) em cada `fsync` e em cada `os.replace` da gravação (antes e depois, rotação das cópias incluída): o cofre e as cópias sempre abrem com tudo que estava confirmado, e a gravação seguinte funciona |
 | `teste_fuzz_cabecalho.py` | Troca cada byte do cabeçalho e da seção FIDO (preenchida): sempre `ArquivoCorrompido`/`ArquivoInvalido`, nunca gasta tentativa nem altera o arquivo |
 | `teste_host_e_politica.py` | Pasta temporária privada (TEMP/TMP/tempfile apontam para `.tmp_cofre`, some ao sair, resto de queda apagado, atalho e pendrive protegido não mudam nada, nada fora da pasta é tocado) e política opcional "exigir NTFS" (variável de ambiente e arquivo marcador) |
@@ -647,7 +649,7 @@ Os `teste_*.py` do núcleo (sem janela) listados abaixo ficam todos dentro de `t
 | `2_telas_e_botoes/teste_gui_resiliencia_uso.py` | Salvar clicado 15x (1 item só), texto gigante/emoji/RTL/controle, perda de foco (aviso curto não cobre, prolongado cobre, clique restaura, texto digitado fica), 30 ciclos sem vazar widgets/descritores/GDI, janelas de senha fecham, tela de integridade, aviso "não retire o pendrive" |
 | `1_motor_do_cofre/teste_nucleo_soak_longa_duracao.py` | **Soak (longa duração) do núcleo:** 1.000 ciclos seguidos de abrir → alterar → salvar → fechar (com consulta e troca de senha de vez em quando; Argon2id barato só no teste). Descritores/handles, threads, instâncias de `Cofre` vivas e memória do Python não crescem; sem `.tmp`, no máx. 5 cópias, arquivo do mesmo tamanho; o cofre abre no fim. Padrão 1.000 (`COFRE_SOAK_CICLOS`); ~13 s |
 | `2_telas_e_botoes/teste_gui_soak_longa_duracao.py` | **Soak da interface:** ciclos seguidos de desbloquear → tela principal → (formulário a cada 20, salvar a cada 50) → bloquear: widgets, descritores, objetos GDI/USER (Windows), threads, `Cofre` vivos e memória. Padrão 60 ciclos (~3 s cada, a interface é desenhada em Python puro); `COFRE_SOAK_CICLOS=1000` para a corrida longa (~50 min). **Observação:** a memória do Python sobe ~12 KiB por ciclo na interface (limitado e pequeno; o teste só falha acima de 2 MiB no total) |
-| `ferramentas_dos_testes/cobertura_codigo.py` (+ `cobertura_codigo_windows.bat`) | **Cobertura de código** (coverage.py, com ramificações): roda núcleo e pentest sob `coverage` e grava `cobertura_codigo.txt` (total e faixas de `cofre_senhas.py` SEM teste, destacando `except`/`raise`), `cobertura_codigo.json` e `cobertura_html/index.html`. Fora do Testar_Tudo (lento; é análise, não teste). `--gui` inclui a interface; `--minimo N` falha abaixo de N% |
+| `6_ferramentas_dos_testes/cobertura_codigo.py` (+ `cobertura_codigo_windows.bat`) | **Cobertura de código** (coverage.py, com ramificações): roda núcleo e pentest sob `coverage` e grava `cobertura_codigo.txt`, `cobertura_codigo.json` e `cobertura_html.zip` diretamente em `testes\resultados\`. Fora do Testar_Tudo (lento; é análise, não teste). `--gui` inclui a interface; `--minimo N` falha abaixo de N% |
 
 ---
 
@@ -737,7 +739,7 @@ Cada camada é **independente**: perder uma não abre o cofre (exceto o código 
 
 **Instalação:** pergunta **Portátil × No computador** antes de tudo; **ACL NTFS** no modo computador; nenhum atalho criado; **pacotes offline** (`pacotes\`) sem download antes de compilar; aviso de FAT32/exFAT e BitLocker; cache de compilação.
 
-**Qualidade:** a senha mínima (14 caracteres) agora também é exigida no núcleo (`Cofre.criar` e `trocar_senha`), não só na tela; análise estática (bandit) e de dependências (pip-audit) sem achados médios/altos; suíte de testes ampliada (`teste_ocultar_apoio`, `teste_pc_autorizado`, `teste_pc_segredo_local`, GUI de computadores e de impressão); MODELO_DE_AMEACAS com adendos 5 a 9.
+**Qualidade:** a senha mínima (14 caracteres) também é exigida no núcleo (`Cofre.criar` e `trocar_senha`); análise estática (Bandit/Flake8) empacotada no wheelhouse. O `pip-audit` só verifica vulnerabilidades ao consultar a base atual pela internet e, por isso, é registrado como `PULADO` no fluxo offline; resultados de rodadas online anteriores não significam que a base esteja atualizada hoje.
 
 **Não verificado em Windows real:** atributos de arquivo, ACL (`icacls`), DPAPI, leitura do SMBIOS, instalador em PowerShell, ganho de desempenho da interface, chave FIDO2 (PRF).
 

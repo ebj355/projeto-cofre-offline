@@ -12,7 +12,7 @@ Roda no Linux e no Windows (Python). Usa o nível 'alto' do Argon2 (256 MiB por 
 import os, sys, time, subprocess, tempfile, textwrap, importlib.util
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "ferramentas_dos_testes"))
+sys.path.insert(0, os.path.join(AQUI, "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)          # grava resultados/resultado_nucleo_concorrencia_multiprocessos.txt
 
 CAMINHO_PROG = os.path.abspath(os.path.join(AQUI, "..", "..", "cofre_senhas.py"))

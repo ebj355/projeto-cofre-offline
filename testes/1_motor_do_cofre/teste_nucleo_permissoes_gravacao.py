@@ -5,7 +5,7 @@ intacto. Parte 1 SIMULA a negação (vale mesmo rodando como administrador/root)
 quando ela é aplicável (pula, dizendo, se o teste roda como root, que ignora permissões). Linux e Windows."""
 import os, sys, stat, errno, hashlib, subprocess
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ferramentas_dos_testes"))
+sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)
 import cofre_senhas as c
 f = []

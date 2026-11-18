@@ -7,7 +7,7 @@ A cada ciclo: abre o cofre, mostra a tela principal e bloqueia; a cada 20 abre e
 Argon2id fica barato SÓ aqui (o que se mede é o gerenciamento de recursos). Ciclos: variável COFRE_SOAK_CICLOS. O soak de 1.000 ciclos do núcleo (sem janelas) roda no teste_nucleo_soak_longa_duracao."""
 import gc, os, sys, threading, time, tracemalloc
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ferramentas_dos_testes"))
+sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)          # grava resultados/resultado_gui_soak_longa_duracao.txt
 import tkinter as tk, cofre_senhas as c
 from tkinter import messagebox

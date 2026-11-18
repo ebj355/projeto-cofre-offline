@@ -5,7 +5,7 @@
 #   2. instala o Python 3.13 se não houver (winget ou python.org, com assinatura e SHA-256 conferidos)
 #   3. instala as bibliotecas em versões FIXAS e com hash (pip --require-hashes)
 #   4. compila o CofreSenhas.exe (código nativo) DENTRO DO PENDRIVE, a partir de uma pasta limpa
-#   5. deixa o .exe em <pendrive>:\CofreSenhas, grava o SHA-256 dele e mostra na tela
+#   5. deixa o .exe diretamente na raiz do pendrive (<pendrive>:\), grava o SHA-256 dele e mostra na tela
 #  O instalador PERGUNTA onde instalar: (1) pendrive/disco externo, recomendado, ou (2) uma pasta no computador.
 #  Em qualquer dos dois a compilação roda DENTRO do destino escolhido (e não em %LOCALAPPDATA%): nada do cofre,
 #  nem restos de compilação, vai parar em outro lugar. No pendrive ela é mais lenta (veja os tempos).
@@ -340,7 +340,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
         Write-Host "   =================================================================" -ForegroundColor Red
         Write-Host ""
     }
-    $destino = if ($modoPc) { $pastaPc } else { "$($letra):\CofreSenhas" }
+    $destino = if ($modoPc) { $pastaPc } else { "$($letra):\" }
     $raizObra = if ($modoPc) { $pastaPc } else { "$($letra):" }
     # Compilação dentro do pendrive, numa pasta de nome CURTO na raiz: o compilador C tem arquivos de nome
     # muito comprido, e caminhos longos passam do limite de 260 caracteres do Windows.
@@ -391,7 +391,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
     $env:TEMP = $tmp; $env:TMP = $tmp
     try { Start-Transcript -Path $log -Force | Out-Null } catch {}
-    Ok "o cofre vai ficar em $destino"
+    Ok "o cofre vai ficar diretamente em $destino"
 
     # Já existe um cofre neste destino? Pergunta se MANTÉM (padrão) ou APAGA TUDO para recomeçar do zero.
     # Apagar exige digitar a palavra APAGAR; qualquer outra resposta mantém o cofre. Nada é apagado sem isso.
@@ -600,45 +600,60 @@ function Instalar-Cofre([string]$LetraPedida = '') {
 
     $python = Achar-Preferido
     if (-not $python) {
-        Info "Python 3.13 não encontrado. Instalando (pode aparecer um pedido de permissão do Windows)..."
-        $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-        if ($winget) {
-            # Tempo limite de 5 min: o winget pode ficar esperando uma janela de permissão (UAC) escondida atrás desta
-            Info "Se aparecer (ou piscar na barra de tarefas) um pedido de permissão do Windows, aceite. Esperando até 5 minutos..."
-            try {
-                $pw = Start-Process -FilePath $winget.Source -ArgumentList 'install', '-e', '--id', 'Python.Python.3.13', '--scope', 'user', '--silent', '--accept-package-agreements', '--accept-source-agreements' -PassThru -NoNewWindow
-                if (-not $pw.WaitForExit(300000)) {
-                    try { $pw.Kill() } catch {}
-                    Info "O winget não terminou em 5 minutos (provável janela de permissão escondida). Seguindo para o download direto."
-                }
-            } catch { Info "winget indisponível: $($_.Exception.Message)" }
-        }
-        $python = Achar-Preferido
-        if (-not $python) {
-            Info "Baixando o instalador oficial em python.org..."
-            # 3.13.17: última versão 3.13 com instalador para Windows (as seguintes só têm código-fonte)
-            $sufixo = if ($hostArm) { 'arm64' } else { 'amd64' }
-            $url = "https://www.python.org/ftp/python/3.13.17/python-3.13.17-$sufixo.exe"
-            $shaPython = if ($hostArm) { '3089a1977c32b26f5078e5a7d0285b7a861b8c96250c5dac3b6af59fbe9e9a75' } else { '5da012101ba2e17113a9a1cd901e9ce1441086f2b7ecb5de06ec94163899a190' }
-            $inst = Join-Path $base "python-3.13.17-$sufixo.exe"
-            $baixou = $false
-            for ($t = 1; $t -le 3 -and -not $baixou; $t++) {
-                try { Invoke-WebRequest -Uri $url -OutFile $inst -UseBasicParsing -TimeoutSec 300; $baixou = $true }
-                catch { Info "Download do Python falhou (tentativa $t de 3): $($_.Exception.Message)"; if ($t -lt 3) { Start-Sleep -Seconds (5 * $t) } }
-            }
-            if (-not $baixou) { Erro "Não consegui baixar o Python depois de 3 tentativas. Verifique a internet e rode de novo."; return }
-            $shaBaixado = (Get-FileHash -LiteralPath $inst -Algorithm SHA256).Hash
-            $sig = Get-AuthenticodeSignature -LiteralPath $inst
-            if ($shaBaixado -ne $shaPython.ToUpper() -or $sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
-                Remove-Item $inst -Force -ErrorAction SilentlyContinue
-                Erro "O instalador baixado NÃO confere (SHA-256 ou assinatura da Python Software Foundation). Instalação cancelada por segurança."
+        $sufixo = if ($hostArm) { 'arm64' } else { 'amd64' }
+        $shaPython = if ($hostArm) { '3089a1977c32b26f5078e5a7d0285b7a861b8c96250c5dac3b6af59fbe9e9a75' } else { '5da012101ba2e17113a9a1cd901e9ce1441086f2b7ecb5de06ec94163899a190' }
+        $instLocal = Join-Path (Join-Path $pasta 'pacotes') "python-3.13.17-$sufixo.exe"
+        if (Test-Path -LiteralPath $instLocal) {
+            $shaLocal = (Get-FileHash -LiteralPath $instLocal -Algorithm SHA256).Hash
+            $sigLocal = Get-AuthenticodeSignature -LiteralPath $instLocal
+            if ($shaLocal -ne $shaPython.ToUpper() -or $sigLocal.Status -ne 'Valid' -or $sigLocal.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+                Erro "O instalador local do Python NÃO confere (SHA-256 ou assinatura). Instalação cancelada por segurança."
                 return
             }
-            Ok "instalador do Python: SHA-256 e assinatura oficial verificados"
-            $pi = Start-Process -FilePath $inst -ArgumentList '/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_tcltk=1', 'Include_launcher=1', 'Include_pip=1', 'Include_test=0' -PassThru
+            Info "Python ausente; usando o instalador verificado de pacotes (modo offline)..."
+            $pi = Start-Process -FilePath $instLocal -ArgumentList '/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_tcltk=1', 'Include_launcher=1', 'Include_pip=1', 'Include_test=0' -PassThru
             if (-not $pi.WaitForExit(600000)) { try { $pi.Kill() } catch {}; Info "A instalação do Python passou de 10 minutos e foi interrompida." }
-            Remove-Item $inst -Force -ErrorAction SilentlyContinue
             $python = Achar-Preferido
+        }
+        if (-not $python) {
+            Info "Python 3.13 não encontrado. Instalando (pode aparecer um pedido de permissão do Windows)..."
+            $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+            if ($winget) {
+                # Tempo limite de 5 min: o winget pode ficar esperando uma janela de permissão (UAC) escondida atrás desta
+                Info "Se aparecer (ou piscar na barra de tarefas) um pedido de permissão do Windows, aceite. Esperando até 5 minutos..."
+                try {
+                    $pw = Start-Process -FilePath $winget.Source -ArgumentList 'install', '-e', '--id', 'Python.Python.3.13', '--scope', 'user', '--silent', '--accept-package-agreements', '--accept-source-agreements' -PassThru -NoNewWindow
+                    if (-not $pw.WaitForExit(300000)) {
+                        try { $pw.Kill() } catch {}
+                        Info "O winget não terminou em 5 minutos (provável janela de permissão escondida). Seguindo para o download direto."
+                    }
+                } catch { Info "winget indisponível: $($_.Exception.Message)" }
+            }
+            $python = Achar-Preferido
+            if (-not $python) {
+                Info "Baixando o instalador oficial em python.org..."
+                # 3.13.17: última versão 3.13 com instalador para Windows (as seguintes só têm código-fonte)
+                $url = "https://www.python.org/ftp/python/3.13.17/python-3.13.17-$sufixo.exe"
+                $inst = Join-Path $base "python-3.13.17-$sufixo.exe"
+                $baixou = $false
+                for ($t = 1; $t -le 3 -and -not $baixou; $t++) {
+                    try { Invoke-WebRequest -Uri $url -OutFile $inst -UseBasicParsing -TimeoutSec 300; $baixou = $true }
+                    catch { Info "Download do Python falhou (tentativa $t de 3): $($_.Exception.Message)"; if ($t -lt 3) { Start-Sleep -Seconds (5 * $t) } }
+                }
+                if (-not $baixou) { Erro "Não consegui baixar o Python depois de 3 tentativas. Verifique a internet e rode de novo."; return }
+                $shaBaixado = (Get-FileHash -LiteralPath $inst -Algorithm SHA256).Hash
+                $sig = Get-AuthenticodeSignature -LiteralPath $inst
+                if ($shaBaixado -ne $shaPython.ToUpper() -or $sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+                    Remove-Item $inst -Force -ErrorAction SilentlyContinue
+                    Erro "O instalador baixado NÃO confere (SHA-256 ou assinatura da Python Software Foundation). Instalação cancelada por segurança."
+                    return
+                }
+                Ok "instalador do Python: SHA-256 e assinatura oficial verificados"
+                $pi = Start-Process -FilePath $inst -ArgumentList '/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_tcltk=1', 'Include_launcher=1', 'Include_pip=1', 'Include_test=0' -PassThru
+                if (-not $pi.WaitForExit(600000)) { try { $pi.Kill() } catch {}; Info "A instalação do Python passou de 10 minutos e foi interrompida." }
+                Remove-Item $inst -Force -ErrorAction SilentlyContinue
+                $python = Achar-Preferido
+            }
         }
         if (-not $python) {
             Erro "Não foi possível instalar o Python automaticamente. Instale pelo site python.org (marque 'Add python.exe to PATH') e rode este instalador de novo."

@@ -2,7 +2,7 @@
 
 **Para que serve esta pasta:** Provam o motor do cofre: criptografia, arquivo, backups, tentativas, importação, falhas de disco. Rodam no Linux e no Windows, rápidos, sem tela. Cada `teste_*.py` é independente.
 
-_Gerado por `testes/ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
+_Gerado por `testes/6_ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
 
 | Arquivo | Para que serve |
 |---|---|

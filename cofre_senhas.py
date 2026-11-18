@@ -1006,11 +1006,14 @@ def _zerar(buf):
             buf[i] = 0
 
 
-def zerar_objeto(o):
+def zerar_objeto(o, permitir_compartilhado=False):
     """Melhor esforço (só CPython): sobrescreve com zeros o conteúdo de um `bytes` ou de um `str` ASCII, que o
-    Python normalmente não deixa apagar. Ignora objetos de 0 ou 1 caractere (o Python os compartilha).
-    Só use em dados que ninguém mais vai usar: o objeto fica ILEGÍVEL."""
+    Python normalmente não deixa apagar. Ignora objetos de 0 ou 1 caractere (o Python os compartilha) e, por padrão,
+    também não toca em objetos compartilhados. `permitir_compartilhado` é reservado à limpeza de segredos ao fechar
+    o cofre: os aliases passam a ver zeros."""
     try:
+        if sys.implementation.name != "cpython" or sys.flags.dev_mode or "debug" in os.environ.get("PYTHONMALLOC", "").lower():
+            return False
         t = type(o)
         if t is bytes:
             n = len(o)
@@ -1020,10 +1023,12 @@ def zerar_objeto(o):
             return False
         if n < 2:
             return False
-        if t is str and getattr(sys, "_is_interned", lambda _x: False)(o):
-            return False                    # texto internado é compartilhado pelo programa inteiro: nunca mexer
-        if sys.getrefcount(o) > 1_000_000:
-            return False                    # objeto imortal (3.12+): idem
+        if t is str:
+            is_interned = getattr(sys, "_is_interned", None)
+            if is_interned is None or is_interned(o):
+                return False                # sem a API de detecção, não arriscar alterar texto compartilhado
+        if not permitir_compartilhado and sys.getrefcount(o) > 4:
+            return False                    # não sobrescrever objetos compartilhados
         import ctypes as _ct
         _ct.memset(id(o) + sys.getsizeof(o) - n - 1, 0, n)
         return True
@@ -1125,6 +1130,7 @@ def _gravar_atomico(caminho, dados):
     escrever), o link é removido primeiro e a escrita nunca passa por ele - sem isso, a gravação seguiria o link
     e sobrescreveria o arquivo de destino do link em vez de criar o cofre, e o cofre final acabaria sendo, ele
     mesmo, um link para esse outro lugar (achado real de pentest, corrigido aqui)."""
+    _limpar_temporarios_interrompidos(caminho)
     tmp = "%s.%d.tmp" % (caminho, os.getpid())     # um temporário POR PROCESSO: dois processos nunca trocam o .tmp um do outro
     esperado = hashlib.sha256(dados).digest()
     try:
@@ -1158,6 +1164,36 @@ def _gravar_atomico(caminho, dados):
         novo.errno = ex.errno
         novo.protegido = _e_protecao_de_escrita(ex)      # pasta/arquivo somente leitura: a tela oferece o MODO CONSULTA
         raise novo from ex
+
+
+def _limpar_temporarios_interrompidos(caminho):
+    """Apaga temporários de gravação apenas quando o processo que os criou já terminou."""
+    prefixo = caminho + "."
+    for temporario in glob.glob(glob.escape(caminho) + ".*.tmp"):
+        nome = temporario[len(prefixo):-4]
+        if not nome.isdecimal() or len(nome) > 10:
+            continue
+        pid = int(nome)
+        if pid <= 0:
+            continue
+        try:
+            os.kill(pid, 0)
+        except PermissionError:
+            continue
+        except OverflowError:
+            continue
+        except OSError as ex:
+            if ex.errno != errno.ESRCH and getattr(ex, "winerror", None) != 87:
+                diag_registrar(DIAG_GRAVACAO, ex)
+                continue
+        else:
+            continue
+        try:
+            os.remove(temporario)
+        except FileNotFoundError:
+            pass
+        except OSError as ex:
+            diag_registrar(DIAG_GRAVACAO, ex)
 
 
 # ----------------------------------------------------------------------------
@@ -3138,6 +3174,7 @@ class Cofre:
         resultante recusa qualquer salvamento.
         Se o cofre exigir FIDO: 'fido' é uma função (lista_de_credenciais, salt) -> (credencial, saída)
         que toca a chave física; ou então 'recuperacao' é o código de recuperação em texto."""
+        _limpar_temporarios_interrompidos(caminho)
         with open(caminho, "rb") as f:
             bruto = f.read(LIMITE_COFRE + 1)
         if len(bruto) > LIMITE_COFRE:
@@ -3714,13 +3751,13 @@ class Cofre:
         (melhor esforço, só CPython) as chaves e os textos dos itens, para não sobrarem na RAM do processo."""
         with _TRAVA_SALVAR:
             for k in ("dek", "_ks", "_kb", "_F", "_G", "_vkey", "chave_gerada"):
-                zerar_objeto(getattr(self, k, None))
+                zerar_objeto(getattr(self, k, None), permitir_compartilhado=True)
             for m in (self._vmacs or []):
-                zerar_objeto(m)
+                zerar_objeto(m, permitir_compartilhado=True)
             for r in (self.registros or []):
                 if isinstance(r, dict):
                     for v in r.values():
-                        zerar_objeto(v)
+                        zerar_objeto(v, permitir_compartilhado=True)
             self.dek = None
             self._vkey = self._vmacs = None
             self._ks = None
@@ -7632,28 +7669,30 @@ class App:
         ttk.Label(topo, image=self._img_marca, style="C.TLabel").pack(side="left", padx=(0, 16))
         tt = ttk.Frame(topo, style="C.TFrame")
         tt.pack(side="left", fill="x")
-        ttk.Label(tt, text="Criar seu cofre", style="C.Titulo.TLabel").pack(anchor="w")
-        lt_ = ttk.Frame(tt, style="C.TFrame")
-        lt_.pack(anchor="w")
-        ttk.Label(lt_, text="Escolha a senha mestra", style="C.Suave.TLabel").pack(side="left")
-        self._ajuda(lt_, "Senha mestra",
+        tit = ttk.Frame(tt, style="C.TFrame")
+        tit.pack(anchor="w")
+        ttk.Label(tit, text="Criar seu cofre", style="C.Titulo.TLabel").pack(side="left")
+        self._ajuda(tit, "Senha mestra",
                     "A senha mestra protege tudo. Ela nunca sai deste computador e não pode ser recuperada: "
                     "se a esquecer, ninguém consegue abrir o cofre.\n\nLocal do cofre:\n"
-                    + os.path.abspath(self.caminho), CORES["fundo"]).pack(side="left", padx=(4, 0))
+                    + os.path.abspath(self.caminho), CORES["fundo"]).pack(side="left", padx=(8, 0))
+        ttk.Label(tt, text="Configure a senha e escolha como você vai abrir o cofre.",
+                  style="C.Suave.TLabel").pack(anchor="w")
         ttk.Separator(f).pack(fill="x", pady=(18, 16))
 
         colunas = ttk.Frame(f, style="C.TFrame")
         colunas.pack(fill="x")
-        esq = ttk.Frame(colunas, style="C.TFrame", width=380)
+        esq = ttk.Frame(colunas, style="Card.TFrame", width=_px(380), padding=(_px(16), _px(14)))
         esq.pack(side="left", fill="y", anchor="n")
-        ttk.Frame(colunas, style="C.TFrame", width=34).pack(side="left")
-        tk.Frame(colunas, bg=C["borda"], width=1).pack(side="left", fill="y")
-        ttk.Frame(colunas, style="C.TFrame", width=30).pack(side="left")
-        dir_ = ttk.Frame(colunas, style="C.TFrame")
+        ttk.Frame(colunas, style="C.TFrame", width=_px(18)).pack(side="left")
+        dir_ = ttk.Frame(colunas, style="Card.TFrame", padding=(_px(16), _px(14)))
         dir_.pack(side="left", fill="both", expand=True, anchor="n")
 
-        # Coluna da senha
-        self._rotulo_campo(esq, f"Senha mestra  (mínimo {MIN_SENHA} caracteres)").pack(anchor="w")
+        ttk.Label(esq, text="1. Defina a senha mestra", style="C.H2.TLabel",
+                  image=imagem_icone(self.root, "cadeado", C["prim_txt"], 16), compound="left").pack(anchor="w")
+        ttk.Label(esq, text="Se esquecer esta senha, não será possível recuperar o cofre.",
+                  style="C.Suave.TLabel", wraplength=_px(340), justify="left").pack(anchor="w", pady=(4, 14))
+        self._rotulo_campo(esq, f"Nova senha  (mínimo {MIN_SENHA} caracteres)").pack(anchor="w")
         l1fr = ttk.Frame(esq, style="C.TFrame")
         l1fr.pack(fill="x", pady=(4, 0))
         l1, s1 = self._linha_secreta(l1fr, 30, "C.")
@@ -7667,20 +7706,33 @@ class App:
         self._dicas_mestra = PainelForca(esq, self, largura=_px(400), pref="C.",
                                          vazio="A análise aparece quando você digitar a senha.")
         self._medidor(esq, s1, dicas_lbl=self._dicas_mestra, pref="C.").pack(anchor="w", pady=(8, 0))
-        self._rotulo_campo(esq, "Confirmar senha").pack(anchor="w", pady=(14, 0))
+        self._rotulo_campo(esq, "Confirme a senha").pack(anchor="w", pady=(14, 0))
         l2, s2 = self._linha_secreta(esq, 30, "C.")
         l2.pack(fill="x", pady=(4, 0))
         confere = ttk.Label(esq, text="", style="C.TLabel")
         confere.pack(anchor="w", pady=(6, 0))
         self._dicas_mestra.pack(fill="x", pady=(10, 0))
 
-        # Coluna das opções
         modo = tk.IntVar(value=MODO_E)
         usar_fido = tk.BooleanVar(value=False)
-        lm = ttk.Frame(dir_, style="C.TFrame")
-        lm.pack(anchor="w", fill="x")
-        self._rotulo_campo(lm, "Como o cofre abre").pack(side="left")
-        self._ajuda(lm, "Como o cofre abre",
+
+        def atualizar_proximo():
+            """Explica o que vai acontecer depois da criação conforme as opções escolhidas."""
+            if modo.get() == MODO_S:
+                texto = "Depois de criar, o cofre abrirá com a senha mestra."
+            elif modo.get() == MODO_E:
+                texto = "Depois de criar, guarde a chave de acesso: ela será mostrada uma única vez."
+            else:
+                texto = "Depois de criar, guarde a chave: ela também poderá abrir o cofre sozinha."
+            if usar_fido.get():
+                texto += " O cadastro da chave física será solicitado."
+            proximo.config(text="PRÓXIMO PASSO  ·  " + texto)
+
+        cab_modo = ttk.Frame(dir_, style="C.TFrame")
+        cab_modo.pack(anchor="w", fill="x")
+        ttk.Label(cab_modo, text="2. Escolha como abrir", style="C.H2.TLabel",
+                  image=imagem_icone(self.root, "chave", C["prim_txt"], 16), compound="left").pack(side="left")
+        self._ajuda(cab_modo, "Como o cofre abre",
                     "• Só senha mestra: a forma mais simples. Quem souber a senha abre.\n\n"
                     "• Senha E chave de acesso (recomendado): dois fatores. A chave aparece uma única vez, "
                     "agora; quem descobrir só a senha, ou só a chave, não abre.\n\n"
@@ -7689,28 +7741,91 @@ class App:
                     "• Chave FIDO (opcional, soma-se a qualquer modo): uma chave física USB/NFC com toque. "
                     "Perdendo a chave, o código de recuperação em papel a substitui. Só passa a valer depois de "
                     "cadastrar a primeira chave (próximo passo).",
-                    CORES["fundo"]).pack(side="left")
-        for valor, titulo in ((MODO_S, "Só senha mestra"),
-                              (MODO_E, "Senha E chave de acesso  (recomendado)"),
-                              (MODO_OU, "Senha OU chave de acesso")):
-            ttk.Radiobutton(dir_, text=titulo, value=valor, variable=modo, style="C.TRadiobutton").pack(
-                anchor="w", pady=(6, 0))
-        ttk.Checkbutton(dir_, text="Exigir também a chave FIDO", variable=usar_fido,
-                        style="C.TCheckbutton").pack(anchor="w", pady=(10, 0))
+                    CORES["fundo"]).pack(side="left", padx=(4, 0))
+        ttk.Label(dir_, text="Escolha uma opção. A descrição mostra o que será exigido para abrir.",
+                  style="C.Suave.TLabel", wraplength=_px(420), justify="left").pack(anchor="w", pady=(4, 2))
 
+        cartoes = {}
+
+        def atualizar_cartoes(variavel):
+            """Destaca com o acento do cofre a opção selecionada em cada grupo."""
+            for valor, cartao in cartoes.get(id(variavel), ()):
+                selecionado = variavel.get() == valor
+                cartao.configure(highlightbackground=C["prim"] if selecionado else C["borda"],
+                                 highlightthickness=_px(2) if selecionado else _px(1))
+
+        def opcao_cartao(pai, variavel, valor, titulo, descricao, comando=None):
+            """Opção de segurança em cartão clicável, com explicação e seleção destacada."""
+            cartao = tk.Frame(pai, bg=C["sup2"], bd=0, cursor="hand2",
+                              highlightbackground=C["borda"], highlightcolor=C["prim"],
+                              highlightthickness=_px(1))
+            cartao.pack(fill="x", pady=(_px(5), 0))
+            corpo = ttk.Frame(cartao, style="Card2.TFrame", padding=(_px(10), _px(6)))
+            corpo.pack(fill="both", expand=True)
+
+            def mudou():
+                """Atualiza o destaque e qualquer resumo dependente da seleção."""
+                atualizar_cartoes(variavel)
+                if comando:
+                    comando()
+
+            radio = ttk.Radiobutton(corpo, text=titulo, value=valor, variable=variavel,
+                                    style="S2.TRadiobutton", command=mudou)
+            radio.pack(anchor="w", fill="x")
+            detalhe = ttk.Label(corpo, text=descricao, style="S2.Suave.TLabel",
+                                wraplength=_px(420), justify="left")
+            detalhe.pack(anchor="w", padx=(_px(28), 0), pady=(_px(1), 0))
+            cartoes.setdefault(id(variavel), []).append((valor, cartao))
+
+            def selecionar(event=None):
+                """Seleciona também ao clicar na área explicativa do cartão."""
+                variavel.set(valor)
+                mudou()
+                return "break"
+
+            cartao.bind("<Button-1>", selecionar, add="+")
+            detalhe.bind("<Button-1>", selecionar, add="+")
+            detalhe.configure(cursor="hand2")
+            atualizar_cartoes(variavel)
+            return cartao
+
+        opcao_cartao(dir_, modo, MODO_S, "Só senha mestra",
+                     "Só a senha abre o cofre. É simples; use uma frase longa e exclusiva.", atualizar_proximo)
+        opcao_cartao(dir_, modo, MODO_E, "Senha E chave de acesso  (recomendado)",
+                     "Exige senha e chave juntos. Guarde a chave em local seguro.", atualizar_proximo)
+        opcao_cartao(dir_, modo, MODO_OU, "Senha OU chave de acesso",
+                     "Qualquer uma abre sozinha. É mais fácil recuperar, mas oferece menos proteção.",
+                     atualizar_proximo)
+
+        fido = ttk.Frame(dir_, style="Card2.TFrame", padding=(_px(10), _px(6)))
+        fido.pack(fill="x", pady=(_px(7), 0))
+        ttk.Checkbutton(fido, text="Exigir também a chave FIDO", variable=usar_fido,
+                        style="S2.TCheckbutton", command=atualizar_proximo).pack(anchor="w")
+        ttk.Label(fido, text="Opcional: chave física USB/NFC compatível; o cadastro será solicitado após criar.",
+                  style="S2.Suave.TLabel", wraplength=_px(420), justify="left").pack(
+                      anchor="w", padx=(_px(28), 0))
+
+        ttk.Separator(dir_).pack(fill="x", pady=(_px(12), _px(10)))
         nivel = tk.StringVar(value=nivel_recomendado())      # PC com pouca RAM livre começa em "Alta" (sem paginação)
-        lb = ttk.Frame(dir_, style="C.TFrame")
-        lb.pack(anchor="w", fill="x", pady=(16, 0))
-        self._rotulo_campo(lb, "Blindagem da senha").pack(side="left")
-        self._ajuda(lb, "Blindagem da senha",
-                    "É o custo, em memória, de cada tentativa de adivinhar a senha.\n\n"
-                    "• Máxima (1 GB): abre em 3 a 8 segundos e torna ataques inviáveis.\n"
-                    "• Alta (256 MB): para computadores com pouca memória livre.").pack(side="left")
-        for valor, titulo, desc in (
-                ("maximo", "Máxima — 1 GB por tentativa", "Abre em 3 a 8 segundos. Torna ataques inviáveis."),
-                ("alto", "Alta — 256 MB por tentativa", "Para computadores com pouca memória.")):
-            ttk.Radiobutton(dir_, text=titulo, value=valor, variable=nivel, style="C.TRadiobutton").pack(
-                anchor="w", pady=(6, 0))
+        cab_nivel = ttk.Frame(dir_, style="C.TFrame")
+        cab_nivel.pack(anchor="w", fill="x")
+        ttk.Label(cab_nivel, text="3. Proteção contra tentativas", style="C.H2.TLabel",
+                  image=imagem_icone(self.root, "escudo", C["ok"], 16), compound="left").pack(side="left")
+        self._ajuda(cab_nivel, "Proteção contra tentativas",
+                    "Define quanta memória cada tentativa de adivinhar a senha pode usar. Mais memória dificulta "
+                    "tentativas automatizadas, mas também exige mais recursos deste computador.\n\n"
+                    "• Máxima (1 GB): escolha se o computador tiver memória livre suficiente.\n"
+                    "• Alta (256 MB): alternativa para computadores com pouca memória livre.",
+                    CORES["fundo"]).pack(side="left", padx=(4, 0))
+        ttk.Label(dir_, text="A opção Alta só é necessária se o computador tiver pouca memória livre.",
+                  style="C.Suave.TLabel", wraplength=_px(420), justify="left").pack(anchor="w", pady=(4, 2))
+        opcao_cartao(dir_, nivel, "maximo", "Máxima — 1 GB por tentativa",
+                     "Maior custo para cada tentativa de adivinhar; requer mais memória.")
+        opcao_cartao(dir_, nivel, "alto", "Alta — 256 MB por tentativa",
+                     "Use se o computador não tiver memória livre para a opção Máxima.")
+        proximo = ttk.Label(dir_, text="", style="C.Suave.TLabel", wraplength=_px(420), justify="left")
+        proximo.pack(anchor="w", pady=(_px(10), 0))
+        atualizar_proximo()
 
         def criar(event=None):
             """Valida os campos da tela e cria o cofre em segundo plano."""
@@ -7777,11 +7892,13 @@ class App:
         ttk.Separator(f).pack(fill="x", pady=(18, 14))
         rod = ttk.Frame(f, style="C.TFrame")
         rod.pack(fill="x")
-        prot = ttk.Frame(rod, style="C.TFrame")
+        prot = ttk.Frame(rod, style="Card2.TFrame", padding=(_px(12), _px(8)))
         prot.pack(side="left", fill="x", expand=True)
-        self._rotulo_protecao(prot)
+        ttk.Label(prot, text="PROTEÇÕES DESTE COMPUTADOR", style="S2.Campo.TLabel").pack(anchor="w")
+        self._rotulo_protecao(prot, "S2.")
         ttk.Button(rod, text="Criar cofre", style="C.Primario.TButton", command=criar,
-                   image=imagem_icone(self.root, "seta", "#ffffff"), compound="right").pack(side="right")
+                   image=imagem_icone(self.root, "seta", "#ffffff"), compound="right").pack(
+                       side="right", padx=(12, 0), anchor="n")
         s1.focus_set()
 
     @sem_piscar

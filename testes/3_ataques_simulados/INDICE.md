@@ -2,7 +2,7 @@
 
 **Para que serve esta pasta:** Tentam ATACAR o cofre (injeção, força bruta, DoS, vazamento de memória, engenharia reversa, rede, instalador) para provar que as defesas funcionam.
 
-_Gerado por `testes/ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
+_Gerado por `testes/6_ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
 
 | Arquivo | Para que serve |
 |---|---|

@@ -10,21 +10,17 @@ if not exist "cofre_senhas.py" (
   if not defined COFRE_AUTO pause
   exit /b 2
 )
-set "REL=testes\resultados\ferramentas_externas"
+set "REL=testes\resultados"
 if not exist "%REL%" mkdir "%REL%"
 set "LOG=%REL%\bandit.txt"
-set "PY=py -3.13"
-%PY% --version >nul 2>&1
-if errorlevel 1 set "PY=py -3.12"
-%PY% --version >nul 2>&1
+call "%~dp0preparar_ambiente_offline.bat"
 if errorlevel 1 (
-  echo AVISO: nao encontrei Python 3.13 nem 3.12 pelo inicializador py.
   if not defined COFRE_AUTO pause
   exit /b 9
 )
-%PY% -m bandit --version >nul 2>&1
+"%COFRE_PYTHON%" -m bandit --version >nul 2>&1
 if errorlevel 1 (
-  echo AVISO: Bandit nao esta instalado. Para instalar: %PY% -m pip install bandit
+  echo ERRO: Bandit nao foi instalado pelo wheelhouse local.
   if not defined COFRE_AUTO pause
   exit /b 9
 )
@@ -32,7 +28,7 @@ echo Analisando cofre_senhas.py com Bandit...
 echo Projeto: %CD% > "%LOG%"
 echo Data: %DATE% %TIME% >> "%LOG%"
 echo. >> "%LOG%"
-%PY% -m bandit -r "cofre_senhas.py" -f txt >> "%LOG%" 2>&1
+"%COFRE_PYTHON%" -m bandit -r "cofre_senhas.py" -f txt >> "%LOG%" 2>&1
 set "RC=%ERRORLEVEL%"
 echo.>> "%LOG%"
 echo Codigo de saida: %RC%>> "%LOG%"

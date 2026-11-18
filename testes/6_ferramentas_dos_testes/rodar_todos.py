@@ -1,10 +1,10 @@
 """Executa TODOS os testes do cofre e mostra um resumo.
 
 Uso (na pasta do projeto):
-    python testes/ferramentas_dos_testes/rodar_todos.py              # tudo (núcleo + interface)
-    python testes/ferramentas_dos_testes/rodar_todos.py --rapido     # só o núcleo (sem janelas)
-    python testes/ferramentas_dos_testes/rodar_todos.py --so gui     # só a interface   (ou: --so nucleo)
-    python testes/ferramentas_dos_testes/rodar_todos.py --filtro fido
+    python testes/6_ferramentas_dos_testes/rodar_todos.py              # tudo (núcleo + interface)
+    python testes/6_ferramentas_dos_testes/rodar_todos.py --rapido     # só o núcleo (sem janelas)
+    python testes/6_ferramentas_dos_testes/rodar_todos.py --so gui     # só a interface   (ou: --so nucleo)
+    python testes/6_ferramentas_dos_testes/rodar_todos.py --filtro fido
 
 No Linux sem tela, a interface roda dentro do `xvfb-run` (precisa estar instalado).
 No Windows roda direto: durante os testes de interface aparecem janelas por alguns segundos.
@@ -14,7 +14,11 @@ import argparse, datetime, glob, os, re, shutil, subprocess, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _resultado                                          # log de depuração (testes/resultados/log_depuracao.txt)
 
-AQUI = os.path.dirname(os.path.abspath(__file__))        # testes/ferramentas_dos_testes
+for fluxo in (sys.stdout, sys.stderr):
+    if hasattr(fluxo, "reconfigure"):
+        fluxo.reconfigure(errors="replace")
+
+AQUI = os.path.dirname(os.path.abspath(__file__))        # testes/6_ferramentas_dos_testes
 RAIZ_TESTES = os.path.dirname(AQUI)                       # testes/ (onde ficam nucleo/ e gui/)
 ruim = re.compile(r"\[FALHOU\]|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]")
 bom = re.compile(r"TODOS( OS TESTES)? (PASSARAM|OK)|FALHAS( v\d+)?: \[\]|\[OK\]|FIM-OK")
@@ -94,7 +98,7 @@ def main():
             if n == "teste_memoria.py" and not sys.platform.startswith("linux"):
                 continue                                  # lê /proc/<pid>/mem: só existe no Linux
             # o soak (1.000 ciclos) fica fora do modo dev: ele deixa o teste 50x mais lento (de ~13 s para ~11 min)
-            flags = [] if (a.sem_dev or n in ("teste_severo.py", "teste_backup.py", "teste_nucleo_soak_longa_duracao.py")) else ["-X", "dev", "-W", "error"]
+            flags = [] if (a.sem_dev or os.name == "nt" or n in ("teste_severo.py", "teste_backup.py", "teste_nucleo_soak_longa_duracao.py")) else ["-X", "dev", "-W", "error"]
             tarefas.append(("nucleo/" + n, [py] + flags + [f], os.path.dirname(f), 1500))
     if a.so != "nucleo" and not a.rapido:
         pg = python_da_interface()
@@ -103,7 +107,7 @@ def main():
             print("AVISO: sem tela e sem xvfb-run: testes de interface pulados.")
         else:
             for f in sorted(glob.glob(os.path.join(RAIZ_TESTES, "2_telas_e_botoes", "teste_*.py"))):
-                tarefas.append(("gui/" + os.path.basename(f), xv + [pg] + ([] if (a.sem_dev or "soak" in os.path.basename(f)) else ["-X", "dev"]) + [f], os.path.dirname(f), 900 if "soak" in os.path.basename(f) else 400))   # soak: sem modo dev (lento) e com mais tempo
+                tarefas.append(("gui/" + os.path.basename(f), xv + [pg] + ([] if (a.sem_dev or os.name == "nt" or "soak" in os.path.basename(f)) else ["-X", "dev"]) + [f], os.path.dirname(f), 900 if "soak" in os.path.basename(f) else 400))   # Windows/dev e soak: sem modo dev (lento/incompatível) e com mais tempo
     tarefas = [t for t in tarefas if a.filtro in t[0]]
     falhas = 0
     for nome, cmd, cwd, lim in tarefas:
@@ -114,6 +118,7 @@ def main():
         inicio = datetime.datetime.now()
         estado, ruins, tb, seg, saida = roda(nome, cmd, cwd, lim)
         _resultado.log_depuracao('geral', nome, cmd, estado, seg, saida, inicio)   # saída COMPLETA vai para o log de depuração
+        _resultado.gravar_resultado_executor(nome, estado, seg, saida)
         marca = "FALHOU" if estado.startswith("FALHOU") else "  ok  "
         extra = "  (%d aviso(s) de Traceback, ruído de -W error)" % tb if tb and marca == "  ok  " else ""
         print("[%s] %-38s %5.1fs  %s%s" % (marca, nome, seg, estado if marca == "FALHOU" else "", extra))

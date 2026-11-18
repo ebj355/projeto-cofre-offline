@@ -1,7 +1,7 @@
 """Apaga as pastas temporárias que os testes deixam para trás (cofres de mentira em %TEMP%/tmp) quando um teste é
 interrompido no meio. Só toca em pastas com os PREFIXOS que os nossos testes usam e que tenham mais de N minutos
 (padrão 5: nunca mexe no que um teste em andamento está usando). Nunca apaga nada fora da pasta temporária do sistema.
-Uso: python testes/ferramentas_dos_testes/limpar_artefatos_testes.py [minutos]   -> grava testes/resultados/limpeza_artefatos.txt"""
+Uso: python testes/6_ferramentas_dos_testes/limpar_artefatos_testes.py [minutos]   -> grava testes/resultados/limpeza_artefatos.txt"""
 import datetime, glob, os, shutil, sys, tempfile, time
 
 PREFIXOS = ("cofre_gui_", "cofre_conc_", "cofre_gc_", "cofre_esq_", "cofre_ocu_", "cofre cam_", "cofre_ataques_",

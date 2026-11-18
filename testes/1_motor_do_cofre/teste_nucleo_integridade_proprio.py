@@ -3,7 +3,7 @@ independente (hashlib), muda se UM byte do arquivo mudar, tem 64 hex, e o progra
 Simula o .exe compilado (COMPILADO=True, argv[0]=arquivo) sem precisar do Nuitka. Roda no Linux e no Windows."""
 import os, re, sys, hashlib, tempfile, shutil
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ferramentas_dos_testes"))
+sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)
 import cofre_senhas as c
 f = []

@@ -157,7 +157,7 @@ regs,_=c.ler_planilha(casos["nums"]); ok(regs[0]["login"]=="4111111111111111","n
 wb=openpyxl.Workbook(); ws=wb.active; ws.append(["Serviço","Login","Senha"])
 for i in range(3000): ws.append([f"S{i}","u","p"])
 ws.cell(row=3001,column=16384,value="fim"); cam=os.path.join(d,"larga.xlsx"); wb.save(cam)
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ferramentas_dos_testes"))  # testes/ferramentas_dos_testes/ -> _util_mem.py
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "6_ferramentas_dos_testes"))  # testes/6_ferramentas_dos_testes/ -> _util_mem.py
 from _util_mem import pico_kb
 t0=time.time(); regs,_=c.ler_planilha(cam); pico=pico_kb()/1024
 ok(len(regs)==3000 and pico<900,f"planilha A1:XFD3001: {len(regs)} regs em {time.time()-t0:.1f}s, pico {pico:.0f} MB")

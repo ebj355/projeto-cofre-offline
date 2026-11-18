@@ -14,7 +14,7 @@ garantidas; por isso o item 5 usa iscas montadas caractere a caractere e confere
 import gc, os, sys, tempfile, secrets, weakref, importlib.util
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "ferramentas_dos_testes"))
+sys.path.insert(0, os.path.join(AQUI, "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)          # grava resultados/resultado_nucleo_gc_objetos_sensiveis.txt
 
 CAMINHO_PROG = os.path.abspath(os.path.join(AQUI, "..", "..", "cofre_senhas.py"))
@@ -92,8 +92,12 @@ ok(all(getattr(v, k, "x") in (None, [], ()) for k in ("dek", "_ks", "_kb", "_F",
    "depois de fechar(): campos de chave são None e a lista de itens está vazia")
 zeradas = {k: (set(bytes(o)) == {0}) for k, o in chaves.items()}
 ok(all(zeradas.values()), f"as chaves capturadas antes foram ZERADAS no próprio objeto: {zeradas}")
-zt = {k: (set(t.encode()) == {0}) for k, t in textos.items() if isinstance(t, str)}
-ok(zt and all(zt.values()), f"os textos secretos do item foram zerados no próprio objeto: {zt}")
+verifica_internacao = getattr(sys, "_is_interned", None)
+if verifica_internacao is None:
+    print("  [PULADO] strings não são sobrescritas nesta versão do Python: não há API segura para detectar strings internadas")
+else:
+    zt = {k: (set(t.encode()) == {0}) for k, t in textos.items() if isinstance(t, str)}
+    ok(zt and all(zt.values()), f"os textos secretos do item foram zerados no próprio objeto: {zt}")
 v = None
 gc.collect()
 ok(fraca() is None, "a instância Cofre foi coletada (nenhum ciclo de referência a segura viva)")

@@ -2,7 +2,7 @@
 
 **Para que serve esta pasta:** Abrem as telas de verdade (no Linux com tela virtual `xvfb-run`; no Windows em janelas reais) e clicam/digitam como um usuário. Cada `teste_gui_*.py` é independente.
 
-_Gerado por `testes/ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
+_Gerado por `testes/6_ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
 
 | Arquivo | Para que serve |
 |---|---|

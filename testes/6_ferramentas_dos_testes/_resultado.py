@@ -5,7 +5,7 @@ Por que existe: o dono do projeto quer que cada teste tenha o seu arquivo de res
 sobrescrever o de outro teste), para mandar só o arquivo do teste que interessa. Uso, nas primeiras linhas do teste:
 
     import os, sys
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ferramentas_dos_testes"))
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import _resultado; _resultado.registrar(__file__)
 
 Depois disso, tudo que o teste imprime (print) vai para a tela E para o arquivo. O arquivo é sobrescrito a cada
@@ -108,6 +108,22 @@ def log_depuracao(titulo, nome, comando, estado, segundos, saida, inicio=None):
             f.write("-" * 78 + "\n")
     except Exception:
         pass
+
+
+def gravar_resultado_executor(nome, estado, segundos, saida):
+    """Grava a saída completa de qualquer teste do executor, mesmo sem registrar() no próprio teste."""
+    base = os.path.splitext(os.path.basename(nome.replace("\\", "/")))[0]
+    if base.startswith("teste_"):
+        base = base[len("teste_"):]
+    destino = "testes/resultados/resultado_" + base + ".txt"
+    marca = "[FALHOU]" if estado.startswith("FALHOU") else "[OK]"
+    try:
+        destino = os.path.join(pasta_resultados(), "resultado_" + base + ".txt")
+        with open(destino, "w", encoding="utf-8", errors="replace") as f:
+            f.write("%s %s | %.1f s | %s\n\n" % (marca, nome, segundos, estado))
+            f.write(saida or "(sem saída do teste)\n")
+    except OSError as ex:
+        print("AVISO: não foi possível gravar %s: %s" % (destino, ex), file=sys.stderr)
 
 
 def handles_processo():
@@ -222,12 +238,12 @@ def baixa_prioridade():
 
 # arquivos GERADOS por uma bateria (cada bateria nova apaga os da anterior, para nunca misturar "ontem" com "hoje")
 _GERADOS = ("resultado_*.txt", "resumo_testes.md", "resumo_testes.json", "resultados.sarif", "log_depuracao*.txt",
-            "limpeza_artefatos.txt", "cobertura_codigo.*", "*.tmp")
+            "limpeza_artefatos.txt", "cobertura_codigo.*", "cobertura_html.zip", ".coverage*", ".coveragerc", "*.tmp")
 
 
 def limpar_resultados_antigos():
     """Apaga os resultados da bateria anterior em testes/resultados/ e leva para a pasta certa o que não é resultado
-    (documentos .md vão para testes/ferramentas_dos_testes/, relatorio_pentest.md para testes/3_ataques_simulados/). Devolve a lista do que fez."""
+    (documentos .md vão para testes/6_ferramentas_dos_testes/, relatorio_pentest.md para testes/3_ataques_simulados/). Devolve a lista do que fez."""
     import fnmatch
     feitos = []
     pasta = pasta_resultados()
@@ -236,7 +252,7 @@ def limpar_resultados_antigos():
         caminho = os.path.join(pasta, nome)
         try:
             if os.path.isdir(caminho):
-                if nome == "cobertura_html" or nome.startswith("rodada_"):
+                if nome == "cobertura_html" or nome.startswith("rodada_") or nome == "ferramentas_externas":
                     shutil.rmtree(caminho, True)
                     feitos.append("apagada pasta " + nome)
                 continue
@@ -244,7 +260,7 @@ def limpar_resultados_antigos():
                 os.remove(caminho)
                 feitos.append("apagado " + nome)
             elif nome.lower().endswith(".md"):
-                destino = os.path.join(aqui, "3_ataques_simulados" if nome.startswith("relatorio_pentest") else "ferramentas_dos_testes", nome)
+                destino = os.path.join(aqui, "3_ataques_simulados" if nome.startswith("relatorio_pentest") else "6_ferramentas_dos_testes", nome)
                 if os.path.exists(destino):
                     os.remove(destino)
                 shutil.move(caminho, destino)

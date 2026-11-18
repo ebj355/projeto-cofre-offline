@@ -5,11 +5,11 @@ da gravação...) que NENHUM teste automatizado exercita. Linha coberta não pro
 ponto cego garantido.
 Como: roda cada teste do núcleo e do pentest como processo separado sob `coverage run --parallel-mode` (com ramificações),
 junta os dados e grava em testes/resultados/: cobertura_codigo.txt (resumo + as faixas de linhas sem cobertura, com o texto
-da linha), cobertura_codigo.json e a pasta cobertura_html/ (relatório navegável). Os testes de interface ficam de fora
+da linha), cobertura_codigo.json e cobertura_html.zip (relatório navegável, sem criar subpasta em resultados/). Os testes de interface ficam de fora
 por padrão (são lentos); inclua com --gui. Se o `coverage` não estiver instalado, tenta instalar; se não der, avisa e sai
 com código 0 (cobertura é uma ferramenta de análise, nunca uma falha de teste).
-Uso: python testes/ferramentas_dos_testes/cobertura_codigo.py [--gui] [--filtro texto] [--minimo 0]   (--minimo N: sai com 1 se cobrir menos de N%)"""
-import argparse, glob, json, os, subprocess, sys, time
+Uso: python testes/6_ferramentas_dos_testes/cobertura_codigo.py [--gui] [--filtro texto] [--minimo 0]   (--minimo N: sai com 1 se cobrir menos de N%)"""
+import argparse, glob, json, os, shutil, subprocess, sys, tempfile, time, zipfile
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 TESTES = os.path.dirname(AQUI)
@@ -20,6 +20,14 @@ PROG = os.path.join(RAIZ, "cofre_senhas.py")
 
 def tem_coverage():
     return subprocess.run([sys.executable, "-c", "import coverage"], capture_output=True).returncode == 0
+
+
+def limpar_dados_coverage(dados, rc):
+    for caminho in glob.glob(dados) + glob.glob(dados + ".*"):
+        if os.path.isfile(caminho) or os.path.islink(caminho):
+            os.remove(caminho)
+    if os.path.isfile(rc) or os.path.islink(rc):
+        os.remove(rc)
 
 
 def main():
@@ -35,10 +43,18 @@ def main():
             print("coverage não está instalado e não deu para instalar (sem internet?): cobertura pulada.")
             return 0
     os.makedirs(RES, exist_ok=True)
+    html_antigo = os.path.join(RES, "cobertura_html")
+    if os.path.islink(html_antigo) or os.path.isfile(html_antigo):
+        os.remove(html_antigo)
+    elif os.path.isdir(html_antigo):
+        shutil.rmtree(html_antigo)
     dados = os.path.join(RES, ".coverage")
-    for velho in glob.glob(dados + "*"):
-        os.remove(velho)
     rc = os.path.join(RES, ".coveragerc")
+    for caminho in (os.path.join(RES, "cobertura_codigo.txt"), os.path.join(RES, "cobertura_codigo.json"),
+                    os.path.join(RES, "cobertura_html.zip")):
+        if os.path.isfile(caminho) or os.path.islink(caminho):
+            os.remove(caminho)
+    limpar_dados_coverage(dados, rc)
     with open(rc, "w", encoding="utf-8") as f:
         f.write("[run]\nbranch = True\nparallel = True\ndata_file = %s\nsource_pkgs =\ninclude = %s\n[report]\nshow_missing = True\n"
                 % (dados, PROG))
@@ -62,8 +78,17 @@ def main():
     subprocess.run([sys.executable, "-m", "coverage", "combine", "--rcfile", rc, "--quiet"], capture_output=True, cwd=RES)
     rel = subprocess.run([sys.executable, "-m", "coverage", "report", "--rcfile", rc, "--show-missing"],
                          capture_output=True, text=True, encoding="utf-8", errors="replace")
-    subprocess.run([sys.executable, "-m", "coverage", "html", "--rcfile", rc, "-d", os.path.join(RES, "cobertura_html")],
-                   capture_output=True)
+    with tempfile.TemporaryDirectory(prefix="cofre_cobertura_") as html_dir:
+        html = subprocess.run([sys.executable, "-m", "coverage", "html", "--rcfile", rc, "-d", html_dir],
+                              capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if html.returncode:
+            limpar_dados_coverage(dados, rc)
+            raise RuntimeError("Falha ao gerar relatório HTML do coverage: " + (html.stderr or html.stdout).strip())
+        with zipfile.ZipFile(os.path.join(RES, "cobertura_html.zip"), "w", zipfile.ZIP_DEFLATED) as relatorio:
+            for raiz, _, nomes in os.walk(html_dir):
+                for nome in nomes:
+                    caminho = os.path.join(raiz, nome)
+                    relatorio.write(caminho, os.path.relpath(caminho, html_dir))
     subprocess.run([sys.executable, "-m", "coverage", "json", "--rcfile", rc, "-o", os.path.join(RES, "cobertura_codigo.json")],
                    capture_output=True)
     pct, faltam = 0.0, []
@@ -92,11 +117,12 @@ def main():
         txt = fonte[ini - 1].strip()[:90] if 0 < ini <= len(fonte) else ""
         marca = "  <== tratamento de erro" if txt.startswith(("except", "raise", "return None")) else ""
         linhas.append("  %5d-%-5d %s%s" % (ini, fim, txt, marca))
-    linhas += ["", "Relatório navegável: testes/resultados/cobertura_html/index.html"]
+    linhas += ["", "Relatório navegável: extraia testes/resultados/cobertura_html.zip fora da pasta de resultados."]
     saida = "\n".join(linhas)
     print(saida[:3000])
     with open(os.path.join(RES, "cobertura_codigo.txt"), "w", encoding="utf-8") as f:
         f.write(saida + "\n")
+    limpar_dados_coverage(dados, rc)
     return 1 if (a.minimo and pct < a.minimo) else 0
 
 

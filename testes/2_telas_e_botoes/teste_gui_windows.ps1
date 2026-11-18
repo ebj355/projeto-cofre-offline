@@ -51,7 +51,7 @@ if (-not $py) { L '[PULADO] nenhum Python 3 com Tkinter foi encontrado: a bateri
 # 2) ambiente temporário com as mesmas bibliotecas do cofre (o Python do sistema normalmente não as tem)
 $usouVenv = $false
 $fonte = Join-Path $pai 'cofre_senhas.py'
-$rodar = Join-Path $aqui '..\ferramentas_dos_testes\rodar_todos.py'
+$rodar = Join-Path $aqui '..\6_ferramentas_dos_testes\rodar_todos.py'
 if ($py -and (Test-Path $fonte) -and (Test-Path $rodar)) {
     $req = Join-Path $pai 'requirements.txt'
     if (-not (Test-Path $req)) { L "[info] requirements.txt não está em ${pai}: copie-o para lá para a bateria rodar" }
@@ -59,7 +59,7 @@ if ($py -and (Test-Path $fonte) -and (Test-Path $rodar)) {
         $pins = Get-Content $req | Where-Object { $_ -match '^(cryptography|argon2-cffi|argon2-cffi-bindings|openpyxl|defusedxml|fido2|cffi|pycparser|et-xmlfile)==' }
         $reqT = Join-Path $aqui 'req_gui_tmp.txt'
         Set-Content -Path $reqT -Value $pins -Encoding ASCII
-        L 'Criando ambiente temporário e instalando as bibliotecas (precisa de internet, ~1 min)...'
+        L 'Criando ambiente temporário e instalando as bibliotecas do wheelhouse local...'
         Apagar-ComTentativas $venvT   # por segurança: apaga um venv_gui_tmp que tenha sobrado de uma execução anterior
         & cmd /c "$py -m venv `"$venvT`" 2>&1" | Out-Null
         $pyV = Join-Path $venvT 'Scripts\python.exe'
@@ -69,10 +69,14 @@ if ($py -and (Test-Path $fonte) -and (Test-Path $rodar)) {
         # ambiente criado corretamente.
         for ($i = 1; $i -le 5; $i++) { if (Test-Path $cfgV) { break }; Start-Sleep -Seconds 1 }
         if ((Test-Path $pyV) -and (Test-Path $cfgV)) {
-            $pipOut = & cmd /c "`"$pyV`" -m pip install --disable-pip-version-check --progress-bar off -r `"$reqT`" 2>&1"
+            $wheelhouse = Join-Path $pai 'pacotes'
+            $pipOut = & cmd /c "`"$pyV`" -m pip install --disable-pip-version-check --no-index --find-links `"$wheelhouse`" --progress-bar off -r `"$reqT`" 2>&1"
             $okPip = ($LASTEXITCODE -eq 0)
             Teste 'bibliotecas instaladas no ambiente temporário' $okPip
-            if (-not $okPip) { foreach ($o in ($pipOut | Select-Object -Last 15)) { L "    pip> $o" } }
+            if (-not $okPip) {
+                L '    [info] Rode 3 - BAIXAR PACOTES antes de testar sem internet.'
+                foreach ($o in ($pipOut | Select-Object -Last 15)) { L "    pip> $o" }
+            }
             else { $env:PATH = (Join-Path $venvT 'Scripts') + ';' + $env:PATH; $py = 'python'; $usouVenv = $true }
         } else { Teste 'ambiente temporário criado' $false }
         Remove-Item $reqT -Force -ErrorAction SilentlyContinue

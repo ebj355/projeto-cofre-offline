@@ -8,7 +8,7 @@ e uma volta salvar/abrir funcionam, e que um cofre NORMAL passa pelo saneamento 
 import copy, os, sys, tempfile, importlib.util
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "ferramentas_dos_testes"))
+sys.path.insert(0, os.path.join(AQUI, "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)          # grava resultados/resultado_nucleo_esquema_hostil.txt
 
 CAMINHO_PROG = os.path.abspath(os.path.join(AQUI, "..", "..", "cofre_senhas.py"))

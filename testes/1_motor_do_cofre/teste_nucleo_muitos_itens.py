@@ -2,7 +2,7 @@
 salvar e abrir ficam em tempo razoável, e cada salvamento seguinte (que renova as cópias de segurança) continua íntegro. Mede o pico de memória do processo."""
 import json, os, random, sys, time
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ferramentas_dos_testes"))
+sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)
 from _util_mem import pico_kb
 import cofre_senhas as c

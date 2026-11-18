@@ -105,7 +105,7 @@ if ($py -and (Test-Path $fonte)) {
         $pins = Get-Content $req | Where-Object { $_ -match '^(cryptography|argon2-cffi|argon2-cffi-bindings|openpyxl|defusedxml|fido2|cffi|pycparser|et-xmlfile)==' }
         $reqT = Join-Path $aqui 'req_teste_tmp.txt'
         Set-Content -Path $reqT -Value $pins -Encoding ASCII
-        L 'Criando ambiente temporário e instalando as bibliotecas (precisa de internet, ~1 min)...'
+        L 'Criando ambiente temporário e instalando as bibliotecas do wheelhouse local...'
         Apagar-ComTentativas $venvT   # por segurança: apaga um venv_teste_tmp que tenha sobrado de uma execução anterior
         & cmd /c "$py -m venv `"$venvT`" 2>&1" | Out-Null
         $pyV = Join-Path $venvT 'Scripts\python.exe'
@@ -115,10 +115,14 @@ if ($py -and (Test-Path $fonte)) {
         # "failed to locate pyvenv.cfg" mesmo com o ambiente criado corretamente.
         for ($i = 1; $i -le 5; $i++) { if (Test-Path $cfgV) { break }; Start-Sleep -Seconds 1 }
         if ((Test-Path $pyV) -and (Test-Path $cfgV)) {
-            $pipOut = & cmd /c "`"$pyV`" -m pip install --disable-pip-version-check --progress-bar off -r `"$reqT`" 2>&1"
+            $wheelhouse = Join-Path $pai 'pacotes'
+            $pipOut = & cmd /c "`"$pyV`" -m pip install --disable-pip-version-check --no-index --find-links `"$wheelhouse`" --progress-bar off -r `"$reqT`" 2>&1"
             $okPip = ($LASTEXITCODE -eq 0)
             Teste 'bibliotecas instaladas no ambiente temporário' $okPip
-            if (-not $okPip) { foreach ($o in ($pipOut | Select-Object -Last 15)) { L "    pip> $o" } }
+            if (-not $okPip) {
+                L '    [info] Rode 3 - BAIXAR PACOTES antes de testar sem internet.'
+                foreach ($o in ($pipOut | Select-Object -Last 15)) { L "    pip> $o" }
+            }
             else { $env:PATH = (Join-Path $venvT 'Scripts') + ';' + $env:PATH; $py = 'python'; $usouVenv = $true }
         } else { Teste 'ambiente temporário criado' $false }
         Remove-Item $reqT -Force -ErrorAction SilentlyContinue
@@ -181,6 +185,12 @@ if ($py) {
 #  testes\1_motor_do_cofre\RODAR ESTA PASTA - testes do motor do cofre.bat, para poder rodar separada dos testes do instalador abaixo)
 # 6) testes unitários (Pester) das funções auxiliares do instalador
 $pt = Join-Path $aqui 'instalador.Tests.ps1'
+$pesterModules = Join-Path (Join-Path $pai 'pacotes') 'powershell-modules'
+if (Test-Path (Join-Path $pesterModules 'Pester\5.7.1\Pester.psd1')) {
+    $env:PSModulePath = $pesterModules + [IO.Path]::PathSeparator + $env:PSModulePath
+    try { Import-Module Pester -RequiredVersion 5.7.1 -ErrorAction Stop }
+    catch { L "[FALHOU] Nao consegui carregar o Pester empacotado: $($_.Exception.Message)" }
+}
 if ((Get-Command Invoke-Pester -ErrorAction SilentlyContinue) -and (Test-Path $pt)) {
     try {
         $rp = Invoke-Pester -Path $pt -PassThru | Select-Object -Last 1

@@ -1,6 +1,6 @@
 """Valores-limite, memória e vazamento: senhas extremas, itens extremos, zerar_objeto sem corromper vizinhos."""
 import gc, os, secrets, sys, tempfile, unicodedata
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ferramentas_dos_testes"))  # testes/ferramentas_dos_testes/ -> _util_mem.py
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "6_ferramentas_dos_testes"))  # testes/6_ferramentas_dos_testes/ -> _util_mem.py
 from _util_mem import pico_kb
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 import cofre_senhas as c
@@ -37,10 +37,23 @@ except Exception as e: ok(False, "reabrir após extremos: %r" % e)
 i = sys.intern("senha_interna_x"); ok(not c.zerar_objeto(i) and i == "senha_interna_x", "internado alterado")
 ok(not any(c.zerar_objeto(x) for x in (None, "é" * 5, b"", b"a", 7)), "zerou o que não devia")
 viz = [bytes([65 + k % 26]) * k + b"!" for k in range(2, 300)]; ref = [bytes(x) for x in viz]
+compartilhado = bytes(b"segredo-compartilhado")
+alias = compartilhado
+ok(not c.zerar_objeto(compartilhado) and alias == b"segredo-compartilhado", "bytes compartilhados preservados")
 for k in range(1, 200):
-    a = "x" + secrets.token_hex(k); ok(c.zerar_objeto(a) and a == "\0" * len(a), "str não zerada")
+    a = "x" + secrets.token_hex(k)
+    if hasattr(sys, "_is_interned") and not sys.flags.dev_mode:
+        ok(c.zerar_objeto(a) and a == "\0" * len(a), "str não zerada")
+    else:
+        original = a
+        ok(not c.zerar_objeto(a) and a == original, "str preservada sem zeragem segura neste modo")
 for k in range(2, 300):
-    b = bytes(secrets.token_bytes(k)); ok(c.zerar_objeto(b) and b == bytes(k), "bytes não zerado")
+    b = bytes(secrets.token_bytes(k))
+    if sys.flags.dev_mode or "debug" in os.environ.get("PYTHONMALLOC", "").lower():
+        original = b
+        ok(not c.zerar_objeto(b) and b == original, "bytes preservados no modo de depuração")
+    else:
+        ok(c.zerar_objeto(b) and b == bytes(k), "bytes não zerado")
 ok(viz == ref, "vizinho corrompido")
 # vazamento: 60 ciclos abrir/salvar/fechar
 q = os.path.join(d, "l.dat"); M = "Mestra" + secrets.token_hex(6) + "Aa1!"; c.Cofre.criar(q, M, 3, 0, "alto").fechar()

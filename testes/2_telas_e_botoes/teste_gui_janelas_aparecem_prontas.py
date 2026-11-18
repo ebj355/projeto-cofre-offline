@@ -4,7 +4,7 @@ defeito visual de "janela que aparece cortada/montando e depois se ajeita" (o te
 isso não via isso). Cobre a tela de criar, desbloqueio, tela principal e todos os diálogos. Linux (xvfb-run) ou Windows."""
 import os, sys, time, tempfile
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ferramentas_dos_testes"))
+sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)
 import tkinter as tk
 from tkinter import messagebox, filedialog

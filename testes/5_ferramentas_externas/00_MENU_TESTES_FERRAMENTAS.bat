@@ -49,5 +49,5 @@ goto MENU
 
 :FIM
 echo.
-echo Encerrado. Os relatorios ficam em testes\resultados\ferramentas_externas\
+echo Encerrado. Os relatorios ficam diretamente em testes\resultados\
 endlocal

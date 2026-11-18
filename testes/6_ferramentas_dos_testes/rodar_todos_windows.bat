@@ -1,6 +1,6 @@
 @echo off
-rem Roda as CINCO baterias de teste do Windows real, UMA VEZ cada, uma depois da outra, sem parar entre elas, chamando o .bat
-rem de CADA UMA (nucleo, instalador, nativo, interface, pentest). Cada bateria grava o seu PROPRIO resultado,
+rem Roda as SEIS baterias de teste do Windows real, UMA VEZ cada, uma depois da outra, sem parar entre elas, chamando o .bat
+rem de CADA UMA (nucleo, instalador, nativo, interface, pentest, ferramentas externas). Cada bateria grava o seu PROPRIO resultado,
 rem exatamente como se tivesse sido chamada sozinha - nada aqui muda o comportamento dela.
 rem
 rem Uso: rodar_todos_windows.bat          (nativo testa so o disco do sistema)
@@ -11,8 +11,8 @@ rem  - cada ...\teste_*.bat termina com um "pause" (espera uma tecla) para quem 
 rem    vezes). Encadeado aqui, sem jeito de apertar nenhuma tecla, o "pause" ia travar o .bat para sempre - o
 rem    "< nul" da a ele uma entrada vazia, que o "pause" aceita como se fosse um "Enter" e segue na hora.
 rem  - cada .bat chamado muda a pasta atual do processo (faz "cd" para a propria pasta) - por isso ha um
-rem    "cd /d %~dp0" antes de cada etapa, voltando para a pasta deste arquivo (testes\ferramentas_dos_testes\).
-rem  - este arquivo fica em testes\ferramentas_dos_testes\ (junto com rodar_todos.py, test_pytest.py etc. - o que so ORGANIZA os
+rem    "cd /d %~dp0" antes de cada etapa, voltando para a pasta deste arquivo (testes\6_ferramentas_dos_testes\).
+rem  - este arquivo fica em testes\6_ferramentas_dos_testes\ (junto com rodar_todos.py, test_pytest.py etc. - o que so ORGANIZA os
 rem    testes, sem ser um teste em si), um nivel ABAIXO de nucleo\, windows\ e gui\ - por isso todo caminho abaixo
 rem    tem um "..\" a mais do que teria se este .bat estivesse solto direto em testes\.
 rem  - cada teste_*_windows.bat e chamado com o CAMINHO COMPLETO (%~dp0..\1_motor_do_cofre\..., %~dp0..\4_so_no_windows\...), nunca
@@ -28,6 +28,7 @@ rem para nunca misturar arquivos de "ontem" com os de "hoje". Documentos que est
 rem O log de depuracao (testes\resultados\log_depuracao.txt) e recriado do zero; cada executor acrescenta nele a saida completa de cada teste.
 if not exist "%~dp0..\resultados" mkdir "%~dp0..\resultados"
 set "DRIVE=%~1"
+set "COFRE_OFFLINE=1"
 py -3.13 "%~dp0limpar_resultados.py" 2>nul
 set "FALHAS=0"
 set "RODADAS=1"
@@ -40,40 +41,48 @@ goto :fim
 :rodada
 echo ============================================================
 echo  Cofre de Senhas - bateria COMPLETA no Windows real
-echo  1/5 nucleo                2/5 instalador (SO/atributos do instalador)
-echo  3/5 nativo (atributos/ACL/DPAPI)   4/5 interface (automatico)
-echo  5/5 pentest (injecao, forca bruta, DoS, vazamento de memoria, etc.)
-echo  Roda UMA vez cada bateria. Precisa de internet.
+echo  1/6 nucleo                2/6 instalador (SO/atributos do instalador)
+echo  3/6 nativo (atributos/ACL/DPAPI)   4/6 interface (automatico)
+echo  5/6 pentest (injecao, forca bruta, DoS, vazamento de memoria, etc.)
+echo  6/6 ferramentas externas (Bandit, pip-audit, Nmap)
+echo  Roda UMA vez cada bateria sem baixar dependencias.
+echo  A auditoria pip-audit e pulada offline porque requer dados atuais da internet.
 echo ============================================================
 echo.
 
-echo [1/5] nucleo (testes\1_motor_do_cofre\RODAR ESTA PASTA - testes do motor do cofre.bat) ...
+echo [1/6] nucleo (testes\1_motor_do_cofre\RODAR ESTA PASTA - testes do motor do cofre.bat) ...
 cd /d "%~dp0"
 call "%~dp0..\1_motor_do_cofre\RODAR ESTA PASTA - testes do motor do cofre.bat" < nul
 if errorlevel 1 set /a FALHAS+=1
 echo.
 
-echo [2/5] instalador (testes\4_so_no_windows\A - testar o instalador.bat) ...
+echo [2/6] instalador (testes\4_so_no_windows\A - testar o instalador.bat) ...
 cd /d "%~dp0"
 call "%~dp0..\4_so_no_windows\A - testar o instalador.bat" < nul
 if errorlevel 1 set /a FALHAS+=1
 echo.
 
-echo [3/5] nativo: atributos/ACL/DPAPI (testes\4_so_no_windows\B - testar atributos e permissoes do Windows.bat %1) ...
+echo [3/6] nativo: atributos/ACL/DPAPI (testes\4_so_no_windows\B - testar atributos e permissoes do Windows.bat %1) ...
 cd /d "%~dp0"
 call "%~dp0..\4_so_no_windows\B - testar atributos e permissoes do Windows.bat" %DRIVE% < nul
 if errorlevel 1 set /a FALHAS+=1
 echo.
 
-echo [4/5] interface (testes\2_telas_e_botoes\RODAR ESTA PASTA - testes das telas e botoes.bat) ...
+echo [4/6] interface (testes\2_telas_e_botoes\RODAR ESTA PASTA - testes das telas e botoes.bat) ...
 cd /d "%~dp0"
 call "%~dp0..\2_telas_e_botoes\RODAR ESTA PASTA - testes das telas e botoes.bat" < nul
 if errorlevel 1 set /a FALHAS+=1
 echo.
 
-echo [5/5] pentest (testes\3_ataques_simulados\RODAR ESTA PASTA - testes de ataque simulado.bat) ...
+echo [5/6] pentest (testes\3_ataques_simulados\RODAR ESTA PASTA - testes de ataque simulado.bat) ...
 cd /d "%~dp0"
 call "%~dp0..\3_ataques_simulados\RODAR ESTA PASTA - testes de ataque simulado.bat" < nul
+if errorlevel 1 set /a FALHAS+=1
+echo.
+
+echo [6/6] ferramentas externas (testes\5_ferramentas_externas\RODAR ESTA PASTA - ferramentas externas.bat) ...
+cd /d "%~dp0"
+call "%~dp0..\5_ferramentas_externas\RODAR ESTA PASTA - ferramentas externas.bat" < nul
 if errorlevel 1 set /a FALHAS+=1
 echo.
 
@@ -83,45 +92,44 @@ py -3.13 "%~dp0consolidar_resultados.py" >nul 2>nul
 py -3.13 "%~dp0limpar_artefatos_testes.py" >nul 2>nul
 
 cd /d "%~dp0"
-rem junta os 5 resultados (que cada teste grava em testes\resultados\) num arquivo SO, tambem em testes\resultados\ -
+rem junta os 6 resultados (que cada teste grava em testes\resultados\) num arquivo SO, tambem em testes\resultados\ -
 rem assim so precisa entrar numa pasta so (resultados\) para ver tudo, inclusive o resumo junto.
 if not exist "%~dp0..\resultados" mkdir "%~dp0..\resultados"
 if "%DRIVE%"=="" (set "NATIVO_ARQ=%~dp0..\resultados\resultado_nativo_windows.txt") else (set "NATIVO_ARQ=%~dp0..\resultados\resultado_nativo_windows_%DRIVE%.txt")
 set "TUDO=%~dp0..\resultados\resultado_rodar_todos_windows.txt"
-echo ====== 1/5 nucleo (RODAR ESTA PASTA - testes do motor do cofre.bat) ====== > "%TUDO%"
+echo ====== 1/6 nucleo (RODAR ESTA PASTA - testes do motor do cofre.bat) ====== > "%TUDO%"
 type "%~dp0..\resultados\resultado_nucleo_windows.txt" >> "%TUDO%" 2>nul
 echo. >> "%TUDO%"
-echo ====== 2/5 instalador (A - testar o instalador.bat) ====== >> "%TUDO%"
+echo ====== 2/6 instalador (A - testar o instalador.bat) ====== >> "%TUDO%"
 type "%~dp0..\resultados\resultado_teste_windows.txt" >> "%TUDO%" 2>nul
 echo. >> "%TUDO%"
-echo ====== 3/5 nativo: atributos/ACL/DPAPI (B - testar atributos e permissoes do Windows.bat) ====== >> "%TUDO%"
+echo ====== 3/6 nativo: atributos/ACL/DPAPI (B - testar atributos e permissoes do Windows.bat) ====== >> "%TUDO%"
 type "%NATIVO_ARQ%" >> "%TUDO%" 2>nul
 echo. >> "%TUDO%"
-echo ====== 4/5 interface (RODAR ESTA PASTA - testes das telas e botoes.bat) ====== >> "%TUDO%"
+echo ====== 4/6 interface (RODAR ESTA PASTA - testes das telas e botoes.bat) ====== >> "%TUDO%"
 type "%~dp0..\resultados\resultado_teste_gui_windows.txt" >> "%TUDO%" 2>nul
 echo. >> "%TUDO%"
-echo ====== 5/5 pentest (RODAR ESTA PASTA - testes de ataque simulado.bat) ====== >> "%TUDO%"
+echo ====== 5/6 pentest (RODAR ESTA PASTA - testes de ataque simulado.bat) ====== >> "%TUDO%"
 type "%~dp0..\resultados\resultado_pentest_windows.txt" >> "%TUDO%" 2>nul
-rem guarda uma copia dos arquivos desta rodada em testes\resultados\rodada_N
-if not exist "%~dp0..\resultados\rodada_%~1" mkdir "%~dp0..\resultados\rodada_%~1"
-copy /y "%~dp0..\resultados\*.txt" "%~dp0..\resultados\rodada_%~1\" >nul 2>nul
-copy /y "%~dp0..\resultados\*.json" "%~dp0..\resultados\rodada_%~1\" >nul 2>nul
-copy /y "%~dp0..\resultados\*.md" "%~dp0..\resultados\rodada_%~1\" >nul 2>nul
+echo. >> "%TUDO%"
+echo ====== 6/6 ferramentas externas (RODAR ESTA PASTA - ferramentas externas.bat) ====== >> "%TUDO%"
+type "%~dp0..\resultados\resultado_ferramentas_externas_windows.txt" >> "%TUDO%" 2>nul
 exit /b 0
 
 :fim
 echo ============================================================
-echo  Rodada concluida. Uma copia fica guardada em testes\resultados\rodada_1.
+echo  Rodada concluida. Todos os arquivos ficam diretamente em testes\resultados\.
 if "%FALHAS%"=="0" (
-  echo  TUDO PASSOU nas 5 baterias.
+  echo  TUDO PASSOU nas 6 baterias.
 ) else (
   echo  Pelo menos uma etapa terminou com erro: confira o resultado abaixo mesmo assim ^(o numero acima
   echo  nem sempre e exato - o que vale e o conteudo do arquivo^).
 )
 echo.
-echo  Resultado (as 5 baterias juntas): testes\resultados\resultado_rodar_todos_windows.txt
+echo  Resultado (as 6 baterias juntas): testes\resultados\resultado_rodar_todos_windows.txt
 echo  Resumo: resumo_testes.md  ^|  Log de depuracao completo: testes\resultados\log_depuracao.txt
 echo ============================================================
+set "COFRE_OFFLINE="
 echo Pressione uma tecla para fechar esta janela.
 pause >nul
 exit /b %FALHAS%

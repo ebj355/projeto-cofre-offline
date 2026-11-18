@@ -11,7 +11,7 @@ import os, sys, re, socket, tempfile, shutil, time, random, hashlib, ast
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 sys.path.insert(0, RAIZ)
 import cofre_senhas as c
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ferramentas_dos_testes"))  # testes/ferramentas_dos_testes/ -> _util_mem.py
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "6_ferramentas_dos_testes"))  # testes/6_ferramentas_dos_testes/ -> _util_mem.py
 from _util_mem import pico_kb   # pico de memória: resource (Linux/macOS) não existe no Windows, _util_mem cobre os dois
 f = []
 def ok(cond, nome):

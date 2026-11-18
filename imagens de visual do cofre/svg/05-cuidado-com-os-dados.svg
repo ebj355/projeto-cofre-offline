@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0d12"/><stop offset="1" stop-color="#171a27"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity=".38"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <g font-family="Segoe UI, Inter, Arial, sans-serif">
+    <text x="112" y="104" fill="#a8a3ff" font-size="15" font-weight="700" letter-spacing="2">USO RESPONSÁVEL</text>
+    <text x="112" y="162" fill="#f0f2f7" font-size="38" font-weight="700">Segurança também é rotina.</text>
+    <text x="112" y="200" fill="#9aa2b4" font-size="18">Boas práticas para demonstrar e usar um cofre local com mais cuidado.</text>
+  </g>
+  <g transform="translate(112 255)" filter="url(#shadow)" font-family="Segoe UI, Inter, Arial, sans-serif">
+    <rect width="670" height="472" rx="24" fill="#151821" stroke="#303648" stroke-width="2"/>
+    <text x="38" y="54" fill="#edf0f5" font-size="21" font-weight="700">Checklist de demonstração</text>
+    <g font-size="15">
+      <circle cx="58" cy="112" r="15" fill="#13291f"/><path d="m51 112 5 5 10-11" fill="none" stroke="#3dd68c" stroke-width="2.4" stroke-linecap="round"/>
+      <text x="88" y="108" fill="#e4e7ef" font-weight="650">Use uma cópia de teste</text><text x="88" y="132" fill="#929bad">Nunca abra seu cofre pessoal durante a apresentação.</text>
+      <circle cx="58" cy="190" r="15" fill="#13291f"/><path d="m51 190 5 5 10-11" fill="none" stroke="#3dd68c" stroke-width="2.4" stroke-linecap="round"/>
+      <text x="88" y="186" fill="#e4e7ef" font-weight="650">Preencha somente dados fictícios</text><text x="88" y="210" fill="#929bad">Sem contas reais, senhas, chaves ou códigos de recuperação.</text>
+      <circle cx="58" cy="268" r="15" fill="#13291f"/><path d="m51 268 5 5 10-11" fill="none" stroke="#3dd68c" stroke-width="2.4" stroke-linecap="round"/>
+      <text x="88" y="264" fill="#e4e7ef" font-weight="650">Proteja capturas e arquivos</text><text x="88" y="288" fill="#929bad">Confira metadados e notificações antes de compartilhar.</text>
+      <circle cx="58" cy="346" r="15" fill="#13291f"/><path d="m51 346 5 5 10-11" fill="none" stroke="#3dd68c" stroke-width="2.4" stroke-linecap="round"/>
+      <text x="88" y="342" fill="#e4e7ef" font-weight="650">Guarde backups separadamente</text><text x="88" y="366" fill="#929bad">Teste a recuperação e mantenha o meio de backup protegido.</text>
+      <circle cx="58" cy="424" r="15" fill="#2e2414"/><path d="M58 415v11m0 5v1" fill="none" stroke="#f5b544" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="88" y="420" fill="#e4e7ef" font-weight="650">Feche e limpe a demonstração</text><text x="88" y="444" fill="#bda56f">Apague a cópia descartável ao terminar, conforme seu plano.</text>
+    </g>
+  </g>
+  <g transform="translate(824 255)" font-family="Segoe UI, Inter, Arial, sans-serif">
+    <rect width="664" height="472" rx="24" fill="#151821" stroke="#303648"/>
+    <text x="38" y="54" fill="#edf0f5" font-size="21" font-weight="700">Cofre local, cópia local</text>
+    <text x="38" y="82" fill="#929bad" font-size="14">Ilustração do fluxo; não é um serviço de sincronização.</text>
+    <g transform="translate(49 132)">
+      <rect x="0" y="0" width="170" height="112" rx="17" fill="#1b1f2a" stroke="#343a4b"/>
+      <rect x="58" y="23" width="54" height="41" rx="7" fill="#0f1218" stroke="#7770f3" stroke-width="2"/>
+      <path d="M67 71h36m-18-7v7m-28 4h56" stroke="#7770f3" stroke-width="2" stroke-linecap="round"/>
+      <text x="85" y="98" text-anchor="middle" fill="#dfe2eb" font-size="13" font-weight="650">Dispositivo</text>
+      <path d="M184 56h98" stroke="#666f82" stroke-width="2.5" stroke-dasharray="6 7"/>
+      <path d="m275 48 10 8-10 8" fill="none" stroke="#a8a3ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="302" y="0" width="170" height="112" rx="17" fill="#1b1f2a" stroke="#343a4b"/>
+      <path d="M362 34h50l10 12v36h-70V34z" fill="#0f1218" stroke="#7cb4ff" stroke-width="2"/>
+      <path d="M362 47h70" stroke="#7cb4ff" stroke-width="2"/>
+      <text x="387" y="98" text-anchor="middle" fill="#dfe2eb" font-size="13" font-weight="650">Backup protegido</text>
+    </g>
+    <rect x="42" y="295" width="580" height="132" rx="17" fill="#2e2414" stroke="#5d4825"/>
+    <circle cx="78" cy="333" r="14" fill="#4a3719"/>
+    <path d="M78 325v10m0 5v1" stroke="#f5b544" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="108" y="330" fill="#f4e3bf" font-size="15" font-weight="700">O backup também é sensível</text>
+    <text x="108" y="358" fill="#c5b28a" font-size="13">Mantenha-o offline, com acesso restrito, e nunca envie</text>
+    <text x="108" y="380" fill="#c5b28a" font-size="13">cofre.dat, chaves ou códigos de recuperação a terceiros.</text>
+    <text x="108" y="408" fill="#9d8b63" font-size="12">A restauração deve ser testada sem expor dados reais.</text>
+  </g>
+  <text x="112" y="842" fill="#666f82" font-family="Segoe UI, Arial" font-size="14" letter-spacing="1.2">MATERIAL DE APOIO · DADOS FICTÍCIOS · SEGURANÇA DEPENDE TAMBÉM DO USO</text>
+</svg>

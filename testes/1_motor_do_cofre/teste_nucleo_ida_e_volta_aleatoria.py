@@ -3,7 +3,7 @@ com textos de todo tipo (acentos, emoji, chinês, controle, vazio), salvar, fech
 abrir nunca pode devolver dados DIFERENTES em silêncio, nem estourar erro não tratado (IndexError, KeyError, struct.error...)."""
 import json, os, random, shutil, struct, sys
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ferramentas_dos_testes"))
+sys.path.insert(0, _RAIZ); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)
 import cofre_senhas as c
 f = []

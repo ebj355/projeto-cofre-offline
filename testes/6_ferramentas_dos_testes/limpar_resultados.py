@@ -1,6 +1,6 @@
 """Apaga os resultados da bateria ANTERIOR (testes/resultados/) e guarda cada coisa na pasta certa.
 Roda sozinho no começo do Testar_Tudo / rodar_todos: bateria nova SUBSTITUI a antiga (nunca mistura 'ontem' com 'hoje').
-Uso: python testes/ferramentas_dos_testes/limpar_resultados.py"""
+Uso: python testes/6_ferramentas_dos_testes/limpar_resultados.py"""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _resultado

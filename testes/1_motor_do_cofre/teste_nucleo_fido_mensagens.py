@@ -10,7 +10,7 @@ produz, principalmente os de uma MÁQUINA/CHAVE LIMPA (chave nova, ainda sem PIN
 import importlib.util, os, re, sys
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "ferramentas_dos_testes"))
+sys.path.insert(0, os.path.join(AQUI, "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)          # grava resultados/resultado_nucleo_fido_mensagens.txt
 
 CAMINHO_PROG = os.path.abspath(os.path.join(AQUI, "..", "..", "cofre_senhas.py"))

@@ -20,13 +20,10 @@ set "PYTHONDONTWRITEBYTECODE=1"
 echo.
 echo  Teste nativo do Cofre de Senhas - aguarde (1 a 3 minutos)...
 where py >nul 2>nul || (echo  Python nao encontrado. Instale o Python 3.13 e rode de novo. & pause & exit /b 9)
+if not exist "%RAIZ%\pacotes\*.whl" (echo  Dependencias offline nao encontradas em pacotes\. Rode primeiro 3 - BAIXAR PACOTES. & pause & exit /b 9)
 if exist "%VENV%" rmdir /s /q "%VENV%"
 py -3.13 -m venv "%VENV%" || (echo  Falhou criar o ambiente Python 3.13. & pause & exit /b 9)
-if exist "%RAIZ%\pacotes\*.whl" (
-  "%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml
-) else (
-  "%VENV%\Scripts\python.exe" -m pip install --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml
-)
+"%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml
 if errorlevel 1 (echo  Falhou instalar as bibliotecas. & pause & exit /b 9)
 "%VENV%\Scripts\python.exe" -X utf8 "%~dp0teste_nativo_windows.py" %* > "%SAIDA%" 2>&1
 set "COD=%errorlevel%"

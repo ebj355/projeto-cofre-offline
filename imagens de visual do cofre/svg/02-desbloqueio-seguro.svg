@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0d12"/><stop offset="1" stop-color="#171a27"/>
+    </linearGradient>
+    <linearGradient id="lock" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6c63ff"/><stop offset="1" stop-color="#3933a8"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#000" flood-opacity=".42"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="800" cy="400" r="330" fill="#5147dd" opacity=".07"/>
+  <g font-family="Segoe UI, Inter, Arial, sans-serif">
+    <text x="112" y="104" fill="#a8a3ff" font-size="15" font-weight="700" letter-spacing="2">DEMONSTRAÇÃO DE DESBLOQUEIO</text>
+    <text x="112" y="158" fill="#f0f2f7" font-size="34" font-weight="700">A chave fica com você.</text>
+    <text x="112" y="194" fill="#9aa2b4" font-size="18">Mockup sem senha real; os campos abaixo são apenas ilustrativos.</text>
+  </g>
+  <g transform="translate(490 236)" filter="url(#shadow)" font-family="Segoe UI, Inter, Arial, sans-serif">
+    <rect width="620" height="560" rx="28" fill="#151821" stroke="#303648" stroke-width="2"/>
+    <rect x="0" y="0" width="620" height="80" rx="28" fill="#10131a"/>
+    <path d="M0 52v28h620V52" fill="#10131a"/>
+    <rect x="38" y="21" width="40" height="40" rx="13" fill="url(#lock)"/>
+    <path d="M51 40v-5a7 7 0 0 1 14 0v5m-17 0h20v14H48z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="94" y="49" fill="#eceef4" font-size="18" font-weight="650">Cofre de Senhas</text>
+    <circle cx="570" cy="40" r="5" fill="#3dd68c"/>
+    <text x="38" y="132" fill="#f3f4f8" font-size="26" font-weight="700">Desbloquear cofre</text>
+    <text x="38" y="164" fill="#929bad" font-size="15">A autenticação acontece neste dispositivo.</text>
+
+    <text x="38" y="218" fill="#b9c0cf" font-size="14" font-weight="600">SENHA MESTRA</text>
+    <rect x="38" y="233" width="544" height="58" rx="12" fill="#0f1218" stroke="#41485c"/>
+    <text x="62" y="269" fill="#828ba0" font-size="22" letter-spacing="4">••••••••••••••</text>
+    <text x="544" y="269" fill="#7e879b" font-size="17">◉</text>
+
+    <text x="38" y="335" fill="#b9c0cf" font-size="14" font-weight="600">CHAVE DE ACESSO (SE CONFIGURADA)</text>
+    <rect x="38" y="350" width="544" height="58" rx="12" fill="#0f1218" stroke="#303648"/>
+    <text x="62" y="386" fill="#737c90" font-size="16">Digite sua chave de acesso</text>
+    <rect x="38" y="435" width="544" height="58" rx="12" fill="url(#lock)"/>
+    <text x="310" y="472" text-anchor="middle" fill="#fff" font-size="17" font-weight="700">DESBLOQUEAR</text>
+    <rect x="38" y="514" width="544" height="1" fill="#2b3040"/>
+    <circle cx="51" cy="540" r="9" fill="#211f42"/>
+    <path d="M47 540h8m-4-4v8" stroke="#a8a3ff" stroke-width="1.7" stroke-linecap="round"/>
+    <text x="70" y="545" fill="#929bad" font-size="13">FIDO2 e código de recuperação dependem da configuração do cofre.</text>
+  </g>
+  <g font-family="Segoe UI, Inter, Arial, sans-serif">
+    <rect x="1150" y="320" width="315" height="150" rx="18" fill="#151821" stroke="#303648"/>
+    <circle cx="1190" cy="363" r="16" fill="#13291f"/>
+    <path d="m1183 363 5 5 10-11" fill="none" stroke="#3dd68c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1220" y="359" fill="#e7eaf1" font-size="17" font-weight="650">Nada de senha visivel</text>
+    <text x="1220" y="389" fill="#929bad" font-size="14">Os caracteres aparecem ocultos.</text>
+    <text x="1220" y="412" fill="#929bad" font-size="14">Use um cofre de demonstração.</text>
+    <rect x="133" y="385" width="278" height="150" rx="18" fill="#151821" stroke="#303648"/>
+    <circle cx="173" cy="428" r="16" fill="#211f42"/>
+    <path d="M173 419v9l6 4" fill="none" stroke="#a8a3ff" stroke-width="2" stroke-linecap="round"/>
+    <text x="203" y="424" fill="#e7eaf1" font-size="16" font-weight="650">Tentativas protegidas</text>
+    <text x="203" y="454" fill="#929bad" font-size="13">Ajuste a politica ao seu modelo</text>
+    <text x="203" y="476" fill="#929bad" font-size="13">de uso e guarde um backup seguro.</text>
+  </g>
+  <text x="112" y="842" fill="#666f82" font-family="Segoe UI, Arial" font-size="14" letter-spacing="1.2">MOCKUP CONCEITUAL · TEXTO E DADOS FICTÍCIOS · NÃO COMPARTILHE CREDENCIAIS REAIS</text>
+</svg>

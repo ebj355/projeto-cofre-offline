@@ -19,17 +19,14 @@ set "PYTHONDONTWRITEBYTECODE=1"
 echo.
 echo  Teste do nucleo do Cofre de Senhas - aguarde (pode levar alguns minutos)...
 where py >nul 2>nul || (echo  Python nao encontrado. Instale o Python 3.13 e rode de novo. & pause & exit /b 9)
+if not exist "%RAIZ%\pacotes\*.whl" (echo  Dependencias offline nao encontradas em pacotes\. Rode primeiro 3 - BAIXAR PACOTES. & pause & exit /b 9)
 if exist "%VENV%" rmdir /s /q "%VENV%"
 py -3.13 -m venv "%VENV%" || (echo  Falhou criar o ambiente Python 3.13. & pause & exit /b 9)
-if exist "%RAIZ%\pacotes\*.whl" (
-  "%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml
-) else (
-  "%VENV%\Scripts\python.exe" -m pip install --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml
-)
+"%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml
 if errorlevel 1 (echo  Falhou instalar as bibliotecas. & pause & exit /b 9)
 rem -u (sem buffer) + -v: mesmo truque de teste_windows.ps1/teste_gui_windows.ps1, para o arquivo de resultado
 rem trazer tambem a saida de quem falhar, e nao so o resumo final.
-"%VENV%\Scripts\python.exe" -u -X utf8 "%~dp0..\ferramentas_dos_testes\rodar_todos.py" --so nucleo --sem-dev -v > "%SAIDA%" 2>&1
+"%VENV%\Scripts\python.exe" -u -X utf8 "%~dp0..\6_ferramentas_dos_testes\rodar_todos.py" --so nucleo --sem-dev -v > "%SAIDA%" 2>&1
 set "COD=%errorlevel%"
 type "%SAIDA%"
 rmdir /s /q "%VENV%" >nul 2>nul

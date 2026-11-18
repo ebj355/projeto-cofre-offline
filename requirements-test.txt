@@ -1,0 +1,17 @@
+# Dependencias de runtime e ferramentas para as baterias de teste no Windows/Python 3.13.
+# Mantido separado de requirements.txt para nao incluir Nuitka e Zig nos ambientes de teste.
+cryptography==50.0.1 ; platform_machine == "AMD64"
+cryptography==46.0.3 ; platform_machine == "ARM64"
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+openpyxl==3.1.5
+defusedxml==0.7.1
+fido2==2.2.1
+cffi==2.1.1
+pycparser==3.12
+et-xmlfile==2.0.0
+bandit==1.9.4
+coverage==7.17.3
+flake8==7.5.0
+pip-audit==2.10.1
+pytest==9.2.0

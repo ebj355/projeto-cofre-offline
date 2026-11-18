@@ -2,14 +2,23 @@
   - resumo_testes.md     : tabela legível (um teste por linha, com contagem de [OK]/[FALHOU] e as linhas que falharam);
   - resumo_testes.json   : o mesmo em formato de máquina (para comparar uma rodada com a outra);
   - resultados.sarif     : formato SARIF 2.1.0 (só as falhas), aceito por ferramentas de revisão de código.
-Uso: python testes/ferramentas_dos_testes/consolidar_resultados.py        Sai com código 1 se algum teste falhou.
+Uso: python testes/6_ferramentas_dos_testes/consolidar_resultados.py        Sai com código 1 se algum teste falhou.
 Não altera nenhum resultado individual; se a pasta não puder ser gravada, imprime o resumo na tela e segue."""
 import datetime, glob, json, os, re, sys
 
 PASTA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "resultados")
+TESTES = os.path.dirname(PASTA)
 RUIM = re.compile(r"\[FALHOU\]|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]")
 OK = re.compile(r"\[OK\]|^\s*\[\s*ok\s*\]", re.I)
 IGNORAR = ("resultado_rodar_todos_windows.txt",)          # é só a junção dos outros
+BATERIAS = (
+    ("1_motor_do_cofre", "resultado_nucleo_windows.txt"),
+    ("2_telas_e_botoes", "resultado_teste_gui_windows.txt"),
+    ("3_ataques_simulados", "resultado_pentest_windows.txt"),
+    ("4_so_no_windows", ("resultado_teste_windows.txt", "resultado_nativo_windows.txt")),
+    ("5_ferramentas_externas", "resultado_ferramentas_externas_windows.txt"),
+    ("6_ferramentas_dos_testes", None),
+)
 
 
 def analisa(caminho):
@@ -26,11 +35,39 @@ def analisa(caminho):
 def main():
     arqs = [a for a in sorted(glob.glob(os.path.join(PASTA, "resultado_*.txt"))) if os.path.basename(a) not in IGNORAR]
     itens = [analisa(a) for a in arqs]
+    pastas = []
+    for pasta, esperado in BATERIAS:
+        caminho_pasta = os.path.join(TESTES, pasta)
+        arquivos = sorted(glob.glob(os.path.join(caminho_pasta, "teste_*.py"))) if os.path.isdir(caminho_pasta) else []
+        if pasta == "6_ferramentas_dos_testes":
+            arquivos = [a for a in arquivos if os.path.basename(a) != "test_pytest.py"]
+        resultados = esperado if isinstance(esperado, tuple) else (esperado,) if esperado else ()
+        presentes = [nome for nome in resultados if os.path.exists(os.path.join(PASTA, nome))]
+        pastas.append({
+            "pasta": pasta,
+            "arquivos_de_teste": len(arquivos),
+            "arquivos_resultado": list(resultados),
+            "resultados_presentes": presentes,
+        })
     quando = datetime.datetime.now().isoformat(timespec="seconds")
     ruins = [i for i in itens if i["estado"] == "FALHOU"]
     total_ok = sum(i["ok"] for i in itens)
     md = ["# Resumo dos testes", "", "Gerado em %s | %d resultado(s) | %d verificações [OK] | %d teste(s) com falha" % (
-        quando, len(itens), total_ok, len(ruins)), "", "| Teste | Estado | [OK] | Falhas |", "|---|---|---:|---:|"]
+        quando, len(itens), total_ok, len(ruins)), "",
+        "Todas as baterias são gravadas diretamente em `testes/resultados/`, sem subpastas por rodada.", "",
+        "| Pasta | Testes encontrados | Resultado |", "|---|---:|---|"]
+    for pasta in pastas:
+        if pasta["pasta"] == "6_ferramentas_dos_testes":
+            estado = "ferramentas auxiliares; não é bateria"
+        elif not pasta["arquivos_resultado"]:
+            estado = "sem resultado configurado"
+        elif len(pasta["resultados_presentes"]) == len(pasta["arquivos_resultado"]):
+            estado = "presente"
+        else:
+            estado = "resultado(s) presente(s): %d/%d" % (
+                len(pasta["resultados_presentes"]), len(pasta["arquivos_resultado"]))
+        md.append("| %s | %d | %s |" % (pasta["pasta"], pasta["arquivos_de_teste"], estado))
+    md += ["", "| Teste | Estado | [OK] | Falhas |", "|---|---|---:|---:|"]
     for i in itens:
         md.append("| %s | %s | %d | %d |" % (i["nome"], "**FALHOU**" if i["estado"] == "FALHOU" else "ok", i["ok"], i["falhou"]))
     if ruins:
@@ -50,7 +87,7 @@ def main():
         with open(os.path.join(PASTA, "resumo_testes.md"), "w", encoding="utf-8") as f:
             f.write("\n".join(md) + "\n")
         with open(os.path.join(PASTA, "resumo_testes.json"), "w", encoding="utf-8") as f:
-            json.dump({"gerado_em": quando, "testes": itens}, f, ensure_ascii=False, indent=1)
+            json.dump({"gerado_em": quando, "pastas_testadas": pastas, "testes": itens}, f, ensure_ascii=False, indent=1)
         with open(os.path.join(PASTA, "resultados.sarif"), "w", encoding="utf-8") as f:
             json.dump(sarif, f, ensure_ascii=False, indent=1)
     except OSError as ex:

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0d12"/><stop offset="1" stop-color="#171a27"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity=".38"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <g font-family="Segoe UI, Inter, Arial, sans-serif">
+    <text x="112" y="106" fill="#a8a3ff" font-size="15" font-weight="700" letter-spacing="2">SEGURANÇA EM CAMADAS</text>
+    <text x="112" y="164" fill="#f0f2f7" font-size="38" font-weight="700">Mais de uma barreira.</text>
+    <text x="112" y="202" fill="#9aa2b4" font-size="18">Ative apenas os fatores que você consegue guardar e recuperar com segurança.</text>
+  </g>
+  <g transform="translate(112 260)" filter="url(#shadow)" font-family="Segoe UI, Inter, Arial, sans-serif">
+    <rect width="876" height="490" rx="24" fill="#151821" stroke="#303648" stroke-width="2"/>
+    <text x="38" y="53" fill="#eef0f5" font-size="21" font-weight="700">Fatores de desbloqueio</text>
+    <text x="38" y="81" fill="#8992a5" font-size="14">Exemplo visual; as opções reais dependem da configuração do cofre.</text>
+    <rect x="38" y="112" width="800" height="92" rx="16" fill="#1b1f2a" stroke="#2b3040"/>
+    <circle cx="82" cy="158" r="22" fill="#211f42"/>
+    <path d="M73 160h18m-14-6 7-7 7 7m-14 12 7 7 7-7" fill="none" stroke="#aaa5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="124" y="151" fill="#e9ebf2" font-size="17" font-weight="650">Senha mestra</text>
+    <text x="124" y="177" fill="#929bad" font-size="13">Principal fator; use uma frase longa, única e guardada em segurança.</text>
+    <rect x="766" y="147" width="42" height="24" rx="12" fill="#3d8d68"/>
+    <circle cx="794" cy="159" r="8" fill="#f4fff8"/>
+
+    <rect x="38" y="222" width="800" height="92" rx="16" fill="#1b1f2a" stroke="#2b3040"/>
+    <circle cx="82" cy="268" r="22" fill="#17283c"/>
+    <path d="M74 267a8 8 0 1 1 16 0v8H74zm8 8v5" fill="none" stroke="#8fc4ff" stroke-width="2" stroke-linecap="round"/>
+    <text x="124" y="261" fill="#e9ebf2" font-size="17" font-weight="650">Chave de acesso</text>
+    <text x="124" y="287" fill="#929bad" font-size="13">Opcional; mantenha uma cópia segura, separada do cofre.</text>
+    <rect x="766" y="257" width="42" height="24" rx="12" fill="#2a2f3c"/>
+    <circle cx="780" cy="269" r="8" fill="#8b94a7"/>
+
+    <rect x="38" y="332" width="800" height="92" rx="16" fill="#1b1f2a" stroke="#2b3040"/>
+    <circle cx="82" cy="378" r="22" fill="#192d24"/>
+    <rect x="73" y="369" width="18" height="16" rx="4" fill="none" stroke="#86d8aa" stroke-width="2"/>
+    <path d="M77 369v-4a5 5 0 0 1 10 0v4m-5 7v4" fill="none" stroke="#86d8aa" stroke-width="2" stroke-linecap="round"/>
+    <text x="124" y="371" fill="#e9ebf2" font-size="17" font-weight="650">FIDO2 / chave física</text>
+    <text x="124" y="397" fill="#929bad" font-size="13">Opcional; requer chave compatível e um plano de recuperação.</text>
+    <rect x="766" y="367" width="42" height="24" rx="12" fill="#2a2f3c"/>
+    <circle cx="780" cy="379" r="8" fill="#8b94a7"/>
+
+    <rect x="38" y="442" width="800" height="1" fill="#2b3040"/>
+    <circle cx="53" cy="466" r="7" fill="#f5b544"/>
+    <text x="72" y="471" fill="#c6a45e" font-size="13">Fatores extras podem tornar a recuperação mais difícil: mantenha códigos e backups seguros.</text>
+  </g>
+  <g transform="translate(1032 282)" font-family="Segoe UI, Inter, Arial, sans-serif">
+    <rect width="456" height="430" rx="24" fill="#151821" stroke="#303648"/>
+    <circle cx="228" cy="100" r="55" fill="#211f42"/>
+    <path d="M228 65 267 80v33c0 27-16 46-39 58-23-12-39-31-39-58V80z" fill="none" stroke="#a8a3ff" stroke-width="4" stroke-linejoin="round"/>
+    <path d="m210 108 12 12 25-28" fill="none" stroke="#3dd68c" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="228" y="202" text-anchor="middle" fill="#edf0f5" font-size="20" font-weight="700">Defesa em camadas</text>
+    <text x="228" y="234" text-anchor="middle" fill="#929bad" font-size="14">Nenhum fator substitui uma senha</text>
+    <text x="228" y="257" text-anchor="middle" fill="#929bad" font-size="14">forte, backups e cuidado com o dispositivo.</text>
+    <rect x="42" y="300" width="372" height="82" rx="15" fill="#13291f" stroke="#214b36"/>
+    <text x="66" y="334" fill="#dff8e9" font-size="14" font-weight="650">Sem promessa de invulnerabilidade</text>
+    <text x="66" y="359" fill="#8fc8a8" font-size="12">A segurança depende da configuração e do uso.</text>
+  </g>
+  <text x="112" y="842" fill="#666f82" font-family="Segoe UI, Arial" font-size="14" letter-spacing="1.2">MOCKUP CONCEITUAL · NÃO MOSTRA UMA CONFIGURAÇÃO ATIVA DE UM COFRE REAL</text>
+</svg>

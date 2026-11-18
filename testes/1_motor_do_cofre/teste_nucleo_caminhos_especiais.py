@@ -10,7 +10,7 @@ Roda no Linux e no Windows (no Windows os nomes realmente passam pela API de arq
 import importlib.util, os, shutil, sys, tempfile
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "ferramentas_dos_testes"))
+sys.path.insert(0, os.path.join(AQUI, "..", "6_ferramentas_dos_testes"))
 import _resultado; _resultado.registrar(__file__)          # grava resultados/resultado_nucleo_caminhos_especiais.txt
 
 CAMINHO_PROG = os.path.abspath(os.path.join(AQUI, "..", "..", "cofre_senhas.py"))
