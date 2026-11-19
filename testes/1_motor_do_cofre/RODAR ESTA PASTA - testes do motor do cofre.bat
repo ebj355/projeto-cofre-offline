@@ -4,9 +4,9 @@ setlocal
 rem Teste do NUCLEO (os teste_*.py desta pasta) no Windows real, com o Python do Windows em vez do Linux.
 rem Util para rodar SO essa parte, sem os testes especificos do instalador (esses ficam em
 rem testes\4_so_no_windows\A - testar o instalador.bat) nem a bateria de interface (testes\2_telas_e_botoes\RODAR ESTA PASTA - testes das telas e botoes.bat).
-rem Offline: usa a pasta pacotes, se existir.
+rem Offline: usa a pasta pacotes da raiz do projeto.
 cd /d "%~dp0"
-set "RAIZ=%~dp0.."
+set "RAIZ=%~dp0..\.."
 set "VENV=%~dp0_venv_nucleo_tmp"
 rem tudo fica DENTRO desta pasta (nada em %TEMP%\ ou solto no C:): o ambiente de teste fica aqui do lado e e
 rem apagado sozinho no fim. So o RESULTADO vai uma pasta acima, em testes\resultados\, junto com o de todos
@@ -24,6 +24,12 @@ if exist "%VENV%" rmdir /s /q "%VENV%"
 py -3.13 -m venv "%VENV%" || (echo  Falhou criar o ambiente Python 3.13. & pause & exit /b 9)
 "%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml
 if errorlevel 1 (echo  Falhou instalar as bibliotecas. & pause & exit /b 9)
+rem Hypothesis e opcional: se o wheelhouse tiver o pacote, roda o teste por propriedades; sem ele, o executor registra PULADO (codigo 9).
+if exist "%RAIZ%\pacotes\hypothesis-*.whl" (
+  echo Instalando Hypothesis para os testes por propriedades...
+  "%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q hypothesis
+  if errorlevel 1 echo  AVISO: Hypothesis ou uma dependencia nao esta no wheelhouse; o teste sera marcado PULADO.
+)
 rem -u (sem buffer) + -v: mesmo truque de teste_windows.ps1/teste_gui_windows.ps1, para o arquivo de resultado
 rem trazer tambem a saida de quem falhar, e nao so o resumo final.
 "%VENV%\Scripts\python.exe" -u -X utf8 "%~dp0..\6_ferramentas_dos_testes\rodar_todos.py" --so nucleo --sem-dev -v > "%SAIDA%" 2>&1

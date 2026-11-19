@@ -15,3 +15,13 @@ coverage==7.17.3
 flake8==7.5.0
 pip-audit==2.10.1
 pytest==9.2.0
+# Ferramentas externas novas (05-12). Versoes MINIMAS: depois de rodar "3 - BAIXAR PACOTES", fixe com == as versoes que entraram em pacotes\
+hypothesis>=6.100
+ruff>=0.6
+mypy>=1.11
+radon>=6.0
+vulture>=2.11
+detect-secrets>=1.5
+pefile>=2023.2.7
+pytest-timeout>=2.3
+pytest-randomly>=3.15

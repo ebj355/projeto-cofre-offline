@@ -50,13 +50,12 @@ def mudancas(antes, depois):
 REVELADAS = []                       # uma entrada por janela (Toplevel) no instante em que foi mostrada
 _orig = tk.Wm.wm_deiconify
 def deiconify_medindo(self, *a):
-    """Mostra a janela e tira o retrato do PRIMEIRO QUADRO: logo depois de mostrar e de o Tk fazer o layout pendente
-    (o que ele sempre faz antes de desenhar). Medir antes de mostrar não vale: no Windows uma janela escondida ainda
-    não distribuiu o tamanho dos filhos, e isso não é o que o usuário vê."""
+    """Mostra a janela e processa o mapeamento e o layout inicial antes do retrato.
+    No Windows, update_idletasks sozinho não processa as mensagens de geometria do sistema."""
     r = _orig(self, *a)
     if isinstance(self, tk.Toplevel) and not getattr(self, "_rev_ok", False):
         try:
-            self.update_idletasks()
+            self.update()
             self._rev_ok = True
             REVELADAS.append({"j": self, "titulo": self.title(), "req": (self.winfo_width(), self.winfo_height()), "foto": retrato(self), "t": time.perf_counter()})
         except tk.TclError:
@@ -134,6 +133,7 @@ for geo in ("1366x768", "900x600"):
             except tk.TclError: pass
         root.update()
     app.cofre.fechar(); app.cofre = None
+    app._cancelar_todos_after()
     root.destroy()
 tk.Wm.wm_deiconify = tk.Wm.deiconify = _orig
 print("\nTODOS OK" if all(f) else "\nHOUVE FALHAS (%d)" % f.count(False))

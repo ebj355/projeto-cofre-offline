@@ -7,7 +7,7 @@ Dentro de cada pasta de testes existe também um `INDICE.md` que explica **cada 
 | Arquivo na pasta principal | O que faz | Quando usar |
 |---|---|---|
 | `1 - INSTALAR O COFRE - compila e instala.bat` | Instala o cofre (no pendrive ou no computador). | Para instalar ou atualizar o cofre. |
-| `2 - TESTAR TUDO - roda todos os testes.bat` | Roda **todos** os testes no Windows e junta os resultados em `testes\resultados\`. Apaga os resultados da rodada anterior antes. | Depois de mudar qualquer coisa, ou para conferir que está tudo certo. |
+| `2 - TESTAR TUDO - roda todos os testes.bat` | Roda as seis baterias no Windows, incluindo o teste de propriedades Hypothesis e as ferramentas externas 05–12 quando disponíveis; junta os resultados em `testes\resultados\`. Apaga os resultados da rodada anterior antes. | Depois de mudar qualquer coisa, ou para conferir que está tudo certo. |
 | `3 - BAIXAR PACOTES - so para instalar sem internet.bat` | Baixa as dependências do cofre e das ferramentas de teste para `pacotes\`. | Rode com internet antes de copiar o projeto para um computador offline. |
 
 ## 2. O programa em si (não mexer)
@@ -16,7 +16,7 @@ Dentro de cada pasta de testes existe também um `INDICE.md` que explica **cada 
 | `cofre_senhas.py` | **O cofre inteiro** (um arquivo só, de propósito: fica mais fácil de conferir). |
 | `instalar_cofre.ps1` | O instalador que o `1 - INSTALAR...` chama por trás. |
 | `requirements.txt` | Lista das bibliotecas usadas, com a versão exata. |
-| `requirements-test.txt` | Lista das bibliotecas e ferramentas usadas pelas baterias, com versões fixas. |
+| `requirements-test.txt` | Lista de runtime e ferramentas de teste. Algumas ferramentas novas ainda usam versões mínimas até o wheelhouse ser atualizado e suas versões fixadas. |
 | `.gitignore` | Lista de coisas que não vão para o GitHub (arquivo técnico, pode ignorar). |
 
 ## 3. Pastas
@@ -37,6 +37,7 @@ Dentro de cada pasta de testes existe também um `INDICE.md` que explica **cada 
 | `2_telas_e_botoes/` | Testa as **telas**: abre janelas e clica de verdade. |
 | `3_ataques_simulados/` | **Ataca** o cofre de propósito para provar que as defesas funcionam (pentest). |
 | `4_so_no_windows/` | Testes que só valem no **Windows de verdade** (instalador, permissões, atributos). Os `.bat` com letra (A, B, C, D) dizem no nome o que fazem. |
+| `5_ferramentas_externas/` | Ferramentas externas 01–12: Bandit, pip-audit, Nmap, PSScriptAnalyzer, pefile, Defender, verificador de segredos, qualidade, SBOM, rede e Hypothesis. Pytest fica no menu, fora da bateria geral. |
 | `6_ferramentas_dos_testes/` | **Não são testes**: são os programas que rodam os testes, juntam resultados, limpam e medem cobertura. |
 | `resultados/` | **TUDO que os testes geram**: um resultado por teste, o resumo, o relatório de cobertura e o `log_depuracao.txt` (a saída completa, para abrir quando algo falha). Só guarda a **última** rodada; a anterior é apagada ao começar. |
 

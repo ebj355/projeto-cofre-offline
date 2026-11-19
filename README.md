@@ -588,11 +588,11 @@ O projeto tem uma bateria grande de testes, organizada por assunto. Cada teste t
 
 | Pasta | O que testa |
 |---|---|
-| `testes/1_motor_do_cofre/` | O **motor**, sem janelas: criptografia e vetores de teste, formato, backup, migração de versões antigas, corrupção forçada, falha e queda de energia em cada `fsync`/`os.replace`, concorrência entre processos, permissões de gravação, esquema hostil de itens, importação e fuzzing de planilhas, qualidade da aleatoriedade, vazamento de memória, soak de 1.000 ciclos, cofre com 5.000 itens, ida e volta com texto aleatório e bits virados. |
+| `testes/1_motor_do_cofre/` | O **motor**, sem janelas: criptografia e vetores de teste, formato, backup, migração de versões antigas, corrupção forçada, falha e queda de energia em cada `fsync`/`os.replace`, concorrência entre processos, permissões de gravação, esquema hostil de itens, importação e fuzzing de planilhas, qualidade da aleatoriedade, vazamento de memória, soak de 1.000 ciclos, cofre com 5.000 itens, ida e volta com texto aleatório e bits virados. Inclui `teste_propriedades_hypothesis.py` quando Hypothesis está disponível. |
 | `testes/2_telas_e_botoes/` | A **interface**: abre janelas e clica de verdade. Criar, editar, copiar, pessoas, dados bancários, importação, FIDO, alerta de tentativas, bloqueio por inatividade, teclado virtual, captura de tela, acessibilidade por teclado, janelas que aparecem prontas, nada cortado em 3 tamanhos, fluidez, cliques aleatórios ("macaco"), resiliência e soak. |
 | `testes/3_ataques_simulados/` | **Ataques simulados** (pentest): injeção, SSRF, força bruta/spraying, DoS, forense de memória, bypass de contador/autodestruição, engenharia reversa, fuzzing adversarial/Unicode, SAST (`bandit`), dependências (`pip-audit`), canal lateral de tempo, exfiltração pela rede, link simbólico, superfície do instalador e resíduos em disco. Relatório em `testes/3_ataques_simulados/relatorio_pentest.md`. |
 | `testes/4_so_no_windows/` | O que só vale no **Windows real**: sintaxe e funções do instalador (Pester), atributos de arquivo, ACL, SMBIOS × PowerShell, DPAPI, computador autorizado de ponta a ponta, blindagens/DLLs, WebAuthn e Windows Sandbox limpo. |
-| `testes/5_ferramentas_externas/` | Análises externas do Windows: Bandit (código), pip-audit (bibliotecas) e Nmap (portas locais); pytest opcional no menu. |
+| `testes/5_ferramentas_externas/` | Ferramentas: Bandit, pip-audit, Nmap local, PSScriptAnalyzer, pefile, Defender, busca de segredos, qualidade extra, SBOM, conexões do processo e Hypothesis. O pytest é opcional no menu e repete as baterias 1 e 2. |
 | `testes/6_ferramentas_dos_testes/` | **Não são testes:** executores, ajudantes, limpeza, relatórios, cobertura e ponte para o `pytest`. |
 | `testes/resultados/` | Tudo que os testes geram (resultado de cada bateria, `resumo_testes.md/json`, `resultados.sarif`, `log_depuracao.txt`). Os arquivos ficam diretamente nesta pasta, sem subpasta por rodada (não vai para o Git). |
 
@@ -612,7 +612,7 @@ O [`PLANO_DE_TESTES.md`](testes/PLANO_DE_TESTES.md) organiza os testes por risco
 
 ### 14.3 Como rodar
 
-**No Windows (mais fácil):** dê dois cliques em **`2 - TESTAR TUDO - roda todos os testes.bat`**. Ele executa uma vez as seis baterias: núcleo, instalador, Windows nativo, interface, pentest e ferramentas externas. Os resultados ficam diretamente em `testes\resultados\`, sem subpastas por rodada; o arquivo conjunto é `resultado_rodar_todos_windows.txt`. Pode levar de 20 a 30 minutos. Para incluir um pendrive no teste nativo: `2 - TESTAR TUDO - roda todos os testes.bat H`. Cada pasta de testes também tem o seu `.bat` ("RODAR ESTA PASTA - …") para rodar só aquela bateria.
+**No Windows (mais fácil):** primeiro rode **`3 - BAIXAR PACOTES - so para instalar sem internet.bat`** com internet para preparar os wheels das novas ferramentas; depois dê dois cliques em **`2 - TESTAR TUDO - roda todos os testes.bat`**. Ele executa uma vez as seis baterias: núcleo (incluindo a descoberta do teste Hypothesis), instalador, Windows nativo, interface, pentest e ferramentas externas 01, 02 e 04–12. O pytest 03 fica fora porque repete as baterias 1 e 2. Se Hypothesis ou outra ferramenta opcional não estiver disponível, o relatório marca `[PULADO]` (não é aprovação nem falha). Os resultados ficam diretamente em `testes\resultados\`, sem subpastas por rodada; o arquivo conjunto é `resultado_rodar_todos_windows.txt`. Para incluir um pendrive no teste nativo: `2 - TESTAR TUDO - roda todos os testes.bat H`. Cada pasta de testes também tem o seu `.bat` ("RODAR ESTA PASTA - …") para rodar só aquela bateria.
 
 **Pela linha de comando:**
 
@@ -621,9 +621,10 @@ python testes\6_ferramentas_dos_testes\rodar_todos.py            # tudo (núcleo
 python testes\6_ferramentas_dos_testes\rodar_todos.py --rapido   # só o núcleo, sem janelas
 python testes\6_ferramentas_dos_testes\rodar_todos.py --so gui   # só a interface
 python testes\6_ferramentas_dos_testes\rodar_todos.py --filtro fido -v
+python testes\6_ferramentas_dos_testes\rodar_todos.py --so nucleo --filtro propriedades_hypothesis -v
 ```
 
-Com `pytest`: `pytest testes/6_ferramentas_dos_testes/test_pytest.py -v` (cada `teste_*.py` vira um caso). No Linux sem tela, a interface roda dentro do `xvfb-run`.
+Com `pytest`: `pytest testes/6_ferramentas_dos_testes/test_pytest.py -v` (cada `teste_*.py` vira um caso; ausência de Hypothesis aparece como `SKIPPED`). No Linux sem tela, a interface roda dentro do `xvfb-run`.
 
 ### 14.4 Relatórios, depuração e boas maneiras
 
@@ -631,7 +632,8 @@ Com `pytest`: `pytest testes/6_ferramentas_dos_testes/test_pytest.py -v` (cada `
 - **`resumo_testes.md` / `.json` / `resultados.sarif`**: tabela legível, JSON comparável entre rodadas e SARIF só com as falhas.
 - **Bateria nova substitui a antiga:** `limpar_resultados.py` apaga os resultados anteriores antes de começar, para nunca misturar "ontem" com "hoje". No fim, `limpar_artefatos_testes.py` apaga pastas temporárias órfãs.
 - **Respeito ao seu PC:** os testes rodam em prioridade baixa, esperam haver RAM livre e fazem pausa entre si.
-- **Ferramentas de teste:** `bandit`, `flake8`, `pip-audit`, `pytest` e `coverage` estão fixados em `requirements-test.txt` e são instalados em ambiente virtual local a partir de `pacotes\`, sem acesso à rede. Pester também é carregado do pacote local. O Nmap vem como instalador local, mas requer instalação manual e pode solicitar privilégios/Npcap; sem ele, o teste registra `PULADO`. Relatórios ficam diretamente em `testes\resultados\`. Nmap verifica apenas `127.0.0.1`.
+- **Ferramentas de teste:** dependências de runtime e ferramentas estão em `requirements-test.txt` e são instaladas em ambiente virtual local a partir de `pacotes\`, sem acesso à rede. As ferramentas novas 05–12 usam versões mínimas (`>=`) enquanto seus wheels não estão confirmados no pacote local; rode `3 - BAIXAR PACOTES` e depois fixe as versões `==` correspondentes aos wheels baixados antes de distribuir um wheelhouse reprodutível. Pester também é carregado do pacote local. O Nmap vem como instalador local, mas requer instalação manual e pode solicitar privilégios/Npcap; sem ele, o teste registra `PULADO`. Relatórios ficam diretamente em `testes\resultados\`. Nmap verifica apenas `127.0.0.1`.
+- **Hypothesis:** `teste_propriedades_hypothesis.py` verifica ida e volta de cofres com dados gerados e entradas CSV hostis. O executor tenta instalá-lo do wheelhouse do núcleo quando disponível; se faltar, mostra `PULADO` com código 9, sem contar como aprovado nem como falha. Uma falha real do teste retorna código diferente e reprova a bateria. O atalho 12 permite rodá-lo isoladamente.
 - **Auditoria de dependências offline:** o `pip-audit` está empacotado, mas não consulta uma base de vulnerabilidades embutida; offline ele registra `PULADO` para não apresentar dados antigos como atuais. Com internet, defina `COFRE_ONLINE_AUDIT=1` antes de abrir o BAT da auditoria para consultar a fonte atual.
 - **Windows:** o executor não ativa `-X dev`, pois essa opção pode travar alguns builds do Python no Windows; os testes continuam verificando seus resultados e códigos de saída.
 - **Cobertura de código:** `cobertura_codigo_windows.bat` mede quais linhas e ramificações de `cofre_senhas.py` os testes executam e lista as faixas de `except`/`raise` sem teste. Gera `cobertura_codigo.txt`, `cobertura_codigo.json` e `cobertura_html.zip` diretamente em `testes\resultados\` (sem subpastas persistentes). Fica fora do "Testar Tudo" porque é lenta. A medição de 16/11, no Linux e sem interface, foi de **32,1%** (a maior parte do arquivo é interface; o total sobe com `--gui`).
@@ -670,7 +672,7 @@ projeto-cofre-offline/
 ├── cofre_senhas.py        # o programa inteiro (um arquivo só, fácil de auditar)
 ├── instalar_cofre.ps1     # o instalador que o "1 - INSTALAR..." chama por trás
 ├── requirements.txt         # runtime + compilação
-├── requirements-test.txt    # runtime + ferramentas das baterias
+├── requirements-test.txt    # runtime + ferramentas das baterias (novas versões aguardam refresh do wheelhouse)
 ├── .gitignore
 ├── LICENSE                # licença de uso pessoal e estudo
 │
@@ -685,7 +687,7 @@ projeto-cofre-offline/
 │   ├── 2_telas_e_botoes/            # interface (Tk)
 │   ├── 3_ataques_simulados/         # pentest
 │   ├── 4_so_no_windows/             # só no Windows real (A, B, C, D)
-│   ├── 5_ferramentas_externas/      # Bandit, pip-audit, Nmap
+│   ├── 5_ferramentas_externas/      # ferramentas 01-12 (menos pytest na bateria geral)
 │   ├── 6_ferramentas_dos_testes/    # executores, relatórios, cobertura (não são testes)
 │   └── resultados/                  # (não versionada) tudo que os testes geram
 │

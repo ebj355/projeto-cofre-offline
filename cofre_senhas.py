@@ -69,8 +69,9 @@ def _aviso_fatal(titulo, texto):
         if EH_WINDOWS:
             ctypes.windll.user32.MessageBoxW(None, str(texto), str(titulo), 0x10)
             return
-    except Exception:
-        pass
+    except (AttributeError, OSError, ctypes.ArgumentError):
+        print(f"{titulo}\n{texto}")
+        return
     print(f"{titulo}\n{texto}")
 
 
@@ -278,8 +279,8 @@ def ambiente_suspeito():
                 ctypes.windll.kernel32.GetCurrentProcess(), ctypes.byref(presente))
             if presente.value:
                 return "Um depurador externo está ligado ao programa."
-        except Exception:
-            pass
+        except (AttributeError, OSError, ctypes.ArgumentError):
+            return "Não foi possível verificar se há um depurador ligado ao programa."
     return None
 
 
@@ -405,9 +406,9 @@ def blindar_processo():
             try:
                 if k.SetProcessMitigationPolicy(politica, ctypes.byref(v), ctypes.sizeof(v)):
                     BLINDAGEM.append(nome)
-            except Exception:
-                pass
-    except Exception:
+            except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
+                continue
+    except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
         pass
     # 3) a pasta atual deixa de ser usada para procurar DLLs (contra DLL falsa ao lado do programa)
     try:
@@ -415,7 +416,7 @@ def blindar_processo():
         k.SetDllDirectoryW.restype = wintypes.BOOL
         if k.SetDllDirectoryW(""):
             BLINDAGEM.append("busca_dll")
-    except Exception:
+    except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
         pass
     # 3b) DLLs do sistema que NÃO são "conhecidas" do Windows (dwmapi, wer, wtsapi32, webauthn) já entram agora pelo
     #     caminho completo da System32: quando o código pedir só o nome, o Windows reaproveita a que já está carregada
@@ -430,7 +431,7 @@ def blindar_processo():
                     ctypes.WinDLL(os.path.join(sysdir.value, dll + ".dll"))
                 except OSError:
                     pass
-    except Exception:
+    except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
         pass
     # 4) se o cofre travar, o Windows não grava a memória dele (com senhas) em disco
     try:
@@ -443,7 +444,7 @@ def blindar_processo():
         if k.GetModuleFileNameW(None, buf, 1024):
             if wer.WerAddExcludedApplication(os.path.basename(buf.value), False) >= 0:
                 BLINDAGEM.append("sem_despejo")
-    except Exception:
+    except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
         pass
     return BLINDAGEM
 
@@ -472,7 +473,7 @@ def processos_abertos():
         k.CloseHandle.argtypes = [wintypes.HANDLE]
         h = k.CreateToolhelp32Snapshot(0x2, 0)                 # TH32CS_SNAPPROCESS
         if not h or h == ctypes.c_void_p(-1).value:
-            return nomes
+            raise ctypes.WinError(ctypes.get_last_error())
         try:
             pe = _PE32()
             pe.dwSize = ctypes.sizeof(_PE32)
@@ -482,8 +483,8 @@ def processos_abertos():
                 ok = k.Process32NextW(h, ctypes.byref(pe))
         finally:
             k.CloseHandle(h)
-    except Exception:
-        pass
+    except (AttributeError, OSError, ctypes.ArgumentError, TypeError) as ex:
+        raise OSError("Não foi possível verificar os processos abertos.") from ex
     return nomes
 
 
@@ -528,8 +529,8 @@ def memoria_fisica_livre():
             for linha in f:
                 if linha.startswith("MemAvailable:"):
                     return int(linha.split()[1]) * 1024
-    except Exception:
-        pass
+    except (AttributeError, OSError, ValueError, ctypes.ArgumentError, TypeError):
+        return None
     return None
 
 
@@ -1364,8 +1365,8 @@ def diag_registrar(codigo, ex=None, tb=None):
                 _diag_rotacionar(arq)
             with open(arq, "ab") as f:
                 f.write(_diag_selar(pub, dado))
-    except Exception:
-        pass
+    except (OSError, ValueError, AttributeError, ctypes.ArgumentError, TypeError):
+        return None
 
 
 def diag_ler(caminho_cofre, priv_bytes):
@@ -1506,7 +1507,7 @@ def restaurar_copia(caminho):
             with open(b, "rb") as f:
                 dados = f.read(LIMITE_COFRE)
             _ler_cabecalho(dados)
-        except Exception:
+        except (OSError, ArquivoInvalido, ValueError, TypeError, struct.error):
             continue
         try:
             if os.path.exists(caminho):
@@ -1817,7 +1818,7 @@ def _maior_seq_nas_copias(caminho, chave):
                 for v in r.values():
                     zerar_objeto(v)
             maior = max(maior, _seq_de(meta))
-        except Exception:
+        except (OSError, ArquivoInvalido, InvalidTag, ValueError, TypeError, UnicodeError, struct.error):
             continue
     return maior
 
@@ -2862,8 +2863,8 @@ def hook_energia(root, ao_perigo):
                 if (msg == 0x218 and w in (0x4, 0x0)) or (msg == 0x2B1 and w in (0x7, 0x2)) \
                         or (msg == 0x16 and w):      # PBT_APMSUSPEND / sessão bloqueada / desligando
                     ao_perigo()
-            except Exception:
-                pass
+            except (tk.TclError, OSError, RuntimeError, ValueError, TypeError) as ex:
+                diag_registrar(DIAG_INTERFACE, ex)
             return u.CallWindowProcW(estado["antigo"], h, msg, w, l)
 
         cb = PROC(proc)
@@ -2875,7 +2876,7 @@ def hook_energia(root, ao_perigo):
         try:
             wts = ctypes.WinDLL("wtsapi32")
             wts.WTSRegisterSessionNotification(ctypes.c_void_p(hwnd), 0)
-        except Exception:
+        except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
             wts = None
 
         def desfazer():
@@ -2883,8 +2884,11 @@ def hook_energia(root, ao_perigo):
             try:
                 if wts is not None:
                     wts.WTSUnRegisterSessionNotification(ctypes.c_void_p(hwnd))
+            except (AttributeError, OSError, ctypes.ArgumentError):
+                pass
+            try:
                 u.SetWindowLongPtrW(hwnd, -4, ctypes.c_void_p(estado["antigo"]))
-            except Exception:
+            except (AttributeError, OSError, ctypes.ArgumentError):
                 pass
         estado["desfazer"] = desfazer
         _HOOKS.append(estado)
@@ -3327,10 +3331,7 @@ class Cofre:
             c.somente_leitura = True
             return c
         if cand_ok is not None and cand_ok != unicodedata.normalize("NFC", cand_ok):
-            try:                       # cofre antigo gravado em NFD/NFKC: regrava em NFC (a DEK não muda)
-                c._definir_senha(unicodedata.normalize("NFC", cand_ok))
-            except Exception:
-                pass
+            c._definir_senha(unicodedata.normalize("NFC", cand_ok))
         c.fido, c._F = h["fido"], fator
         c.pc, c._G = h["pc"], fator_g
         c._registrar_abertura(meta, h["max_t"] - h["contador"])
@@ -3618,7 +3619,7 @@ class Cofre:
                 priv.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())).decode("ascii")
         try:
             diag_iniciar(self.caminho, _bytes_pub(priv))
-        except Exception:
+        except (OSError, ValueError, TypeError):
             pass
 
     # ----- chave FIDO (as alterações só ficam valendo depois de salvar()) -----
@@ -5442,7 +5443,7 @@ def barra_titulo_escura(janela):
         r, g, b = _hex(CORES["texto"])
         cor = ctypes.c_int(r | (g << 8) | (b << 16))
         dwm.DwmSetWindowAttribute(wintypes.HWND(hwnd), 36, ctypes.byref(cor), 4)   # DWMWA_TEXT_COLOR
-    except Exception:
+    except (AttributeError, tk.TclError):
         pass
 
 
@@ -5453,7 +5454,7 @@ def _apagar_campo_ao_fechar(campo):
     try:
         if str(campo.cget("textvariable")) == "":
             campo.delete(0, "end")
-    except Exception:
+    except (AttributeError, tk.TclError):
         pass
 
 
@@ -6193,9 +6194,14 @@ def _cortar(texto, fonte, largura):
         return ""
     if fonte.measure(texto) <= largura:
         return texto
-    while texto and fonte.measure(texto + "…") > largura:
-        texto = texto[:-1]
-    return texto + "…"
+    inicio, fim = 0, len(texto)
+    while inicio < fim:
+        meio = (inicio + fim + 1) // 2
+        if fonte.measure(texto[:meio] + "…") <= largura:
+            inicio = meio
+        else:
+            fim = meio - 1
+    return texto[:inicio] + "…"
 
 
 class BarraLateral(tk.Frame if tk else object):
@@ -6966,10 +6972,7 @@ class TourGuiado:
         if getattr(self.app, "_tour", None) is self:
             self.app._tour = None
         if self.ao_fechar:
-            try:
-                self.ao_fechar()
-            except Exception:
-                pass
+            self.ao_fechar()
 
     def _limpar(self):
         """Remove as peças de escurecimento/borda do passo atual."""
@@ -7209,7 +7212,10 @@ class App:
         self._salvando = False
         Cofre.executor_salvar = self._executar_salvamento
         self._espias_res = None
+        self._espias_erro = None
         self._espias_thread = None
+        self._espias_pedido = threading.Event()
+        self._espias_parar = threading.Event()
         root.after(2000, self._vigiar_sistema)
         self._hook_energia = hook_energia(root, self._ao_perigo)
         root.protocol("WM_DELETE_WINDOW", self.sair)
@@ -7239,6 +7245,10 @@ class App:
         """'cheio' = tela inteira; 'centro'/'topo' = cartão centralizado sobre fundo com halo suave."""
         if getattr(self, "_tour", None) is not None:
             self._tour.encerrar()
+        rodape_criar = getattr(self, "_rodape_criar", None)
+        if rodape_criar is not None:
+            rodape_criar.destroy()
+            self._rodape_criar = None
         self._publicar_tela()                              # se havia uma troca pendente, conclui antes
         self._mostrar_conteudo()
         for nome in ("_timer_busca", "_timer_aviso"):      # atrasos da tela antiga não podem mexer na nova
@@ -7246,7 +7256,7 @@ class App:
             if t_:
                 try:
                     self.root.after_cancel(t_)
-                except Exception:
+                except (tk.TclError, ValueError):
                     pass
                 setattr(self, nome, None)
         antigo = self.frame                                # continua visível até a tela nova ficar pronta
@@ -7356,13 +7366,18 @@ class App:
                   wraplength=largura, justify="left").pack(side="left", fill="x")
         return lin
 
-    def _rotulo_protecao(self, f, pref="C."):
+    def _rotulo_protecao(self, f, pref="C.", compacto=False):
         """Mostra o aviso de proteção do arquivo (fora do pendrive, sem proteção etc.)."""
+        largura = _px(250 if compacto else 360)
+        lado = "left" if compacto else "top"
+
         def com_ajuda(curto, longo, cor, titulo):
             """Linha de aviso curta; o texto completo abre no '?'."""
-            lin = self._linha_icone(f, "alerta", cor, curto, pref, _px(360), cor)
-            lin.pack(anchor="w", fill="x", pady=(0, 6))
-            self._ajuda(lin, titulo, longo, CORES["fundo"]).pack(side="right", anchor="n")
+            lin = self._linha_icone(f, "alerta", cor, curto, pref, largura, cor)
+            lin.pack(side=lado, anchor="w", fill="x", expand=compacto,
+                     padx=(0, _px(8)) if compacto else (0, 0), pady=(0, 0 if compacto else 6))
+            self._ajuda(lin, titulo, longo, CORES["fundo"]).pack(
+                side="left" if compacto else "right", anchor="n")
         if self._no_disco_do_windows(self.caminho):
             com_ajuda(f"Cofre no disco do Windows ({self._unidade(self.caminho)}).",
                       f"Este cofre está no disco do Windows ({self._unidade(self.caminho)}). O recomendado "
@@ -7374,7 +7389,8 @@ class App:
             com_ajuda("Hibernação ligada neste PC.", AVISO_HIBERNACAO, CORES["alerta"], "Hibernação ligada")
         txt, cor = self._texto_protecao()
         ic = "escudo" if cor == CORES["ok"] else "alerta"
-        self._linha_icone(f, ic, cor, txt, pref, _px(400), cor).pack(anchor="w", fill="x", pady=(0, 6))
+        self._linha_icone(f, ic, cor, txt, pref, largura, cor).pack(
+            side=lado, anchor="w", fill="x", expand=compacto, pady=(0, 0 if compacto else 6))
 
     # ---------- Widgets auxiliares reutilizáveis (ajuda, dicas, campos de senha, medidor de força) ----------
 
@@ -7458,7 +7474,7 @@ class App:
             if sys.platform == "win32":
                 import ctypes
                 return bool(ctypes.windll.user32.GetKeyState(0x14) & 1)
-        except Exception:
+        except (AttributeError, OSError, ctypes.ArgumentError):
             pass
         try:
             return bool(evento is not None and (int(evento.state) & 2))
@@ -7889,14 +7905,16 @@ class App:
             e.bind("<<Atualizar>>", conferir, add="+")
         s2.bind("<Return>", criar)
 
-        ttk.Separator(f).pack(fill="x", pady=(18, 14))
-        rod = ttk.Frame(f, style="C.TFrame")
-        rod.pack(fill="x")
-        prot = ttk.Frame(rod, style="Card2.TFrame", padding=(_px(12), _px(8)))
+        rod = ttk.Frame(self.root, style="C.TFrame", padding=(_px(36), 0, _px(36), _px(8)))
+        self._rodape_criar = rod
+        rod.pack(side="bottom", fill="x")
+        ttk.Separator(rod).pack(fill="x", pady=(0, _px(10)))
+        linha_rodape = ttk.Frame(rod, style="C.TFrame")
+        linha_rodape.pack(fill="x")
+        prot = ttk.Frame(linha_rodape, style="C.TFrame")
         prot.pack(side="left", fill="x", expand=True)
-        ttk.Label(prot, text="PROTEÇÕES DESTE COMPUTADOR", style="S2.Campo.TLabel").pack(anchor="w")
-        self._rotulo_protecao(prot, "S2.")
-        ttk.Button(rod, text="Criar cofre", style="C.Primario.TButton", command=criar,
+        self._rotulo_protecao(prot, compacto=True)
+        ttk.Button(linha_rodape, text="Criar cofre", style="C.Primario.TButton", command=criar,
                    image=imagem_icone(self.root, "seta", "#ffffff"), compound="right").pack(
                        side="right", padx=(12, 0), anchor="n")
         s1.focus_set()
@@ -8298,6 +8316,26 @@ class App:
     # ---------- bloquear junto com o Windows / esconder ao perder o foco ----------
     # ---------- Vigilância de segurança: foco da janela, captura de tela, invasão e ocultação automática ----------
 
+    def _monitorar_espias(self):
+        """Mantém um único trabalhador para verificar processos sem criar um thread novo a cada ciclo."""
+        while True:
+            self._espias_pedido.wait()
+            self._espias_pedido.clear()
+            if self._espias_parar.is_set():
+                return
+            try:
+                self._espias_res = ferramentas_espias()
+            except Exception as ex:
+                self._espias_erro = ex
+
+    def _parar_monitor_espias(self):
+        """Acorda e encerra o trabalhador de verificação antes de fechar a janela."""
+        self._espias_parar.set()
+        self._espias_pedido.set()
+        thread = self._espias_thread
+        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
+            thread.join(timeout=1)
+
     def _vigiar_sistema(self):
         """Vigia periódica: bloqueia se o PC dormiu, se a sessão foi travada ou se surgiu ferramenta espiã/depurador."""
         agora = time.time()
@@ -8333,16 +8371,17 @@ class App:
                 # um depurador/forense e o cofre perceber e se bloquear)
                 espias = self._espias_res                # resultado da leitura anterior
                 self._espias_res = None
-                th_ = self._espias_thread
-                if th_ is None or not th_.is_alive():
-                    def _varrer():
-                        """Lê a lista de processos fora da thread da janela e guarda quem é perigoso."""
-                        try:
-                            self._espias_res = ferramentas_espias()
-                        except Exception:
-                            self._espias_res = []
-                    self._espias_thread = threading.Thread(target=_varrer, daemon=True)
+                if self._espias_erro is not None:
+                    ex, self._espias_erro = self._espias_erro, None
+                    diag_registrar(DIAG_INTERFACE, ex)
+                    self._invasao_em_andamento(
+                        "Não foi possível verificar os programas abertos. O cofre foi fechado por segurança.",
+                        titulo="Verificação de segurança indisponível")
+                    return
+                if self._espias_thread is None:
+                    self._espias_thread = threading.Thread(target=self._monitorar_espias, daemon=True)
                     self._espias_thread.start()
+                self._espias_pedido.set()
                 if espias:
                         self.bloquear()
                         messagebox.showwarning(
@@ -8373,30 +8412,31 @@ class App:
                 pid = wintypes.DWORD(0)
                 u.GetWindowThreadProcessId(fg, ctypes.byref(pid))
                 return pid.value != os.getpid()
-            except Exception:
+            except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
                 pass
         try:
             return self.root.focus_get() is None
         except (KeyError, tk.TclError):
             return False
 
-    def _invasao_em_andamento(self, motivo):
+    def _invasao_em_andamento(self, motivo, titulo="Depurador detectado"):
         """Depurador ligado ao cofre aberto: apaga as chaves da memória e fecha (sem destruir o arquivo)."""
         try:
             if self.cofre:
                 self.cofre.fechar()
             self.cofre = None
             self._limpar_clip(forcar=True)
-        except Exception:
-            pass
+        except (AttributeError, OSError, RuntimeError, tk.TclError, ValueError) as ex:
+            diag_registrar(DIAG_INTERFACE, ex)
         try:                       # chaves já apagadas da memória; o ARQUIVO é preservado (pode ser falso alarme)
             self.root.withdraw()
-            messagebox.showerror("Depurador detectado",
+            messagebox.showerror(titulo,
                                  f"{motivo}\n\nO cofre foi fechado e as chaves apagadas da memória. "
                                  "O arquivo NÃO foi alterado. Se você não está depurando o programa, "
                                  "feche o programa que se anexou a ele (antivírus, ferramenta de captura) "
                                  "e abra o cofre de novo.")
         finally:
+            self._parar_monitor_espias()
             self.root.destroy()
 
     OCULTAR_APOS_MS = 1500
@@ -8812,14 +8852,14 @@ class App:
         if t:
             try:
                 self.root.after_cancel(t)
-            except Exception:
+            except (tk.TclError, ValueError):
                 pass
         self._timer_av_bloq = None
         j = getattr(self, "_janela_av_bloq", None)
         if j is not None:
             try:
                 j.destroy()
-            except Exception:
+            except (tk.TclError, ValueError):
                 pass
         self._janela_av_bloq = None
 
@@ -8931,7 +8971,7 @@ class App:
             if r["id"]:
                 try:
                     widget.after_cancel(r["id"])
-                except Exception:
+                except (AttributeError, tk.TclError, ValueError):
                     pass
                 r["id"] = None
         r["id"] = widget.after(ms, rodar)
@@ -9052,7 +9092,8 @@ class App:
         """Centraliza o diálogo sobre a janela principal, sem deixar sair da tela."""
         try:
             d.update_idletasks()
-            if d.winfo_viewable():
+            visivel = d.winfo_viewable()
+            if visivel:
                 w, h = d.winfo_width(), d.winfo_height()
             else:                          # ainda escondida: o tamanho "real" é o pedido pelo conteúdo
                 w, h = d.winfo_reqwidth(), d.winfo_reqheight()
@@ -9062,7 +9103,7 @@ class App:
             y = r.winfo_rooty() + (r.winfo_height() - h) // 2
             x = max(0, min(x, sw - w))
             y = max(0, min(y, sh - h - _px(48)))
-            d.geometry(f"+{x}+{y}")
+            d.geometry(f"+{x}+{y}" if visivel else f"{w}x{h}+{x}+{y}")
         except tk.TclError:
             pass
 
@@ -9867,7 +9908,7 @@ class App:
         if t:
             try:
                 self.root.after_cancel(t)
-            except Exception:
+            except (AttributeError, tk.TclError, OSError, ValueError):
                 pass
 
         def rodar():
@@ -10091,10 +10132,7 @@ class App:
                                "para que serve cada parte do cofre e como usar?\n\n(Depois você pode repetir no "
                                "botão  ?  do alto da tela.)"):
             self.root.after(150, self.passeio_principal)
-        try:
-            self._transacao(lambda: self.cofre.meta.__setitem__("tour_visto", True))
-        except Exception:
-            pass
+        self._transacao(lambda: self.cofre.meta.__setitem__("tour_visto", True))
 
     def _mostrar_atalhos(self):
         """Guia de uso (botão '?'): atalhos de teclado e como organizar contas, perfis, grupos e códigos."""
@@ -10549,7 +10587,7 @@ class App:
             if chave in timers:
                 try:
                     self.root.after_cancel(timers.pop(chave))
-                except Exception:
+                except tk.TclError:
                     pass
         else:
             if not self._liberar_protegido(r):
@@ -10860,7 +10898,7 @@ class App:
             if timer_mostrar["t"]:
                 try:
                     d.after_cancel(timer_mostrar["t"])
-                except Exception:
+                except (tk.TclError, ValueError):
                     pass
                 timer_mostrar["t"] = None
             s = "" if mostrar.get() else "•"
@@ -11896,8 +11934,9 @@ class App:
             try:
                 if unidade_removivel(getattr(self, "caminho", None) or getattr(self.cofre, "caminho", None)):
                     texto = "Salvando… não retire o pendrive"
-            except Exception:
-                pass                                   # só texto: nunca pode atrapalhar a gravação
+            except OSError as ex:
+                texto = "Salvando… não retire o pendrive"
+                diag_registrar(DIAG_GRAVACAO, ex)
             return self._com_espera(funcao, texto, atraso=0.4)
         finally:
             self._salvando = False
@@ -12518,14 +12557,14 @@ class App:
             if t:
                 try:
                     self.root.after_cancel(t)
-                except Exception:
+                except (tk.TclError, ValueError):
                     pass
             setattr(self, nome, None)
         for t in list(getattr(self, "_timers_revelar", {}).values()):
             try:
                 self.root.after_cancel(t)
-            except Exception:
-                pass
+            except (OSError, AttributeError, ctypes.ArgumentError, TypeError):
+                continue
         self._timers_revelar = {}
         self._revelados = set()
         self._detalhe_chave = None
@@ -12534,12 +12573,12 @@ class App:
                 self.tree._linhas = []
                 self.tree._idx = {}
                 self.tree._sel = None
-        except Exception:
+        except (AttributeError, tk.TclError):
             pass
         try:
             if hasattr(self, "busca"):
                 self.busca.set("")                  # termo digitado na busca
-        except Exception:
+        except (AttributeError, tk.TclError):
             pass
         try:
             if hasattr(self, "lateral_pessoas"):
@@ -12548,7 +12587,7 @@ class App:
             if hasattr(self, "lateral"):
                 self.lateral._itens = {}
                 self.lateral._ordem = []
-        except Exception:
+        except (AttributeError, tk.TclError):
             pass
         for nome in ("tree", "lateral", "lateral_pessoas", "detalhe", "campo_busca", "busca"):
             try:
@@ -12591,8 +12630,8 @@ class App:
                 self.cofre = None
                 varrer_memoria_livre(2000)     # ~15 ms: restos de textos antes de o Windows gravar a RAM
             self.root.after_idle(self.bloquear)       # a troca de tela acontece fora do WndProc
-        except Exception:
-            pass
+        except (AttributeError, OSError, RuntimeError, tk.TclError, ValueError) as ex:
+            diag_registrar(DIAG_INTERFACE, ex)
 
     def sair(self):
         """Fecha o programa (bloqueando antes), perguntando se ainda há tarefa em andamento."""
@@ -12603,11 +12642,12 @@ class App:
         try:
             if getattr(self, "_hook_energia", None) and self._hook_energia.get("desfazer"):
                 self._hook_energia["desfazer"]()
-        except Exception:
-            pass
+        except (AttributeError, OSError, RuntimeError, ctypes.ArgumentError, TypeError) as ex:
+            diag_registrar(DIAG_INTERFACE, ex)
         if self.cofre:
             self.cofre.fechar()
         self._limpar_clip(forcar=True)
+        self._parar_monitor_espias()
         self._cancelar_todos_after()
         self.root.destroy()
 
@@ -12624,9 +12664,9 @@ class App:
             for identificador in self.root.tk.call("after", "info"):
                 try:
                     self.root.after_cancel(identificador)
-                except Exception:
+                except (tk.TclError, ValueError):
                     pass
-        except Exception:
+        except (AttributeError, tk.TclError):
             pass
 
 
@@ -12679,10 +12719,10 @@ def main():
     if EH_WINDOWS:
         try:                                          # nitidez em telas com 125%, 150%...
             ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        except Exception:
+        except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
             try:
                 ctypes.windll.user32.SetProcessDPIAware()
-            except Exception:
+            except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
                 pass
     root = tk.Tk()
     root.withdraw()                                   # só aparece quando a primeira tela estiver pronta
@@ -12716,7 +12756,14 @@ def main():
                              "e abra o cofre de novo.")
         root.destroy()
         sys.exit(2)
-    nomes = processos_abertos()
+    try:
+        nomes = processos_abertos()
+    except OSError:
+        root.withdraw()
+        messagebox.showerror("Verificação de segurança indisponível",
+                             "Não foi possível verificar os programas abertos. O cofre não será iniciado.")
+        root.destroy()
+        sys.exit(7)
     espias = ferramentas_espias(nomes)
     if espias:
         root.withdraw()
@@ -12754,8 +12801,8 @@ def main():
                 messagebox.showerror("Algo deu errado", "Essa ação falhou e não foi concluída. Seus dados no "
                                      "cofre não foram alterados por ela.\n\nUm código do erro (sem senhas, "
                                      "cifrado) foi guardado: menu ⋯ › Diagnóstico.")
-        except Exception:
-            pass
+        except (AttributeError, OSError, RuntimeError, tk.TclError):
+            _aviso_fatal("Algo deu errado", "A ação falhou e não foi possível exibir os detalhes.")
     root.report_callback_exception = erro_interno
     App(root, caminho, em_uso=em_uso)
     revelar_janela(root)                           # primeira tela já montada: aparece de uma vez

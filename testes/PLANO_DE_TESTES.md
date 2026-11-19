@@ -24,7 +24,7 @@ com `FALHAS: []`, `teste_windows` sem [FALHOU], instalador concluído com o auto
 | R3 vazamento | Alto | Média | AES+ChaCha, zerar memória, clipboard com sequência, DACL | ataques, memoria, limites |
 | R4 exe trocado | Alto | Baixa | SHA-256 conferido pelo .bat | teste_windows (bat 0/3) |
 | R5 força bruta | Alto | Média | Argon2id, autodestruição, contador | ataques, forca |
-| R6 planilha maliciosa | Médio | Média | limites de tamanho/linhas, defusedxml, limpeza de texto | importacao, monkey |
+| R6 planilha maliciosa | Médio | Média | limites de tamanho/linhas, defusedxml, limpeza de texto | importacao, fuzzing, Hypothesis |
 | R7 só no Windows | Alto | Alta | script de teste no Windows real | teste_windows |
 
 ## QA3 — Catálogo (resumo; cada linha é executada por `testes/`)
@@ -46,16 +46,22 @@ com `FALHAS: []`, `teste_windows` sem [FALHOU], instalador concluído com o auto
 | TC14 | .bat: exe íntegro / 1 byte trocado / sem .sha256 | Alta | exit 0 / 3 / 2 | instalador (auto-teste) + teste_windows |
 | TC15 | README cita constantes reais | Baixa | valores do texto = do código | teste_readme_constantes |
 | TC16 | Desempenho | Média | abrir 3000 itens ≈ 0,5 s; salvar ≈ 0,02 s; Argon2 "alto" ≈ 0,5 s | medido (não-gate) |
+| TC17 | Ida e volta e entrada CSV arbitrária | Média | Hypothesis gera textos/itens para criar, salvar e reabrir; bytes hostis no CSV não podem gerar exceção não tratada | `teste_propriedades_hypothesis.py` (opcional; `[PULADO]` se Hypothesis indisponível) |
 
 ## Rastreabilidade e lacunas
 Todo risco R1–R7 tem teste. **Lacunas abertas:** R7/TC14 só passam de verdade no Windows do usuário; não há teste de
 acessibilidade (leitor de tela) nem de DPI alto; FIDO2 real só com a chave física.
 
 ## Go / No-Go
-No-Go se: qualquer `FALHAS` não vazio; qualquer `Traceback` que não seja `ResourceWarning` do `-W error` dos testes;
+No-Go se: qualquer `FALHAS` não vazio; qualquer teste obrigatório estiver `[PULADO]`; qualquer `Traceback` que não seja `ResourceWarning` do `-W error` dos testes;
 hash do .exe diferente do `.sha256`; `teste_windows` com [FALHOU]. Pós-instalação: abrir pelo `Abrir_Cofre.bat`, criar
 item, fechar, reabrir, conferir que sobraram só `.dat`, `.bak1` a `.bak5` e `.diag`. Se o computador for ARM64, o
 instalador deve gerar `CofreSenhas-arm64.exe` + `CofreSenhas-arm64.sha256` e o `Abrir_Cofre.bat` deve abri-lo.
+
+## Acréscimos de 2026-11-19
+`teste_propriedades_hypothesis.py` adiciona geração de casos para ida e volta dos registros e CSVs hostis; é descoberto automaticamente por `rodar_todos.py`. Se o pacote opcional não estiver disponível, o código 9 vira `[PULADO]`, não uma falsa aprovação nem uma falha. A bateria externa inclui 05–12: PSScriptAnalyzer, proteções PE, Defender, segredos no repositório, qualidade extra, auditoria/SBOM, conexões do processo e o atalho Hypothesis. O teste pytest (03) continua fora do Testar Tudo por repetir núcleo e interface.
+
+ProcDump e compilação reproduzível não fazem parte do plano atual: o primeiro precisa de um binário externo com hash verificado; a segunda é demorada e ainda não foi implementada. As versões mínimas (`>=`) das ferramentas novas em `requirements-test.txt` devem ser fixadas em `==` depois que `3 - BAIXAR PACOTES` gerar os wheels correspondentes.
 
 
 ## Acréscimos de 2026-11-16

@@ -44,7 +44,7 @@ echo  Cofre de Senhas - bateria COMPLETA no Windows real
 echo  1/6 nucleo                2/6 instalador (SO/atributos do instalador)
 echo  3/6 nativo (atributos/ACL/DPAPI)   4/6 interface (automatico)
 echo  5/6 pentest (injecao, forca bruta, DoS, vazamento de memoria, etc.)
-echo  6/6 ferramentas externas (Bandit, pip-audit, Nmap)
+echo  6/6 ferramentas externas (Bandit, pip-audit, Nmap e ferramentas 05-12)
 echo  Roda UMA vez cada bateria sem baixar dependencias.
 echo  A auditoria pip-audit e pulada offline porque requer dados atuais da internet.
 echo ============================================================

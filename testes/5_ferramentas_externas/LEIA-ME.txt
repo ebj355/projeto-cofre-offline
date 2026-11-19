@@ -8,7 +8,7 @@ soltos ao lado dele.
 
 COMO USAR
 - Tudo junto: o "2 - TESTAR TUDO - roda todos os testes.bat" da raiz ja roda
-  esta bateria como etapa 6/6 (Bandit, pip-audit e Nmap).
+  esta bateria como etapa 6/6: 01, 02 e 04-12.
 - So esta pasta, sem menu: RODAR ESTA PASTA - ferramentas externas.bat
 - Uma ferramenta por vez: 00_MENU_TESTES_FERRAMENTAS.bat
 
@@ -21,20 +21,35 @@ O QUE CADA ARQUIVO FAZ
   baterias 1 e 2, entao nao entra no TESTAR TUDO.
 - 04_NMAP_PORTAS_LOCAIS.bat: verifica as 100 portas TCP mais comuns SOMENTE
   em 127.0.0.1 (este proprio computador).
+- 05_PSSCRIPTANALYZER.bat: analisa os scripts PowerShell do projeto.
+- 06_PEFILE_EXE.bat: verifica protecoes ASLR, DEP, High-Entropy ASLR e CFG
+  do executavel compilado.
+- 07_DEFENDER_EXE.bat: pede ao Windows Defender para verificar o executavel.
+- 08_SEGREDOS_NO_REPOSITORIO.bat: procura cofres, chaves e segredos antes do Git.
+- 09_QUALIDADE_EXTRA.bat: executa Ruff, mypy, Radon e Vulture.
+- 10_PIP_AUDIT_TESTE_E_SBOM.bat: audita dependencias de teste e gera SBOM;
+  exige internet para consultar vulnerabilidades atuais.
+- 11_REDE_DO_PROCESSO.bat: lista conexoes do CofreSenhas.exe aberto.
+- 12_HYPOTHESIS_PROPRIEDADES.bat: testa ida e volta e entradas CSV hostis com
+  dados gerados pelo Hypothesis.
 - 00_MENU_TESTES_FERRAMENTAS.bat: menu para rodar cada um.
-- RODAR ESTA PASTA - ferramentas externas.bat: roda 01, 02 e 04 sem pausas.
+- RODAR ESTA PASTA - ferramentas externas.bat: roda 01, 02 e 04-12 sem menu.
+  O pytest (03) fica fora porque repete as baterias 1 e 2.
 
 RESULTADOS
 - Resumo: testes\resultados\resultado_ferramentas_externas_windows.txt
 - Relatorios completos: diretamente em testes\resultados\
-- [OK] = sem alertas | [ALERTA] = ha achados para revisar (nao conta como
-  falha) | [PULADO] = ferramenta ausente ou sem base de CVEs atual (nao conta como falha).
+- [OK] = sem alertas | [ALERTA] = ha achados para revisar | [PULADO] =
+  ferramenta/dependencia ausente ou auditoria offline; nunca significa aprovado.
+  Uma falha real do Hypothesis e `[FALHOU]` e reprova a etapa.
 
 REQUISITOS / MODO OFFLINE
 - Rode 3 - BAIXAR PACOTES enquanto houver internet e copie o projeto inteiro,
   incluindo pacotes\, para o computador offline.
 - Os .bat criam/atualizam testes\_venv_ferramentas usando somente os wheels de
   pacotes\ e requirements-test.txt; nao alteram o Python do sistema.
+- Depois de alterar requirements-test.txt, rode 3 - BAIXAR PACOTES com
+  internet; fixe as versoes novas em `==` depois de conferir os wheels baixados.
 - Se nao houver Python 3.13 instalado, execute o instalador python-3.13.17-*.exe
   de pacotes\ antes dos testes.
 - Pester e importado de pacotes\powershell-modules.
@@ -42,6 +57,8 @@ REQUISITOS / MODO OFFLINE
   manualmente (pode exigir permissao e Npcap). Sem ele o teste 04 e pulado.
 - pip-audit esta empacotado, mas precisa de internet para dados atuais de CVEs;
   sem rede a auditoria e marcada como [PULADO], nunca como "limpa".
+- PSScriptAnalyzer exige o download pelo script `baixar_psscriptanalyzer.ps1`;
+  confira e fixe o SHA-512 mostrado antes de distribuir o modulo offline.
 
 LIMITES IMPORTANTES
 - Bandit e pip-audit analisam codigo e bibliotecas; alertas precisam de

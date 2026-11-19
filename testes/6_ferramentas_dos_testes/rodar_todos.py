@@ -20,7 +20,7 @@ for fluxo in (sys.stdout, sys.stderr):
 
 AQUI = os.path.dirname(os.path.abspath(__file__))        # testes/6_ferramentas_dos_testes
 RAIZ_TESTES = os.path.dirname(AQUI)                       # testes/ (onde ficam nucleo/ e gui/)
-ruim = re.compile(r"\[FALHOU\]|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]")
+ruim = re.compile(r"\[FALHOU\]|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]|\bKeyboardInterrupt\b")
 bom = re.compile(r"TODOS( OS TESTES)? (PASSARAM|OK)|FALHAS( v\d+)?: \[\]|\[OK\]|FIM-OK")
 
 
@@ -70,6 +70,8 @@ def roda(nome, cmd, cwd, limite):
         estado = "FALHOU (tempo esgotado)"
     elif ruins:
         estado = "FALHOU"
+    elif codigo == 9 and any(l.strip().casefold().startswith("pulado: hypothesis indisponivel") for l in linhas):
+        estado = "PULADO (Hypothesis indisponível)"
     elif codigo != 0:
         estado = "FALHOU (código %s)" % codigo
     elif bons or not linhas:
@@ -109,7 +111,7 @@ def main():
             for f in sorted(glob.glob(os.path.join(RAIZ_TESTES, "2_telas_e_botoes", "teste_*.py"))):
                 tarefas.append(("gui/" + os.path.basename(f), xv + [pg] + ([] if (a.sem_dev or os.name == "nt" or "soak" in os.path.basename(f)) else ["-X", "dev"]) + [f], os.path.dirname(f), 900 if "soak" in os.path.basename(f) else 400))   # Windows/dev e soak: sem modo dev (lento/incompatível) e com mais tempo
     tarefas = [t for t in tarefas if a.filtro in t[0]]
-    falhas = 0
+    falhas = pulados = 0
     for nome, cmd, cwd, lim in tarefas:
         # mostra qual teste está rodando ANTES de começar (alguns, como o de desempenho/força bruta, usam Argon2id
         # no nível alto/máximo de propósito devagar — sem isto a tela ficava muda por minutos nesses e parecia
@@ -119,16 +121,22 @@ def main():
         estado, ruins, tb, seg, saida = roda(nome, cmd, cwd, lim)
         _resultado.log_depuracao('geral', nome, cmd, estado, seg, saida, inicio)   # saída COMPLETA vai para o log de depuração
         _resultado.gravar_resultado_executor(nome, estado, seg, saida)
-        marca = "FALHOU" if estado.startswith("FALHOU") else "  ok  "
+        if estado.startswith("FALHOU"):
+            marca, detalhe = "FALHOU", estado
+        elif estado.startswith("PULADO"):
+            marca, detalhe = "PULADO", estado
+            pulados += 1
+        else:
+            marca, detalhe = "  ok  ", ""
         extra = "  (%d aviso(s) de Traceback, ruído de -W error)" % tb if tb and marca == "  ok  " else ""
-        print("[%s] %-38s %5.1fs  %s%s" % (marca, nome, seg, estado if marca == "FALHOU" else "", extra))
+        print("[%s] %-38s %5.1fs  %s%s" % (marca, nome, seg, detalhe, extra))
         if marca == "FALHOU":
             falhas += 1
             for l in ruins[:5]:
                 print("          >", l[:150])
             if a.v:
                 print("\n".join("          | " + l for l in saida.splitlines()[-25:]))
-    print("\n%d teste(s), %d falha(s)." % (len(tarefas), falhas))
+    print("\n%d teste(s), %d falha(s), %d pulado(s)." % (len(tarefas), falhas, pulados))
     return 1 if falhas else 0
 
 

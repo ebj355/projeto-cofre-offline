@@ -14,9 +14,14 @@ GUI = sorted(glob.glob(os.path.join(RAIZ_TESTES, "2_telas_e_botoes", "teste_*.py
 
 
 def _rodar(cmd, cwd, limite):
-    """Roda o comando e falha o teste com o final da saída se o código de saída não for zero."""
+    """Roda o comando, converte a ausência opcional de Hypothesis em skip e falha nos demais códigos não zero."""
     r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, errors="replace", timeout=limite)
     saida = (r.stdout or "") + (r.stderr or "")
+    if r.returncode == 9 and any(
+        linha.strip().casefold().startswith("pulado: hypothesis indisponivel")
+        for linha in saida.splitlines()
+    ):
+        pytest.skip("Hypothesis indisponível no ambiente")
     assert r.returncode == 0, "saiu com código %d\n%s" % (r.returncode, saida[-3000:])
 
 

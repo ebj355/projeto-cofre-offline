@@ -8,7 +8,7 @@ rem bandit/flake8/pip-audit sao OPCIONAIS (teste_pentest_sast.py e teste_pentest
 rem com aviso, se nao estiverem instalados) - por isso a instalacao delas aqui e so "melhor esforco", nunca
 rem trava o script se nao tiver internet.
 cd /d "%~dp0"
-set "RAIZ=%~dp0.."
+set "RAIZ=%~dp0..\.."
 set "VENV=%~dp0_venv_pentest_tmp"
 rem tudo fica DENTRO desta pasta (nada em %TEMP%\ ou solto no C:): o ambiente de teste fica aqui do lado e e
 rem apagado sozinho no fim. So o RESULTADO vai uma pasta acima, em testes\resultados\, junto com os outros.

@@ -8,7 +8,7 @@ Tudo que é teste está nesta pasta. Os testes trabalham em pastas temporárias:
 
 1. Em um computador com internet, execute na raiz `3 - BAIXAR PACOTES - so para instalar sem internet.bat`.
 2. Copie o projeto inteiro, inclusive `pacotes\`, para o computador sem internet. Os binários de `pacotes\` são ignorados pelo Git e não vêm em uma clonagem nova.
-3. Se o computador não tiver Python 3.13, execute `pacotes\python-3.13.17-*.exe`. As baterias instalam dependências com `--no-index` e não tentam baixar nada.
+3. Se o computador não tiver Python 3.13, execute `pacotes\python-3.13.17-*.exe`. As baterias instalam dependências com `--no-index` e não tentam baixar nada. Depois de alterar `requirements-test.txt`, rode novamente o item 3 para atualizar o wheelhouse; os wheels das ferramentas 05–12 ainda precisam ser incluídos e suas versões `>=` fixadas em `==` antes de distribuir o pacote offline.
 4. Pester é carregado do pacote local. Nmap está em `pacotes\nmap-7.993-setup.exe`, mas requer instalação manual e pode precisar de privilégios/Npcap.
 5. `pip-audit` é deliberadamente marcado como `PULADO` offline: o executável está no wheelhouse, mas sem consulta a uma base atual não é seguro afirmar que a auditoria está em dia. Com internet, use `COFRE_ONLINE_AUDIT=1` antes de abrir o BAT da auditoria.
 
@@ -19,22 +19,23 @@ python testes/6_ferramentas_dos_testes/rodar_todos.py              # núcleo + i
 python testes/6_ferramentas_dos_testes/rodar_todos.py --rapido     # só o núcleo (sem janelas)
 python testes/6_ferramentas_dos_testes/rodar_todos.py --so gui     # só a interface
 python testes/6_ferramentas_dos_testes/rodar_todos.py --filtro fido -v
+python testes/6_ferramentas_dos_testes/rodar_todos.py --so nucleo --filtro propriedades_hypothesis -v
 ```
 
 No Linux sem tela, a interface roda dentro do `xvfb-run`. No Windows, durante os testes de interface aparecem janelas
-por alguns segundos. O resumo mostra `ok` ou `FALHOU` por teste; o código de saída é 0 só se tudo passou.
+por alguns segundos. O resumo mostra `ok`, `PULADO` ou `FALHOU` por teste; opcional ausente (como Hypothesis, código 9) é `PULADO`, nunca aprovado. O código de saída é 0 se não houver falhas.
 Linhas `Traceback` em testes marcados `ok` são ruído do modo `-W error` (avisos de recurso), não falha.
 
 ## Pastas
 
 | Pasta / arquivo | O que é |
 |---|---|
-| `1_motor_do_cofre/` | `teste_*.py` (sem janelas): ataques, fido, forca, importacao, backup, severo, revisao6, transacao, memoria (só Linux), limites, io_diag, estatico, seguranca_extra, readme_constantes, vetores_criptograficos, qualidade_aleatoriedade, qualidade_codigo. `RODAR ESTA PASTA - testes do motor do cofre.bat` roda só esta bateria no **Windows real** (ambiente Python temporário, sem o instalador) |
+| `1_motor_do_cofre/` | `teste_*.py` (sem janelas): inclui testes por propriedades Hypothesis de ida e volta e CSV hostil, além de ataques, fido, importação, backup, concorrência, corrupção, fuzzing, memória e soak. Se Hypothesis não estiver no wheelhouse, o executor registra `[PULADO]` (código 9); com o wheel, o BAT do núcleo o instala no ambiente temporário. |
 | `2_telas_e_botoes/` | Interface (Tk): abrir/criar, editar, copiar, pessoas, importação, FIDO, alerta de tentativas, bloqueio, olho, navegação, energia, "macaco", segurança extra, acessibilidade por teclado, fluidez/glitches visuais. `RODAR ESTA PASTA - testes das telas e botoes.bat` roda só esta bateria no **Windows real** |
 | `4_so_no_windows/` | `A - testar o instalador.bat`: roda no **Windows real** só os testes do instalador/SO (sintaxe do `instalar_cofre.ps1`, import do programa, Pester) - a bateria do núcleo **não** roda mais aqui, veja `1_motor_do_cofre/`. `B - testar atributos e permissoes do Windows.bat`: atributos, ACL, SMBIOS, DPAPI, PC autorizado, DLLs |
 | `3_ataques_simulados/` | Pentest dedicado (14 `teste_pentest_*.py`): injeção de código, SSRF, força bruta/spraying, DoS, vazamento de memória (forense de RAM), bypass de contador/autodestruição, engenharia reversa, fuzzing adversarial/Unicode, SAST (bandit/flake8), dependências (pip-audit), canal lateral de tempo, exfiltração pela rede e link simbólico (achado real, corrigido), além da documentação explícita do que é fora de escopo. `rodar_pentest.py` roda só esta bateria; `RODAR ESTA PASTA - testes de ataque simulado.bat` roda no **Windows real**. Relatório: `resultados/relatorio_pentest.md` |
 | `resultados/` | Onde **todo** `resultado_*.txt` é gravado (de qualquer um dos `.bat` acima ou do `rodar_todos_windows.bat`) - uma pasta só para ver tudo, nunca sobrescrevendo (cada bateria tem seu próprio nome de arquivo). Não cria subpastas por rodada. |
-| `5_ferramentas_externas/` | Ferramentas externas: Bandit, pip-audit e Nmap. |
+| `5_ferramentas_externas/` | Ferramentas 01–12: Bandit, pip-audit, Nmap, PSScriptAnalyzer, pefile, Defender, busca de segredos, qualidade extra, SBOM, conexões do processo e Hypothesis. O `03_PYTEST_PROJETO.bat` é opcional e fica fora da bateria geral por repetir núcleo e interface. |
 | `6_ferramentas_dos_testes/` | O que **organiza** os testes, sem ser um teste em si: `rodar_todos.py` e `rodar_todos_windows.bat` (executores que chamam as 6 baterias), `test_pytest.py` (ponte opcional para o pytest), `_util_mem.py`, limpeza e relatórios. |
 | `PECA_DE_TESTE_cofre_versao_4_antiga.py` | Versão antiga do formato, usada pelo teste de migração (fica em `1_motor_do_cofre/`, junto do teste que a usa) |
 
@@ -67,6 +68,9 @@ Linhas `Traceback` em testes marcados `ok` são ruído do modo `-W error` (aviso
 - `2_telas_e_botoes/teste_gui_caps_fido.py`: ícone de Caps Lock dentro do campo e mensagens FIDO didáticas (próximo passo + código entre parênteses).
 - `2_telas_e_botoes/teste_gui_desempenho_usabilidade.py`: a medida de "abrir+fechar Novo item" usa a MENOR média de 4 rodadas (ruído de CPU só aumenta o tempo), para o teste medir o código e não a carga da máquina.
 - `2_telas_e_botoes/teste_gui_fluidez_animacoes.py`: regressão de glitches relatados de verdade: gerador de senhas fecha ANTES de preencher o campo (sem recentralizar o diálogo de baixo com o gerador ainda em cima); bloco destacado do código de recuperação sorteado e do tamanho certo; rajada de `<Configure>` (teclado virtual) vira poucas reconfigurações do Canvas (debounce); cartão do passeio guiado arrasta pelo título; varredura geral sem Toplevel/widget sobrando.
+
+## Ferramentas novas (05–12)
+O Testar Tudo chama as ferramentas automáticas 01, 02 e 04–12. O pytest (03) fica somente no menu por repetir as baterias 1 e 2. As novas ferramentas usam dependências em `requirements-test.txt`; rode `3 - BAIXAR PACOTES` com internet antes de usar em modo offline. Até os wheels estarem no pacote, ausência de ferramenta é `[PULADO]`; o Hypothesis é descoberto pelo executor do núcleo e código 9 é skip, enquanto falha real retorna código de falha. O atalho 12 é também uma forma de rodar esse teste isoladamente.
 
 - `teste_planilha_selo.py`: modelo selado e **importação estrita** (só o que o cofre gerou); `teste_nivel_protecao.py`: ranking de proteção; `teste_backup_chave.py`: backup exige a chave de acesso.
 - `2_telas_e_botoes/teste_gui_teclado_virtual.py`: teclado virtual sem recriar teclas (sem piscar), com contagem e Esc; `2_telas_e_botoes/teste_gui_ajustes_ui.py`: senhas sempre ocultas até o olho e painel de nível de proteção.

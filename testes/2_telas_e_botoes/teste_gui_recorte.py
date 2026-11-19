@@ -71,5 +71,6 @@ for geo in ("1366x768", "1024x640", "900x600"):
         for t in [x for x in root.winfo_children() if isinstance(x, tk.Toplevel)]: t.destroy()
         root.update()
     app.cofre.fechar(); app.cofre = None
+    app._cancelar_todos_after()
     root.destroy()
 print("FALHAS:", f.count(False)); sys.exit(1 if False in f else 0)

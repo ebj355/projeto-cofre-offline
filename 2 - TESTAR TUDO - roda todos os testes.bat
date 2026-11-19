@@ -1,6 +1,6 @@
 @echo off
 rem Atalho na RAIZ do projeto (fora da pasta testes\) para rodar a bateria COMPLETA de testes (as 6 baterias:
-rem nucleo, instalador, nativo, interface, pentest e ferramentas externas) sem precisar entrar em testes\6_ferramentas_dos_testes\. So CHAMA o
+rem nucleo, incluindo Hypothesis quando disponivel; instalador, nativo, interface, pentest e ferramentas externas 01, 02 e 04-12) sem precisar entrar em testes\6_ferramentas_dos_testes\. So CHAMA o
 rem rodar_todos_windows.bat de la - nao duplica nenhuma logica, so facilita o acesso.
 rem
 rem Cada pasta de teste (testes\1_motor_do_cofre\, testes\4_so_no_windows\, testes\2_telas_e_botoes\, testes\3_ataques_simulados\) ja tem o seu PROPRIO

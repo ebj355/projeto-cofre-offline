@@ -9,7 +9,9 @@ import datetime, glob, json, os, re, sys
 PASTA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "resultados")
 TESTES = os.path.dirname(PASTA)
 RUIM = re.compile(r"\[FALHOU\]|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]")
+INCOMPLETO = re.compile(r"\bKeyboardInterrupt\b|\bTimeoutExpired\b", re.I)
 OK = re.compile(r"\[OK\]|^\s*\[\s*ok\s*\]", re.I)
+PULADO = re.compile(r"^\s*\[PULADO\]", re.I)
 IGNORAR = ("resultado_rodar_todos_windows.txt",)          # é só a junção dos outros
 BATERIAS = (
     ("1_motor_do_cofre", "resultado_nucleo_windows.txt"),
@@ -26,10 +28,16 @@ def analisa(caminho):
     with open(caminho, encoding="utf-8", errors="replace") as f:
         linhas = f.read().splitlines()
     ruins = [l.strip()[:200] for l in linhas if RUIM.search(l)]
+    interrupcoes = [l.strip()[:200] for l in linhas if INCOMPLETO.search(l)]
+    if interrupcoes:
+        ruins.extend("execução interrompida/incompleta: " + l for l in interrupcoes[:20])
     n_ok = sum(1 for l in linhas if OK.search(l))
+    n_pulados = sum(1 for l in linhas if PULADO.search(l))
     nome = os.path.basename(caminho)[len("resultado_"):-len(".txt")]
     return {"nome": nome, "arquivo": os.path.basename(caminho), "ok": n_ok, "falhou": len(ruins),
-            "linhas_ruins": ruins[:20], "estado": "FALHOU" if ruins else "ok"}
+            "pulados": n_pulados, "linhas_ruins": ruins[:20],
+            "estado": "FALHOU" if ruins else "PULADO" if n_pulados and not n_ok else
+                      "ok (com testes pulados)" if n_pulados else "ok"}
 
 
 def main():
@@ -52,8 +60,9 @@ def main():
     quando = datetime.datetime.now().isoformat(timespec="seconds")
     ruins = [i for i in itens if i["estado"] == "FALHOU"]
     total_ok = sum(i["ok"] for i in itens)
-    md = ["# Resumo dos testes", "", "Gerado em %s | %d resultado(s) | %d verificações [OK] | %d teste(s) com falha" % (
-        quando, len(itens), total_ok, len(ruins)), "",
+    total_pulados = sum(i["pulados"] for i in itens)
+    md = ["# Resumo dos testes", "", "Gerado em %s | %d resultado(s) | %d verificações [OK] | %d resultado(s) com falha ou interrupção" % (
+        quando, len(itens), total_ok, len(ruins)) + " | %d teste(s) pulado(s)" % total_pulados, "",
         "Todas as baterias são gravadas diretamente em `testes/resultados/`, sem subpastas por rodada.", "",
         "| Pasta | Testes encontrados | Resultado |", "|---|---:|---|"]
     for pasta in pastas:
@@ -67,9 +76,11 @@ def main():
             estado = "resultado(s) presente(s): %d/%d" % (
                 len(pasta["resultados_presentes"]), len(pasta["arquivos_resultado"]))
         md.append("| %s | %d | %s |" % (pasta["pasta"], pasta["arquivos_de_teste"], estado))
-    md += ["", "| Teste | Estado | [OK] | Falhas |", "|---|---|---:|---:|"]
+    md += ["", "| Teste | Estado | [OK] | Pulados | Falhas |", "|---|---|---:|---:|---:|"]
     for i in itens:
-        md.append("| %s | %s | %d | %d |" % (i["nome"], "**FALHOU**" if i["estado"] == "FALHOU" else "ok", i["ok"], i["falhou"]))
+        estado = "**FALHOU**" if i["estado"] == "FALHOU" else "**PULADO**" if i["estado"] == "PULADO" else i["estado"]
+        md.append("| %s | %s | %d | %d | %d |" % (
+            i["nome"], estado, i["ok"], i["pulados"], i["falhou"]))
     if ruins:
         md += ["", "## O que falhou"]
         for i in ruins:

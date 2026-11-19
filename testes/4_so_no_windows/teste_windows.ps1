@@ -175,9 +175,15 @@ if ($py) {
         'python -X dev + tkinter abre e fecha'        = "$py -X dev -c `"import tkinter; r=tkinter.Tk(); r.withdraw(); r.destroy()`""
         'python -X dev + ctypes.windll'               = "$py -X dev -c `"import ctypes; ctypes.windll.user32.GetForegroundWindow()`""
     }
+    $sondasComFalha = 0
     foreach ($k in $sondas.Keys) {
         $o = & cmd /c "$($sondas[$k]) 2>&1"; $cod = $LASTEXITCODE
-        L ("    sonda [{0}] -> código {1}" -f $k, $cod)
+        $estadoSonda = if ($cod -eq 0) { 'OK' } else { 'AVISO' }
+        L ("    [{0}] sonda [{1}] -> código {2}" -f $estadoSonda, $k, $cod)
+        if ($cod -ne 0) { $sondasComFalha++ }
+    }
+    if ($sondasComFalha -gt 0) {
+        L ("[AVISO] {0} sonda(s) do modo -X dev falharam; os testes do projeto usam --sem-dev neste Windows." -f $sondasComFalha)
     }
     Remove-Item $tmpf -Force -ErrorAction SilentlyContinue
 }

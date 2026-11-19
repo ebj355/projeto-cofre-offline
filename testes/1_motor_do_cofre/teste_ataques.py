@@ -268,14 +268,16 @@ ok(v.registros[0]["servico"] == "Antigo" and open(P, "rb").read()[:8] == c.MAGIC
 ok(c.Cofre.abrir(P, senha=SENHA).registros[0]["servico"] == "Antigo", "depois da conversão, senha e chave seguem valendo")
 
 print("\n15) Custo da força bruta FORA do programa (copiando o arquivo)")
-novo(5, nivel="maximo")
+nivel_ataque = c.nivel_recomendado()
+novo(5, nivel=nivel_ataque)
 h = c._ler_cabecalho(open(P, "rb").read())
 n = 3
 t0 = time.time()
 for i in range(n):
     c.derivar_chave(f"chute{i}", h["sal_pw"], h["t"], h["m"], h["p"])
 dt = (time.time() - t0) / n
-print(f"     1 chute = {dt:.2f} s e 1 GiB de RAM neste computador (blindagem Máxima)")
+memoria_mb = h["m"] // 1024
+print(f"     1 chute = {dt:.2f} s e {memoria_mb} MiB de RAM neste computador (blindagem {nivel_ataque})")
 # Atacante com 10.000 GPUs muito potentes, cada uma 100x mais rápida que este PC
 taxa = 10_000 * 100 / dt
 ano = 3600 * 24 * 365
@@ -286,7 +288,11 @@ for nome, bits in [("senha fraca de 8 letras minúsculas", 8 * math.log2(26)),
     anos = (2 ** bits / 2) / taxa / ano
     txt = f"{anos:.1e} anos" if anos >= 1 else f"{anos * 365 * 24:.1f} horas"
     print(f"     {nome:38s} -> {txt}")
-ok(dt > 1, "cada chute é caro (Argon2id 1 GiB)")
+if nivel_ataque == "maximo":
+    ok(dt > 1, "cada chute é caro (Argon2id 1 GiB)")
+else:
+    ok(h["m"] == c.NIVEIS["alto"][1],
+       "a estimativa usa a blindagem Alta recomendada para a memória livre deste computador")
 print("     No modo DOIS FATORES o atacante ainda precisaria acertar a chave de 160 bits junto: impraticável.")
 
 for x in (P, P + ".tmp"):

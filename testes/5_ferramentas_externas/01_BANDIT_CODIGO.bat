@@ -5,6 +5,8 @@ rem Com a variavel COFRE_AUTO definida (bateria geral) nao mostra o relatorio na
 setlocal
 cd /d "%~dp0..\.."
 title Cofre - Bandit: analise estatica
+set "PYTHONUTF8=1"
+set "PYTHONIOENCODING=utf-8"
 if not exist "cofre_senhas.py" (
   echo ERRO: cofre_senhas.py nao encontrado na raiz do projeto.
   if not defined COFRE_AUTO pause

@@ -20,7 +20,12 @@ messagebox.showinfo = lambda *a, **k: None; messagebox.showerror = lambda *a, **
 messagebox.askyesno = lambda *a, **k: False
 tk.Misc.wait_window = lambda self, window=None: None      # diálogos modais não travam o teste
 W = _resultado.pasta_temporaria("cofre_gui_"); P = os.path.join(W, "r.dat"); S = "cavalo azul come pizza na chuva"
-c.Cofre.criar(P, S, 50, c.MODO_OU, "alto").salvar()
+_nivel_alto = c.NIVEIS["alto"]
+try:
+    c.NIVEIS["alto"] = (1, 8192)  # este teste mede ciclos de UI/recursos, não o custo do Argon2
+    c.Cofre.criar(P, S, 50, c.MODO_OU, "alto").fechar()
+finally:
+    c.NIVEIS["alto"] = _nivel_alto
 root = tk.Tk(); root.geometry("1366x768+0+0"); app = c.App(root, P)
 app.cofre = c.Cofre.abrir(P, senha=S); app.tela_principal(); root.update()
 # O teste NÃO pode depender de quem tem o foco no PC de quem roda (o bloqueio por falta de foco, a capa de "conteúdo
@@ -28,6 +33,7 @@ app.cofre = c.Cofre.abrir(P, senha=S); app.tela_principal(); root.update()
 sem_foco = [False]; app._app_sem_foco = lambda: sem_foco[0]
 def renova():
     app._ultimo_tique = time.time(); app._sem_foco_desde = None
+    app._atividade()
 
 
 def todos(w):
@@ -43,13 +49,15 @@ def novo():
     for _ in range(5):
         renova()
         if app.cofre is None:
-            app.cofre = c.Cofre.abrir(P, senha=S); app.tela_principal(); root.update()
+            app.cofre = c.Cofre.abrir(P, senha=S); app.tela_principal(); renova(); root.update()
         app.dialogo_registro(None); root.update(); root.update(); root.update()
         achou = next((w for w in janelas() if w.title() == "Novo item"), None)
         if achou is not None:
             return achou
         time.sleep(0.3)
-    raise AssertionError("o formulário 'Novo item' não abriu: cofre=%s, janelas=%r" % ("fechado" if app.cofre is None else "aberto", [w.title() for w in janelas()]))
+    raise AssertionError("o formulário 'Novo item' não abriu: cofre=%s, janelas=%r, erros=%r, erro_espias=%r, espias=%r" % (
+        "fechado" if app.cofre is None else "aberto", [w.title() for w in janelas()], erros,
+        app._espias_erro, app._espias_res))
 def ents(d):
     return [w for w in todos(d) if w.winfo_class() == "TEntry" and w.winfo_ismapped()]
 def textos(w):
@@ -80,11 +88,22 @@ ok(not erros, "sem mensagem de erro durante os cliques")
 ok(not any(w.title() == "Novo item" for w in janelas()), "a janela do formulário fechou")
 
 print("== B) texto gigante, unicode, RTL e caracteres de controle")
+class FonteContadora:
+    def __init__(self):
+        self.chamadas = 0
+    def measure(self, texto):
+        self.chamadas += 1
+        return len(texto)
+
+fonte = FonteContadora()
+cortado = c._cortar("x" * 2000, fonte, 80)
+ok(cortado == "x" * 79 + "…" and fonte.chamadas <= 14,
+   f"texto longo truncado com busca limitada ({fonte.chamadas} medições)")
 estranhos = ["x" * 5000, "🔐🗝️" * 500, "שלום עולם مرحبا " * 50, "linha1\nlinha2\ttab", "‮evil‬", "nulo\x00no meio", "ç~´`^ ÀÉÎÕÜ" * 100]
 for i, texto in enumerate(estranhos):
     renova()
     if app.cofre is None:
-        app.cofre = c.Cofre.abrir(P, senha=S); app.tela_principal(); root.update()
+        app.cofre = c.Cofre.abrir(P, senha=S); app.tela_principal(); renova(); root.update()
     try:
         d = novo(); e = ents(d); e[0].insert(0, f"Fuzz {i}"); e[1].insert(0, texto[:2000]); e[2].insert(0, texto)
         achar(d, "Salvar").invoke(); root.update()
@@ -100,22 +119,34 @@ print("== C) perda de foco")
 if app.cofre is None:
     app.cofre = c.Cofre.abrir(P, senha=S); app.tela_principal(); root.update()
 app.OCULTAR_APOS_MS = 200
-sem_foco[0] = True; renova()
+sem_foco[0] = False; renova()
 d = novo(); e = ents(d); e[0].insert(0, "Digitado e mantido")
+app._mostrar_conteudo()
+if app._timer_ocultar is not None:
+    root.after_cancel(app._timer_ocultar)
+    app._timer_ocultar = None
+sem_foco[0] = True
 app._agendar_ocultar(); t1 = app._timer_ocultar; app._agendar_ocultar()
 ok(app._timer_ocultar == t1, "pedidos repetidos de ocultar não empilham temporizadores")
 sem_foco[0] = False
 t0 = time.time()
 while time.time() - t0 < 0.5: root.update(); time.sleep(0.02)
 ok(not app._ocultadores, "foco roubado só por instantes (voltou antes): NÃO cobriu a tela")
+if app._timer_ocultar is not None:
+    root.after_cancel(app._timer_ocultar)
+    app._timer_ocultar = None
 sem_foco[0] = True; app._agendar_ocultar()
 t0 = time.time()
 while time.time() - t0 < 0.6: root.update(); time.sleep(0.02)
 ok(len(app._ocultadores) >= 1, "sem foco por mais que o prazo: cobriu o conteúdo")
+sem_foco[0] = False
+if app._timer_ocultar is not None:
+    root.after_cancel(app._timer_ocultar)
+    app._timer_ocultar = None
 app._mostrar_conteudo(); root.update()
 ok(not app._ocultadores, "clicar na capa tira o 'conteúdo oculto'")
 ok(ents(d)[0].get() == "Digitado e mantido", "o que o usuário digitou continua lá depois de cobrir e descobrir")
-d.destroy(); root.update(); sem_foco[0] = False
+d.destroy(); root.update()
 
 print("== D) 30 ciclos de abrir/bloquear (vazamento de recursos)")
 def fds():
@@ -124,10 +155,13 @@ def gdi():
     return _resultado.objetos_gdi()
 def ciclo():
     app.bloquear(); root.update()
-    app.cofre = c.Cofre.abrir(P, senha=S); app.tela_principal(); root.update()
+    app.cofre = c.Cofre.abrir(P, senha=S); app.tela_principal(); renova(); root.update()
 for _ in range(3): ciclo()                               # aquecimento
 base = (len(list(todos(root))), fds(), gdi(), len(janelas()))
-for _ in range(30): ciclo()
+for i in range(30):
+    ciclo()
+    if (i + 1) % 5 == 0:
+        print(f"  ciclo {i + 1}/30", flush=True)
 fim = (len(list(todos(root))), fds(), gdi(), len(janelas()))
 ok(fim[0] <= base[0] + 5, f"widgets não crescem: {base[0]} -> {fim[0]}")
 ok(base[1] is None or fim[1] <= base[1] + 3, f"descritores de arquivo não crescem: {base[1]} -> {fim[1]}")
@@ -179,10 +213,12 @@ app._executar_salvamento(lambda: 1)
 ok(vistos[-1] == "Salvando…", f"disco comum: '{vistos[-1]}'")
 def quebra(p): raise OSError("api falhou")
 c.unidade_removivel = quebra
-ok(app._executar_salvamento(lambda: 7) == 7 and vistos[-1] == "Salvando…", "se a detecção falhar, grava mesmo assim com o texto simples")
+ok(app._executar_salvamento(lambda: 7) == 7 and vistos[-1] == "Salvando… não retire o pendrive",
+   "se a detecção falhar, grava com o aviso preventivo")
 c.unidade_removivel = orig
 ok(app._salvando is False, "indicador 'salvando' volta a falso")
 
+app._cancelar_todos_after()
 root.destroy()
 print("\nTODOS OK" if all(f) else f"\nFALHAS: {f.count(False)} de {len(f)}")
 sys.exit(0 if all(f) else 1)

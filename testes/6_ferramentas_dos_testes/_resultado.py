@@ -116,7 +116,7 @@ def gravar_resultado_executor(nome, estado, segundos, saida):
     if base.startswith("teste_"):
         base = base[len("teste_"):]
     destino = "testes/resultados/resultado_" + base + ".txt"
-    marca = "[FALHOU]" if estado.startswith("FALHOU") else "[OK]"
+    marca = "[FALHOU]" if estado.startswith("FALHOU") else "[PULADO]" if estado.startswith("PULADO") else "[OK]"
     try:
         destino = os.path.join(pasta_resultados(), "resultado_" + base + ".txt")
         with open(destino, "w", encoding="utf-8", errors="replace") as f:
