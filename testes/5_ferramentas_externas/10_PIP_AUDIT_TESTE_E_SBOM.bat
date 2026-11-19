@@ -18,22 +18,19 @@ if errorlevel 1 (
   if not defined COFRE_AUTO pause
   exit /b 9
 )
-set "PIP_NO_CACHE_DIR=1"
-set "PIP_DEFAULT_TIMEOUT=15"
-set "PIP_RETRIES=0"
 echo Projeto: %CD% > "%LOG%"
 echo Data: %DATE% %TIME% >> "%LOG%"
 set "REQ_AUDIT=%TEMP%\cofre-requirements-test-%RANDOM%-%RANDOM%.txt"
 "%COFRE_PYTHON%" -c "from pathlib import Path; p=Path('requirements-test.txt'); q=Path(r'%REQ_AUDIT%'); linhas=p.read_text(encoding='utf-8-sig').splitlines(); base=lambda l:l.split(';',1)[0].strip(); fixas=[l for l in linhas if l.strip() and not l.lstrip().startswith('#') and '==' in base(l) and not any(op in base(l) for op in ('>=','<=','~=','!=','<','>'))]; pendentes=[base(l) for l in linhas if l.strip() and not l.lstrip().startswith('#') and l not in fixas]; q.write_text('\n'.join(fixas)+'\n',encoding='utf-8'); print('Dependencias de teste fixadas auditadas: '+str(len(fixas))+'; faixas nao fixadas puladas: '+(', '.join(pendentes) or 'nenhuma'))" >> "%LOG%" 2>&1
 if errorlevel 1 goto audit_teste_preparacao_falhou
-"%COFRE_PYTHON%" -m pip_audit -r "%REQ_AUDIT%" --no-deps --disable-pip --timeout 15 >> "%LOG%" 2>&1
+"%COFRE_PYTHON%" "%~dp0..\6_ferramentas_dos_testes\rodar_pip_audit.py" --python "%COFRE_PYTHON%" --requirements "%REQ_AUDIT%" --log "%LOG%" --timeout 60
 set "RC=%ERRORLEVEL%"
 goto audit_teste_preparacao_pronta
 :audit_teste_preparacao_falhou
 set "RC=1"
 :audit_teste_preparacao_pronta
 del "%REQ_AUDIT%" >nul 2>nul
-"%COFRE_PYTHON%" -m pip_audit -r requirements.txt --no-deps --disable-pip --timeout 15 -f cyclonedx-json -o "%REL%\sbom.cdx.json" >> "%LOG%" 2>&1
+"%COFRE_PYTHON%" "%~dp0..\6_ferramentas_dos_testes\rodar_pip_audit.py" --python "%COFRE_PYTHON%" --requirements "requirements.txt" --log "%LOG%" --timeout 60 --format cyclonedx-json --output "%REL%\sbom.cdx.json"
 set "RC_SBOM=%ERRORLEVEL%"
 if "%RC%"=="0" set "RC=%RC_SBOM%"
 echo Codigo de saida: %RC%>> "%LOG%"

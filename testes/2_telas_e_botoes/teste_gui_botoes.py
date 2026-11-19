@@ -3,6 +3,8 @@ nenhum evento levanta exceção, que não sobram janelas, que os textos fixos da
 que os 3 modos de abertura (só senha / senha+chave / senha ou chave) mostram os campos certos e que o
 desempenho fica dentro do limite. Roda no Linux com xvfb-run."""
 import os, sys, tempfile, time
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 sys.path.insert(0, _RAIZ)
 import tkinter as tk

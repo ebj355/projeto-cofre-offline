@@ -27,14 +27,11 @@ if errorlevel 1 (
   if not defined COFRE_AUTO pause
   exit /b 9
 )
-set "PIP_NO_CACHE_DIR=1"
-set "PIP_DEFAULT_TIMEOUT=15"
-set "PIP_RETRIES=0"
 echo Auditando as dependencias declaradas em requirements.txt...
 echo Projeto: %CD% > "%LOG%"
 echo Data: %DATE% %TIME% >> "%LOG%"
 echo. >> "%LOG%"
-"%COFRE_PYTHON%" -m pip_audit -r "requirements.txt" --no-deps --disable-pip --timeout 15 >> "%LOG%" 2>&1
+"%COFRE_PYTHON%" "%~dp0..\6_ferramentas_dos_testes\rodar_pip_audit.py" --python "%COFRE_PYTHON%" --requirements "requirements.txt" --log "%LOG%" --timeout 60
 set "RC=%ERRORLEVEL%"
 echo.>> "%LOG%"
 echo Codigo de saida: %RC%>> "%LOG%"

@@ -6348,6 +6348,7 @@ def sem_piscar(funcao):
             try:
                 self._publicar_tela()
                 self.root.update_idletasks()
+                self.root.update()
             except tk.TclError:
                 pass
     return interno
