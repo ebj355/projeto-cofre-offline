@@ -56,6 +56,7 @@ import errno
 import copy
 import shutil
 import atexit
+import tempfile
 
 EH_WINDOWS = sys.platform == "win32"
 if EH_WINDOWS:
@@ -1177,18 +1178,43 @@ def _limpar_temporarios_interrompidos(caminho):
         pid = int(nome)
         if pid <= 0:
             continue
-        try:
-            os.kill(pid, 0)
-        except PermissionError:
-            continue
-        except OverflowError:
-            continue
-        except OSError as ex:
-            if ex.errno != errno.ESRCH and getattr(ex, "winerror", None) != 87:
-                diag_registrar(DIAG_GRAVACAO, ex)
-                continue
+        if EH_WINDOWS:
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+            kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                erro = ctypes.get_last_error()
+                if erro != 87:                   # ERROR_INVALID_PARAMETER: o processo já não existe
+                    diag_registrar(DIAG_GRAVACAO, ctypes.WinError(erro))
+                    continue
         else:
-            continue
+            try:
+                os.kill(pid, 0)
+            except PermissionError:
+                continue
+            except OverflowError:
+                continue
+            except OSError as ex:
+                if ex.errno != errno.ESRCH:
+                    diag_registrar(DIAG_GRAVACAO, ex)
+                    continue
+            else:
+                continue
+        if EH_WINDOWS and handle:
+            try:
+                codigo_saida = wintypes.DWORD()
+                if not kernel32.GetExitCodeProcess(handle, ctypes.byref(codigo_saida)):
+                    diag_registrar(DIAG_GRAVACAO, ctypes.WinError(ctypes.get_last_error()))
+                    continue
+                if codigo_saida.value == 259:    # STILL_ACTIVE
+                    continue
+            finally:
+                kernel32.CloseHandle(handle)
         try:
             os.remove(temporario)
         except FileNotFoundError:
@@ -3178,7 +3204,8 @@ class Cofre:
         resultante recusa qualquer salvamento.
         Se o cofre exigir FIDO: 'fido' é uma função (lista_de_credenciais, salt) -> (credencial, saída)
         que toca a chave física; ou então 'recuperacao' é o código de recuperação em texto."""
-        _limpar_temporarios_interrompidos(caminho)
+        for destino in (caminho, *_copias(caminho)):
+            _limpar_temporarios_interrompidos(destino)
         with open(caminho, "rb") as f:
             bruto = f.read(LIMITE_COFRE + 1)
         if len(bruto) > LIMITE_COFRE:
@@ -4977,6 +5004,7 @@ CORES = {
     "prim_press": "#4b43d1",
     "prim_txt": "#a8a3ff",
     "prim_fundo": "#211f42",  # seleção / destaque suave
+    "prim_fg": "#ffffff",
     # estados
     "ok": "#3dd68c", "ok_fundo": "#13291f",
     "alerta": "#f5b544", "alerta_fundo": "#2e2414",
@@ -4990,6 +5018,157 @@ CORES.update({
     "cabecalho": CORES["fundo"], "noite": CORES["fundo"], "neutro": CORES["sup2"],
     "neutro_hover": CORES["sup3"],
 })
+
+CORES_BASE = dict(CORES)
+PALETAS = {
+    "Roxo (atual)": CORES_BASE.copy(),
+    "Obsidiana": {
+        **CORES_BASE, "fundo": "#111315", "lateral": "#0d0f11", "sup": "#181a1e",
+        "sup2": "#1f2228", "sup3": "#252932", "sup4": "#30353d", "campo": "#121417",
+        "borda": "#242830", "borda2": "#2c303a", "texto": "#f3f4f6", "suave": "#9ca3af",
+        "fraco": "#6b7280", "prim": "#059669", "prim_hover": "#10b981", "prim_press": "#047857",
+        "prim_txt": "#34d399", "prim_fundo": "#102c24", "prim_fg": "#ffffff",
+        "ok": "#34d399", "ok_fundo": "#102c24", "alerta": "#f59e0b", "alerta_fundo": "#30230e",
+        "perigo": "#f05252", "perigo_fundo": "#301819", "num": "#7dd3fc", "sim": "#f472b6",
+    },
+    "Claro": {
+        **CORES_BASE, "fundo": "#f4f5f7", "lateral": "#eceef2", "sup": "#ffffff",
+        "sup2": "#f1f3f5", "sup3": "#e8ebf0", "sup4": "#dfe3e9", "campo": "#f9fafb",
+        "borda": "#e2e5ea", "borda2": "#d1d5db", "texto": "#111827", "suave": "#4b5563",
+        "fraco": "#6b7280", "prim": "#1d4ed8", "prim_hover": "#2563eb", "prim_press": "#1e40af",
+        "prim_txt": "#2563eb", "prim_fundo": "#dbeafe", "prim_fg": "#ffffff",
+        "ok": "#15803d", "ok_fundo": "#dcfce7", "alerta": "#b45309", "alerta_fundo": "#fef3c7",
+        "perigo": "#b91c1c", "perigo_fundo": "#fee2e2", "num": "#1d4ed8", "sim": "#be185d",
+    },
+    "Terminal": {
+        **CORES_BASE, "fundo": "#090a0b", "lateral": "#08090b", "sup": "#0e1013",
+        "sup2": "#14171c", "sup3": "#171b22", "sup4": "#22262e", "campo": "#08090b",
+        "borda": "#1c2026", "borda2": "#282d37", "texto": "#e5e7eb", "suave": "#94a3b8",
+        "fraco": "#64748b", "prim": "#0ea5e9", "prim_hover": "#38bdf8", "prim_press": "#0284c7",
+        "prim_txt": "#38bdf8", "prim_fundo": "#102b38", "prim_fg": "#041019",
+        "ok": "#34d399", "ok_fundo": "#102c24", "alerta": "#fbbf24", "alerta_fundo": "#30250e",
+        "perigo": "#f87171", "perigo_fundo": "#301819", "num": "#38bdf8", "sim": "#f472b6",
+    },
+    "Azul (Novo Item)": {
+        **CORES_BASE, "fundo": "#0b101d", "lateral": "#090e1a", "sup": "#111827",
+        "sup2": "#182235", "sup3": "#202d43", "sup4": "#2b3a54", "campo": "#090e1a",
+        "borda": "#202b3d", "borda2": "#334155", "texto": "#f8fafc", "suave": "#cbd5e1",
+        "fraco": "#94a3b8", "prim": "#2563eb", "prim_hover": "#3b82f6", "prim_press": "#1d4ed8",
+        "prim_txt": "#93c5fd", "prim_fundo": "#172554", "prim_fg": "#ffffff",
+        "ok": "#34d399", "ok_fundo": "#102c24", "alerta": "#fbbf24", "alerta_fundo": "#30250e",
+        "perigo": "#fb7185", "perigo_fundo": "#301819", "num": "#7dd3fc", "sim": "#f472b6",
+    },
+    "Rosa": {
+        **CORES_BASE, "fundo": "#160e14", "lateral": "#100a0f", "sup": "#21151e",
+        "sup2": "#2c1c28", "sup3": "#392533", "sup4": "#48303f", "campo": "#180f16",
+        "borda": "#382631", "borda2": "#503743", "texto": "#f8f1f5", "suave": "#d2bcc8",
+        "fraco": "#b18b9f", "prim": "#b45382", "prim_hover": "#c86c9a", "prim_press": "#934267",
+        "prim_txt": "#e7a9c5", "prim_fundo": "#3a2030", "prim_fg": "#ffffff",
+        "ok": "#34d399", "ok_fundo": "#102c24", "alerta": "#fbbf24", "alerta_fundo": "#30250e",
+        "perigo": "#fb7185", "perigo_fundo": "#301819", "num": "#7dd3fc", "sim": "#f0a8d0",
+    },
+}
+TEMA_PADRAO = "Roxo (atual)"
+TEMA_ATUAL = TEMA_PADRAO
+
+
+def _caminho_preferencias():
+    """Preferências visuais globais, sem senhas nem dados de cofres."""
+    if EH_WINDOWS:
+        base = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Local")
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, "CofreSenhas", "preferencias.json")
+
+
+def _luminancia_wcag(cor):
+    """Calcula a luminância relativa de uma cor sRGB para escolher texto legível."""
+    canais = [v / 255 for v in _hex(cor)]
+    canais = [v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in canais]
+    return 0.2126 * canais[0] + 0.7152 * canais[1] + 0.0722 * canais[2]
+
+
+def _contraste_wcag(a, b):
+    """Calcula a razão de contraste WCAG entre duas cores."""
+    l1, l2 = sorted((_luminancia_wcag(a), _luminancia_wcag(b)), reverse=True)
+    return (l1 + 0.05) / (l2 + 0.05)
+
+
+def _texto_contraste(fundo):
+    """Seleciona entre texto claro e escuro o que tiver maior contraste com o fundo."""
+    claro, escuro = "#ffffff", "#111827"
+    return max((claro, escuro), key=lambda cor: _contraste_wcag(cor, fundo))
+
+
+def _cores_da_paleta(nome):
+    """Devolve uma paleta independente, incluindo aliases antigos usados pela interface."""
+    cores = PALETAS.get(nome)
+    if cores is None:
+        raise ValueError(f"Tema desconhecido: {nome}")
+    cores = dict(cores)
+    cores["prim_fg"] = _texto_contraste(cores["prim"])
+    cores.update({
+        "prim_esc": cores["prim_press"], "prim_claro": cores["prim_fundo"], "sel": cores["prim_fundo"],
+        "lateral_sel": cores["prim_fundo"], "lateral_txt": cores["texto"], "lateral_titulo": cores["fraco"],
+        "cabecalho": cores["fundo"], "noite": cores["fundo"], "neutro": cores["sup2"],
+        "neutro_hover": cores["sup3"],
+    })
+    return cores
+
+
+def _definir_tema(nome):
+    """Aplica os valores globais de cor e limpa imagens cacheadas com a paleta anterior."""
+    global TEMA_ATUAL
+    novas = _cores_da_paleta(nome)
+    CORES.clear()
+    CORES.update(novas)
+    TEMA_ATUAL = nome
+    _CACHE_ICONES.clear()
+    _PONTOS.clear()
+
+
+def _carregar_preferencia_tema():
+    """Lê a única preferência global de aparência; arquivo ausente significa o roxo padrão."""
+    caminho = _caminho_preferencias()
+    if not os.path.exists(caminho):
+        return TEMA_PADRAO
+    try:
+        with open(caminho, encoding="utf-8") as f:
+            dados = json.load(f)
+        if not isinstance(dados, dict):
+            raise ValueError("Formato da preferência não reconhecido.")
+        nome = dados.get("tema", TEMA_PADRAO)
+        if nome == "Personalizada":
+            nome = dados.get("base", TEMA_PADRAO)
+        if not isinstance(nome, str) or nome not in PALETAS:
+            raise ValueError("Tema salvo não é reconhecido.")
+        return nome
+    except (OSError, ValueError, TypeError) as ex:
+        print(f"AVISO: não foi possível ler a preferência de aparência: {ex}", file=sys.stderr)
+        return TEMA_PADRAO
+
+
+def _salvar_preferencia_tema(nome):
+    """Salva a aparência global de forma atômica, sem registrar dados do cofre."""
+    if not isinstance(nome, str) or nome not in PALETAS:
+        raise ValueError(f"Tema desconhecido: {nome}")
+    caminho = _caminho_preferencias()
+    os.makedirs(os.path.dirname(caminho), exist_ok=True)
+    dados = {"tema": nome}
+    fd, temporario = tempfile.mkstemp(prefix="preferencias-", suffix=".tmp", dir=os.path.dirname(caminho))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(dados, f, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporario, caminho)
+    except OSError:
+        try:
+            os.unlink(temporario)
+        except OSError:
+            pass
+        raise
+
 
 TONS = ("#6c63ff", "#22a6c9", "#2fbf71", "#e3a03a", "#e0568f", "#9a6bff", "#3d8bfd", "#f07a3c",
         "#20b2a0", "#e05561")
@@ -5141,9 +5320,9 @@ def _pecas():
         t.contorno(0, 0, 24, 23, 6, C["prim"] if foco else borda, 1.6 if foco else 1.0)
         return t
     P["btn"] = botao(C["sup2"], C["borda2"])
-    P["btn_hover"] = botao(C["sup3"], "#3d4558")
+    P["btn_hover"] = botao(C["sup3"], C["borda2"])
     P["btn_press"] = botao(C["sup"], C["borda2"], sombra=False)
-    P["btn_dis"] = botao("#14171e", "#22262f", sombra=False)
+    P["btn_dis"] = botao(C["sup"], C["borda"], sombra=False)
     P["btn_foco"] = botao(C["sup2"], C["borda2"], foco=True)
     P["btn_foco_hover"] = botao(C["sup3"], C["borda2"], foco=True)
 
@@ -5160,7 +5339,7 @@ def _pecas():
     P["pri"] = acento(C["prim"])
     P["pri_hover"] = acento(C["prim_hover"])
     P["pri_press"] = acento(C["prim_press"], sombra=False)
-    P["pri_dis"] = acento("#2c2a52", sombra=False)
+    P["pri_dis"] = acento(C["prim_fundo"], sombra=False)
     P["pri_foco"] = acento(C["prim"], foco=True)
     P["pri_foco_hover"] = acento(C["prim_hover"], foco=True)
 
@@ -5171,8 +5350,8 @@ def _pecas():
         t.contorno(0, 0, 24, 23, 6, C["prim"] if foco else borda, 1.6 if foco else 1.0)
         return t
     P["per"] = perigo(C["sup2"], C["borda2"])
-    P["per_hover"] = perigo(C["perigo_fundo"], "#6b2a32")
-    P["per_press"] = perigo("#3a1a1f", "#6b2a32")
+    P["per_hover"] = perigo(C["perigo_fundo"], C["perigo"])
+    P["per_press"] = perigo(C["perigo_fundo"], C["perigo"])
     P["per_foco"] = perigo(C["sup2"], C["borda2"], True)
 
     def fantasma(fundo=None, foco=False):
@@ -5198,9 +5377,9 @@ def _pecas():
             t.pintar(lambda x, y: _sd_rrect(x, y, 1, 0, 23, 23, 5.5) if y > 21 else 9, C["prim"])
         return t
     P["campo"] = campo(C["borda2"])
-    P["campo_hover"] = campo("#3f4759")
+    P["campo_hover"] = campo(C["borda2"], fundo=C["sup2"])
     P["campo_foco"] = campo(C["prim"], foco=True, larg=1.3)
-    P["campo_dis"] = campo("#22262f", fundo="#12141a")
+    P["campo_dis"] = campo(C["borda"], fundo=C["sup"])
     P["campo_erro"] = campo(C["perigo"], larg=1.3)
 
     def caixa(estado):
@@ -5502,7 +5681,7 @@ def aplicar_tema(root):
 
     root.tk_setPalette(background=C["fundo"], foreground=C["texto"], activeBackground=C["sup3"],
                        activeForeground=C["texto"], highlightColor=C["prim"], highlightBackground=C["fundo"],
-                       selectBackground=C["prim"], selectForeground="#ffffff", insertBackground=C["texto"],
+                       selectBackground=C["prim"], selectForeground=C["prim_fg"], insertBackground=C["texto"],
                        troughColor=C["sup"], disabledForeground=C["fraco"])
     for classe in ("Label", "Button", "Entry", "Text", "Checkbutton", "Radiobutton", "Listbox", "Menu",
                    "Spinbox", "Scale", "Menubutton", "Message", "TEntry", "TCombobox", "TSpinbox"):
@@ -5515,14 +5694,14 @@ def aplicar_tema(root):
     root.option_add("*Menu.background", C["sup2"])
     root.option_add("*Menu.foreground", C["texto"])
     root.option_add("*Menu.activeBackground", C["prim"])
-    root.option_add("*Menu.activeForeground", "#ffffff")
+    root.option_add("*Menu.activeForeground", C["prim_fg"])
     root.option_add("*Menu.relief", "flat")
     root.option_add("*Menu.borderWidth", 0)
     root.option_add("*Menu.activeBorderWidth", 0)
     root.option_add("*TCombobox*Listbox.background", C["sup2"])
     root.option_add("*TCombobox*Listbox.foreground", C["texto"])
     root.option_add("*TCombobox*Listbox.selectBackground", C["prim"])
-    root.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
+    root.option_add("*TCombobox*Listbox.selectForeground", C["prim_fg"])
     root.option_add("*TCombobox*Listbox.font", "CofreTexto")
     root.option_add("*TCombobox*Listbox.borderWidth", 0)
     root.option_add("*Text.background", C["campo"])
@@ -5534,7 +5713,7 @@ def aplicar_tema(root):
 
     st.configure(".", background=C["fundo"], foreground=C["texto"], font="CofreTexto", bordercolor=C["borda"],
                  lightcolor=C["fundo"], darkcolor=C["fundo"], troughcolor=C["sup"], focuscolor=C["prim"],
-                 selectbackground=C["prim"], selectforeground="#ffffff", insertcolor=C["texto"],
+                 selectbackground=C["prim"], selectforeground=C["prim_fg"], insertcolor=C["texto"],
                  insertwidth=1, fieldbackground=C["campo"], borderwidth=0, relief="flat")
     st.map(".", foreground=[("disabled", C["fraco"])])
 
@@ -5563,10 +5742,10 @@ def aplicar_tema(root):
     botao("Acao.TButton", "Cofre.botaoA", "btn", padrao, padding=(14, 7))
     primario = [("disabled", "pri_dis"), ("pressed", "pri_press"), ("active focus", "pri_foco_hover"),
                 ("active", "pri_hover"), ("focus", "pri_foco")]
-    botao("Primario.TButton", "Cofre.primario", "pri", primario, padding=(18, 7), fg="#ffffff",
-          fg_map=[("disabled", "#7c79a8")], font="CofreForte")
-    botao("Accent.TButton", "Cofre.primario2", "pri", primario, padding=(14, 7), fg="#ffffff",
-          fg_map=[("disabled", "#7c79a8")], font="CofreForte")
+    botao("Primario.TButton", "Cofre.primario", "pri", primario, padding=(18, 7), fg=C["prim_fg"],
+          fg_map=[("disabled", C["fraco"])], font="CofreForte")
+    botao("Accent.TButton", "Cofre.primario2", "pri", primario, padding=(14, 7), fg=C["prim_fg"],
+          fg_map=[("disabled", C["fraco"])], font="CofreForte")
     perigo = [("pressed", "per_press"), ("active", "per_hover"), ("focus", "per_foco")]
     botao("Perigo.TButton", "Cofre.perigo", "per", perigo, padding=(14, 7), fg=C["perigo"],
           fg_map=[("disabled", "#5d6476")])
@@ -5714,7 +5893,7 @@ def aplicar_tema(root):
     st.map("Treeview.Heading", foreground=[("active", C["suave"])])
     st.configure("Treeview", background=C["sup"], fieldbackground=C["sup"], foreground=C["texto"],
                  rowheight=_px(34), borderwidth=0, font="CofreTexto")
-    st.map("Treeview", background=[("selected", C["prim_fundo"])], foreground=[("selected", "#ffffff")])
+    st.map("Treeview", background=[("selected", C["prim_fundo"])], foreground=[("selected", C["texto"])])
     st.element_create("Cofre.indicador", "image", P["seta_dir"], ("user1", P["seta_baixo"]),
                       ("user2", P["vazio"]), width=_px(22), sticky="")
     st.layout("Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
@@ -6186,6 +6365,55 @@ def tom_para(texto):
     return TONS[hashlib.sha256((texto or "?").lower().encode()).digest()[0] % len(TONS)]
 
 
+_MONOGRAMAS_SERVICOS = {
+    "nubank": "NU", "inter": "IN", "itau": "IT", "bradesco": "BR", "santander": "SA", "caixa": "CX",
+    "banco do brasil": "BB", "bancodobrasil": "BB", "bb": "BB", "c6 bank": "C6", "c6bank": "C6",
+    "c6": "C6", "btg pactual": "BTG", "btgpactual": "BTG", "btg": "BTG", "mercado pago": "MP",
+    "mercadopago": "MP", "picpay": "PP",
+    "wise": "WI", "paypal": "PY", "xp": "XP", "rico": "RI", "clear": "CL", "binance": "BN",
+    "instagram": "IG", "whatsapp": "WA", "tiktok": "TK", "facebook": "FB", "linkedin": "LI",
+    "twitter": "X", "x": "X", "pinterest": "PI", "discord": "DC", "telegram": "TG", "reddit": "RD",
+    "twitch": "TW", "google drive": "GD", "drive google": "GD", "googledrive": "GD", "drive": "GD",
+    "gmail": "GM", "google": "GO",
+    "outlook": "MS",
+    "microsoft": "MS", "icloud": "AP", "apple": "AP", "yahoo": "YH", "onedrive": "OD", "dropbox": "DB",
+    "notion": "NO", "youtube": "YT", "netflix": "NF", "spotify": "SP", "amazon prime video": "PV",
+    "amazonprimevideo": "PV", "prime video": "PV", "primevideo": "PV", "disney plus": "DI", "disneyplus": "DI",
+    "disney": "DI", "amazon": "AM", "mercado livre": "ML", "mercadolivre": "ML",
+    "shopee": "SH", "aliexpress": "AX", "github": "GH", "gitlab": "GL", "chatgpt": "AI", "openai": "AI",
+    "figma": "FG", "canva": "CV", "steam": "ST", "playstation": "PS", "xbox": "XB", "riot games": "RG",
+    "riotgames": "RG", "riot": "RG", "epic games": "EG", "epicgames": "EG", "epic": "EG",
+}
+_MONOGRAMAS_CATEGORIAS = {
+    "banco": "BC", "bancos": "BC", "financas": "BC", "financeiro": "BC", "pagamentos": "BC",
+    "carteira": "BC", "investimentos": "BC", "corretora": "BC", "rede social": "RS", "redes sociais": "RS",
+    "mensagens": "RS", "comunicacao": "RS", "email": "EM", "e mail": "EM", "conta": "EM",
+    "identidade": "EM", "nuvem": "NV", "produtividade": "NV", "streaming": "ST", "loja": "LO",
+    "compras": "LO", "assinaturas": "LO", "trabalho": "TI", "desenvolvimento": "TI", "codigo": "TI",
+    "jogos": "JG", "lazer": "JG",
+}
+
+
+def _normalizar_nome_visual(texto):
+    """Normaliza nomes e URLs para reconhecer serviços sem diferenciar acentos ou pontuação."""
+    sem_acentos = unicodedata.normalize("NFKD", str(texto or ""))
+    ascii_nome = sem_acentos.encode("ascii", "ignore").decode("ascii").casefold()
+    return re.sub(r"[^a-z0-9]+", " ", ascii_nome).strip()
+
+
+def marca_servico(servico, grupo=""):
+    """Retorna um monograma local e discreto, sem buscar ou reproduzir logos oficiais."""
+    nome = _normalizar_nome_visual(servico)
+    for alias in sorted(_MONOGRAMAS_SERVICOS, key=len, reverse=True):
+        if re.search(rf"(?:^| ){re.escape(alias)}(?: |$)", nome):
+            return _MONOGRAMAS_SERVICOS[alias]
+    categoria = _normalizar_nome_visual(grupo)
+    for alias in sorted(_MONOGRAMAS_CATEGORIAS, key=len, reverse=True):
+        if re.search(rf"(?:^| ){re.escape(alias)}(?: |$)", categoria):
+            return _MONOGRAMAS_CATEGORIAS[alias]
+    return ""
+
+
 # ---------- componentes da tela principal ----------
 def _cortar(texto, fonte, largura):
     """Corta o texto com '…' para caber em 'largura' pixels."""
@@ -6342,12 +6570,12 @@ class BarraLateral(tk.Frame if tk else object):
             return
         C = CORES
         sel = iid == self._sel
-        fundo = C["lateral_sel"] if sel else ("#13161e" if hover else C["lateral"])
+        fundo = C["lateral_sel"] if sel else (C["sup3"] if hover else C["lateral"])
         try:
             for w in it["partes"]:
                 w.configure(bg=fundo)
             it["barra"].configure(bg=C["prim"] if sel else fundo)
-            it["texto"].configure(fg="#ffffff" if sel else it["cor_txt"],
+            it["texto"].configure(fg=C["texto"] if sel else it["cor_txt"],
                                   font="CofreForte" if sel else "CofreTexto")
             e = it["ent"]
             if not e.get("cor"):
@@ -6530,7 +6758,7 @@ class ListaContas(tk.Frame if tk else object):
         q = _px
         larg_hl = w - q(16)
         self._hl_sel = self._img(("sel", larg_hl), lambda: imagem_nove_fatias(
-            c, *peca_cartao(C["prim_fundo"], "#34306b", 10), larg_hl, self.ALT - q(6)))
+            c, *peca_cartao(C["prim_fundo"], C["borda2"], 10), larg_hl, self.ALT - q(6)))
         self._hl_hover = self._img(("hov", larg_hl), lambda: imagem_nove_fatias(
             c, *peca_cartao(C["sup"], None, 10), larg_hl, self.ALT - q(6)))
         c.create_image(-999, -999, image=self._hl_hover, anchor="nw", tags="hover")
@@ -6565,9 +6793,18 @@ class ListaContas(tk.Frame if tk else object):
             r = self._linhas[i]
             y = q(8) + i * self.ALT
             meio = y + self.ALT / 2
-            av = self._img(("av", r["cor"]), lambda cor=r["cor"]: desenhar_avatar(cor, 38).imagem(c))
+            marca = r.get("marca")
+            if marca is None:
+                marca = marca_servico(r["titulo"], r.get("grupo", ""))
+                r["marca"] = marca
+            cor = r.get("cor")
+            if cor is None:
+                cor = C["prim_fundo"] if marca else C["sup3"]
+                r["cor"] = cor
+            av = self._img(("av", cor), lambda cor=cor: desenhar_avatar(cor, 38).imagem(c))
             c.create_image(q(36), meio, image=av)
-            c.create_text(q(36), meio, text=(r["titulo"].strip()[:1] or "?").upper(), fill="#ffffff",
+            c.create_text(q(36), meio, text=marca or (r["titulo"].strip()[:1] or "?").upper(),
+                          fill=C["texto"],
                           font="CofreForte")
             direita = w - q(18)
             icones = []
@@ -6643,7 +6880,8 @@ class ListaContas(tk.Frame if tk else object):
                 j = tk.Toplevel(self)
                 j.overrideredirect(True)
                 j.attributes("-topmost", True)
-                tk.Label(j, text="  " + self._linhas[i]["titulo"][:40] + "  ", bg=CORES["prim_fundo"], fg="#ffffff",
+                tk.Label(j, text="  " + self._linhas[i]["titulo"][:40] + "  ", bg=CORES["prim_fundo"],
+                         fg=CORES["texto"],
                          font="CofreForte", padx=10, pady=6).pack()
             except tk.TclError:
                 return
@@ -7185,6 +7423,8 @@ class App:
         self._timer_bloqueio = None
         self._timer_clip = None
         self._clip_valor = None
+        self.tema = _carregar_preferencia_tema()
+        _definir_tema(self.tema)
         root.title(_dx("4GsbmBvBCza3KmB4F(n"))
         aplicar_tema(root)
         instalar_caixas_de_mensagem()
@@ -7461,10 +7701,63 @@ class App:
         widget.bind("<ButtonPress>", sair, add="+")
         widget.bind("<Destroy>", sair, add="+")
 
-    def _campo_secreto(self, mestre, largura=40, pref="", **kw):
+    def _pista_entrada(self, entrada, texto):
+        """Mostra uma dica visual sobre o campo, sem inserir esse texto no valor digitado."""
+        try:
+            fundo = ttk.Style(self.root).lookup(entrada.cget("style") or "TEntry", "fieldbackground")
+        except tk.TclError:
+            fundo = ""
+        rotulo = tk.Label(entrada, text=texto, bg=fundo or CORES["campo"], fg=CORES["fraco"],
+                          font="CofreTexto", anchor="w", padx=2, bd=0, cursor="xterm")
+
+        def atualizar(event=None):
+            """Exibe a dica enquanto o campo estiver vazio."""
+            try:
+                if entrada.get():
+                    rotulo.place_forget()
+                else:
+                    rotulo.place(x=_px(8), rely=0.5, anchor="w")
+                    rotulo.lift()
+            except tk.TclError:
+                pass
+
+        entrada._pista_atualizar = atualizar
+        rotulo.bind("<Button-1>", lambda e: entrada.focus_set())
+        for evento in ("<FocusIn>", "<FocusOut>", "<KeyRelease>", "<<Paste>>", "<<Clear>>", "<Configure>"):
+            entrada.bind(evento, atualizar, add="+")
+        atualizar()
+        return atualizar
+
+    def _pista_texto(self, entrada, texto):
+        """Dica visual para caixa multilinha, sem virar parte do texto salvo."""
+        rotulo = tk.Label(entrada, text=texto, bg=CORES["campo"], fg=CORES["fraco"],
+                          font="CofreTexto", anchor="nw", justify="left", padx=2, pady=1, bd=0,
+                          cursor="xterm")
+
+        def atualizar(event=None):
+            """Exibe a dica enquanto a caixa estiver vazia."""
+            try:
+                vazio = not entrada.get("1.0", "end-1c").strip()
+                if not vazio:
+                    rotulo.place_forget()
+                else:
+                    rotulo.place(x=_px(10), y=_px(8))
+                    rotulo.lift()
+            except tk.TclError:
+                pass
+
+        rotulo.bind("<Button-1>", lambda e: entrada.focus_set())
+        for evento in ("<FocusIn>", "<FocusOut>", "<KeyRelease>", "<<Paste>>", "<<Clear>>", "<Configure>"):
+            entrada.bind(evento, atualizar, add="+")
+        atualizar()
+        return atualizar
+
+    def _campo_secreto(self, mestre, largura=40, pref="", placeholder="••••••••••••", **kw):
         """Campo de senha (caracteres ocultos) que não deixa copiar nem recortar o conteúdo."""
         e = ttk.Entry(mestre, show="•", width=largura, exportselection=False, style=pref + "TEntry", **kw)
         self._bloquear_copia(e)
+        if placeholder:
+            self._pista_entrada(e, placeholder)
         return e
 
     @staticmethod
@@ -7507,11 +7800,12 @@ class App:
         campo.bind("<FocusIn>", atualizar, add="+")
         campo.bind("<FocusOut>", lambda ev: ((aviso.place_forget() if aviso.master is campo else aviso.pack_forget()),
                                              estado.update(v=False)), add="+")
+        atualizar()
 
-    def _linha_secreta(self, mestre, largura=40, pref="", olho=True):
+    def _linha_secreta(self, mestre, largura=40, pref="", olho=True, placeholder="••••••••••••"):
         """Campo secreto + botão de mostrar/ocultar (olho) + botão do teclado virtual, num frame."""
         fr = ttk.Frame(mestre, style=pref + "TFrame")
-        e = self._campo_secreto(fr, largura, pref)
+        e = self._campo_secreto(fr, largura, pref, placeholder=placeholder)
         e.pack(side="left", fill="x", expand=True)
         if olho:
             self._botao_olho(fr, e, pref).pack(side="left", fill="y", padx=(6, 0))
@@ -7711,7 +8005,7 @@ class App:
         self._rotulo_campo(esq, f"Nova senha  (mínimo {MIN_SENHA} caracteres)").pack(anchor="w")
         l1fr = ttk.Frame(esq, style="C.TFrame")
         l1fr.pack(fill="x", pady=(4, 0))
-        l1, s1 = self._linha_secreta(l1fr, 30, "C.")
+        l1, s1 = self._linha_secreta(l1fr, 30, "C.", placeholder="Crie uma senha longa")
         l1.pack(side="left", fill="x", expand=True)
         bg = ttk.Button(l1fr, text="Gerar…", image=imagem_icone(self.root, "gerar", C["texto"]), compound="left",
                         style="C.Fino.TButton",
@@ -7723,7 +8017,7 @@ class App:
                                          vazio="A análise aparece quando você digitar a senha.")
         self._medidor(esq, s1, dicas_lbl=self._dicas_mestra, pref="C.").pack(anchor="w", pady=(8, 0))
         self._rotulo_campo(esq, "Confirme a senha").pack(anchor="w", pady=(14, 0))
-        l2, s2 = self._linha_secreta(esq, 30, "C.")
+        l2, s2 = self._linha_secreta(esq, 30, "C.", placeholder="Repita a senha mestra")
         l2.pack(fill="x", pady=(4, 0))
         confere = ttk.Label(esq, text="", style="C.TLabel")
         confere.pack(anchor="w", pady=(6, 0))
@@ -7915,7 +8209,7 @@ class App:
         prot.pack(side="left", fill="x", expand=True)
         self._rotulo_protecao(prot, compacto=True)
         ttk.Button(linha_rodape, text="Criar cofre", style="C.Primario.TButton", command=criar,
-                   image=imagem_icone(self.root, "seta", "#ffffff"), compound="right").pack(
+               image=imagem_icone(self.root, "seta", C["prim_fg"]), compound="right").pack(
                        side="right", padx=(12, 0), anchor="n")
         s1.focus_set()
 
@@ -7970,7 +8264,7 @@ class App:
             seg.pack(fill="x", pady=(0, 14))
         bloco_senha = ttk.Frame(form, style="C.TFrame")
         self._rotulo_campo(bloco_senha, "Senha mestra").pack(anchor="w")
-        cx1, e_senha = self._linha_secreta(bloco_senha, 36, "C.")
+        cx1, e_senha = self._linha_secreta(bloco_senha, 36, "C.", placeholder="Senha mestra")
         cx1.pack(fill="x", pady=(4, 0))
         bloco_chave = ttk.Frame(form, style="C.TFrame")
         lc = ttk.Frame(bloco_chave, style="C.TFrame")
@@ -7979,7 +8273,7 @@ class App:
         bt_arq = ttk.Button(lc, text="Carregar .key…", style="C.Fantasma.TButton",
                             image=imagem_icone(self.root, "importar", C["suave"], 14), compound="left")
         bt_arq.pack(side="right")
-        cx2, e_chave = self._linha_secreta(bloco_chave, 36, "C.")
+        cx2, e_chave = self._linha_secreta(bloco_chave, 36, "C.", placeholder="Chave de acesso")
         cx2.pack(fill="x", pady=(2, 0))
 
         def mostrar_campos():
@@ -8043,7 +8337,7 @@ class App:
                       style="C.TLabel", wraplength=380, justify="left").pack(anchor="w")
             lrec = ttk.Frame(ff, style="C.TFrame")
             self._rotulo_campo(lrec, "Código de recuperação").pack(anchor="w")
-            cx3, e_rec = self._linha_secreta(lrec, 36, "C.")
+            cx3, e_rec = self._linha_secreta(lrec, 36, "C.", placeholder="Código de recuperação")
             cx3.pack(fill="x", pady=(4, 0))
 
             def alternar_rec():
@@ -8169,7 +8463,7 @@ class App:
                 lbl.config(text=f"Senha ou chave incorreta. Restam {ex.restantes}.", foreground=C["perigo"])
                 restam_ = ex.restantes
                 atualizar_chip(restam_)
-                chip.config(bg=C["perigo"], fg="#ffffff")                 # pisca em vermelho para chamar a atenção
+                chip.config(bg=C["perigo"], fg=_texto_contraste(C["perigo"]))
                 self._depois_do_widget(chip, 900, lambda: atualizar_chip(restam_))
                 return
             except CofreDestruido:
@@ -8259,7 +8553,7 @@ class App:
         if e_rec is not None:
             e_rec.bind("<Return>", abrir)
         bt_abrir = ttk.Button(f, text="Desbloquear", style="C.Primario.TButton", command=abrir,
-                              image=imagem_icone(self.root, "aberto", "#ffffff"), compound="left")
+                              image=imagem_icone(self.root, "aberto", C["prim_fg"]), compound="left")
         bt_abrir.pack(fill="x", pady=(20, 0))
         lbl = ttk.Label(f, text=info, foreground=C["alerta"], style="C.TLabel", wraplength=400, justify="center",
                         anchor="center")
@@ -8881,7 +9175,8 @@ class App:
             j.overrideredirect(True)
             j.attributes("-topmost", True)
             j.configure(bg=CORES["alerta"])
-            rot = tk.Label(j, bg=CORES["alerta"], fg="#000000", padx=18, pady=10, font="CofreForte")
+            rot = tk.Label(j, bg=CORES["alerta"], fg=_texto_contraste(CORES["alerta"]), padx=18, pady=10,
+                           font="CofreForte")
             rot.pack()
             self._janela_av_bloq = j
             proteger_contra_captura(j)
@@ -9322,7 +9617,7 @@ class App:
         fr = ttk.Frame(d, padding=(26, 22, 26, 20))
         fr.pack()
         self._cabecalho_dialogo(fr, "cadeado", titulo, texto)
-        linha, e = self._linha_secreta(fr, 36)
+        linha, e = self._linha_secreta(fr, 36, placeholder="Senha mestra")
         linha.pack(fill="x")
         if medidor:
             painel_forca = PainelForca(fr, self, largura=_px(420))
@@ -9463,12 +9758,13 @@ class App:
             motivo = ("este cofre está aberto em OUTRA janela" if self.cofre.motivo_consulta == "em_uso"
                       else "pendrive protegido contra gravação")
             tk.Label(f, text=f"MODO CONSULTA: {motivo}. Você pode ver e copiar, mas nada "
-                             "será salvo nesta sessão.", bg=C["alerta"], fg="#1a1205", font="CofreSub",
+                             "será salvo nesta sessão.", bg=C["alerta"], fg=_texto_contraste(C["alerta"]), font="CofreSub",
                      wraplength=_px(900), justify="center", pady=_px(4)).pack(fill="x", before=cab)
         if self.cofre is not None and self.cofre.alerta_reversao:
             tk.Label(f, text="ATENÇÃO: este cofre abriu num estado MAIS ANTIGO que uma cópia de segurança dele. Se você "
                              "não restaurou uma cópia de propósito, o arquivo pode ter sido trocado por uma versão velha: "
-                             "confira se os itens e senhas mais recentes estão aqui.", bg=C["perigo"], fg="#ffffff",
+                             "confira se os itens e senhas mais recentes estão aqui.", bg=C["perigo"],
+                     fg=_texto_contraste(C["perigo"]),
                      font="CofreSub", wraplength=_px(900), justify="center", pady=_px(4)).pack(fill="x", before=cab)
             if not getattr(self, "_reversao_avisada", False):
                 self._reversao_avisada = True
@@ -9526,6 +9822,7 @@ class App:
         self._btn_bloquear = bt("Bloquear", "cadeado", self.bloquear, "TButton", C["texto"], "Trancar o cofre agora (Ctrl+L)")
         self._menu_mais = MenuTema(self, [
             "Uso geral",
+            ("Aparência e cores…", "config", self.dialogo_aparencia),
             ("Importar planilha (Excel / CSV)…", "importar", self.importar),
             ("Baixar modelo de planilha…", "documento", self.modelo_planilha),
             ("Gerador e teste de senhas…  (Ctrl+G)", "gerar", lambda: self.dialogo_gerador()),
@@ -9547,7 +9844,8 @@ class App:
         ])
         bmais = bt("", "mais", lambda: self._menu_mais.abrir(bmais), "Icone.TButton", C["texto"], "Mais opções")
         bt("Chave FIDO", "chave", self.gerenciar_fido, dica="Cadastrar ou gerenciar chaves de segurança FIDO2")
-        self._btn_novo = bt("Novo item", "novo", self.novo, "Primario.TButton", "#ffffff", "Adicionar conta (Ctrl+N)")
+        self._btn_novo = bt("Novo item", "novo", self.novo, "Primario.TButton", C["prim_fg"],
+                            "Adicionar conta (Ctrl+N)")
         self._btn_mais = bmais
         tk.Frame(f, bg=C["borda"], height=1).pack(fill="x")
 
@@ -9794,9 +10092,14 @@ class App:
             self.tree.winfo_exists()
         except tk.TclError:
             return
+        if not manter_lateral and not so_status:
+            self._cache_auditoria_lista = None
+            self._cache_lista_ordenada = {}
         C = CORES
         regs = self.cofre.registros
-        auditoria = auditar_cofre(regs)
+        auditoria = getattr(self, "_cache_auditoria_lista", None)
+        if auditoria is None:
+            auditoria = self._cache_auditoria_lista = auditar_cofre(regs)
         alerta = {a[0]["id"] for a in auditoria if a[4] <= 1}
         grave = {a[0]["id"] for a in auditoria if a[4] == 0}
         pessoas = self._pessoas()
@@ -9805,12 +10108,19 @@ class App:
         if fp != "*" and fp not in pessoas:
             fp = "*"
             self.filtro_pessoa.set("*")
-        da_pessoa = [r for r in regs if fp == "*" or self._pessoa_de(r) == fp]
+        da_pessoa = regs if fp == "*" else [r for r in regs if self._pessoa_de(r) == fp]
         filtro = self.filtro_grupo.get()
         termo = self.busca.get().lower().strip()
         visiveis = []
-        for r in sorted(da_pessoa, key=lambda r: chave_ordem_alfabetica(r.get("servico", "")),
-                        reverse=not getattr(self, "ordem_az", True)):
+        ordenadas = getattr(self, "_cache_lista_ordenada", None)
+        if ordenadas is None:
+            ordenadas = self._cache_lista_ordenada = {}
+        if fp not in ordenadas:
+            ordenadas[fp] = sorted(da_pessoa, key=lambda r: chave_ordem_alfabetica(r.get("servico", "")))
+        registros_ordenados = ordenadas[fp]
+        if not getattr(self, "ordem_az", True):
+            registros_ordenados = reversed(registros_ordenados)
+        for r in registros_ordenados:
             g = (r.get("grupo") or "").strip()
             if filtro == "(sem grupo)" and g:
                 continue
@@ -9878,9 +10188,11 @@ class App:
                 sub = r.get("login") or " • ".join(segredos) or "Sem dados"
                 if varias and fp == "*" and self._pessoa_de(r):
                     sub = f"{sub}   ·   {self._pessoa_de(r)}"
-                linhas.append({"iid": r["id"], "titulo": r.get("servico", "") or "(sem nome)",
+                titulo = r.get("servico", "") or "(sem nome)"
+                linhas.append({"iid": r["id"], "titulo": titulo,
                                "login": r.get("login", ""), "sub": sub, "contem": contem,
-                               "cor": tom_para(r.get("servico", "")),
+                               "cor": None,
+                               "marca": None, "grupo": g,
                                "alerta": 2 if r["id"] in grave else (1 if r["id"] in alerta else 0)})
             if not regs:
                 vazio = ("Nenhuma conta ainda", "Clique em  Novo item  ou importe sua planilha pelo menu  "
@@ -9971,10 +10283,11 @@ class App:
         topo = ttk.Frame(d, style="C.TFrame")
         topo.pack(fill="x")
         av = tk.Canvas(topo, width=_px(56), height=_px(56), bg=C["sup"], highlightthickness=0)
-        av._img = self._imagem_avatar(tom_para(r.get("servico", "")), 56)
+        marca = marca_servico(r.get("servico", ""), r.get("grupo", ""))
+        av._img = self._imagem_avatar(C["prim_fundo"] if marca else C["sup3"], 56)
         av.create_image(_px(28), _px(28), image=av._img)
-        av.create_text(_px(28), _px(28), text=(r.get("servico", "?").strip()[:1] or "?").upper(), fill="white",
-                       font="CofreTitulo")
+        av.create_text(_px(28), _px(28), text=marca or (r.get("servico", "?").strip()[:1] or "?").upper(),
+                       fill=C["texto"], font="CofreTitulo")
         av.pack(side="left", padx=(0, 14))
         tit = ttk.Frame(topo, style="C.TFrame")
         tit.pack(side="left", fill="x", expand=True)
@@ -10321,6 +10634,8 @@ class App:
         e = ttk.Entry(fr, width=32)
         e.pack(fill="x")
         e.insert(0, inicial)
+        if not inicial:
+            self._pista_entrada(e, "Digite um nome")
         e.select_range(0, "end")
         e.focus_set()
         res = {"v": None}
@@ -10687,6 +11002,63 @@ class App:
         self._bloquear_copia(t)
         return t
 
+    def dialogo_aparencia(self):
+        """Escolhe um dos seis temas prontos e salva a preferência global neste computador."""
+        d = self._nova_janela("Aparência e cores")
+        self._modal(d)
+        fr = ttk.Frame(d, padding=(_px(24), _px(18), _px(24), _px(18)))
+        fr.pack(fill="both", expand=True)
+        self._cabecalho_dialogo(fr, "config", "Aparência e cores",
+                                "A escolha vale para todos os cofres neste computador.")
+        ttk.Label(fr, text="Escolha um dos seis temas", style="Campo.TLabel").pack(anchor="w", pady=(8, 6))
+        escolha = tk.StringVar(value=self.tema)
+
+        for nome, paleta in PALETAS.items():
+            linha = ttk.Frame(fr, style="Card2.TFrame", padding=(_px(10), _px(6)))
+            linha.pack(fill="x", pady=2)
+            ttk.Radiobutton(linha, text=nome, value=nome, variable=escolha).pack(side="left", anchor="w")
+            amostras = tk.Canvas(linha, width=_px(104), height=_px(20), bg=CORES["sup2"], highlightthickness=0)
+            amostras.pack(side="right")
+            for i, cor in enumerate((paleta["fundo"], paleta["sup"], paleta["prim"], paleta["texto"])):
+                x = _px(3 + i * 25)
+                amostras.create_rectangle(x, _px(3), x + _px(18), _px(17), fill=cor, outline=paleta["borda2"])
+
+        ttk.Separator(fr).pack(fill="x", pady=(16, 10))
+        botoes = ttk.Frame(fr)
+        botoes.pack(fill="x")
+        ttk.Button(botoes, text="Cancelar", command=d.destroy).pack(side="right", padx=(8, 0))
+
+        def aplicar_escolha():
+            """Persiste o tema antes de reconstruir a interface com as novas cores."""
+            nome = escolha.get()
+            try:
+                _salvar_preferencia_tema(nome)
+            except OSError as ex:
+                messagebox.showerror("Aparência", f"Não foi possível salvar a preferência global:\n{texto_erro(ex)}",
+                                     parent=d)
+                return
+
+            estado = {
+                "grupo": self.filtro_grupo.get(),
+                "pessoa": self.filtro_pessoa.get(),
+                "busca": self.busca.get(),
+                "id": (self._selecionado_silencioso() or {}).get("id"),
+            }
+            _definir_tema(nome)
+            self.tema = nome
+            d.destroy()
+            aplicar_tema(self.root)
+            self.tela_principal()
+            self.filtro_grupo.set(estado["grupo"])
+            self.filtro_pessoa.set(estado["pessoa"])
+            self.busca.set(estado["busca"])
+            self.atualizar_lista()
+            if estado["id"] is not None:
+                self.tree.selection_set(estado["id"])
+
+        ttk.Button(botoes, text="Aplicar", command=aplicar_escolha, style="Primario.TButton").pack(side="right")
+        d.bind("<Escape>", lambda e: d.destroy())
+
     # ---------- Diálogo de edição/criação de um item (o formulário completo) ----------
 
     def dialogo_registro(self, reg, senha_inicial=None):
@@ -10710,7 +11082,7 @@ class App:
         self._dica(bt_tour, "Como preencher: um passeio guiado explicando cada campo do formulário.")
 
         # Conta / grupo / login
-        topo = ttk.Frame(fr)
+        topo = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
         topo.pack(fill="x")
         topo.columnconfigure(0, weight=3)
         topo.columnconfigure(1, weight=2)
@@ -10721,6 +11093,7 @@ class App:
         ent = ttk.Entry(topo, width=30)
         ent.grid(row=1, column=0, sticky="ew", pady=(4, 12))
         campos["servico"] = ent
+        self._pista_entrada(ent, "Ex.: Gmail, banco ou aplicativo")
         NOVO_GRUPO = "＋ Criar novo grupo…"        # 1ª opção da lista: o usuário escolhe o próprio nome de grupo
         cg = ttk.Combobox(topo, width=20, values=[NOVO_GRUPO] + list(self._grupos_sugeridos()))
         cg.grid(row=1, column=1, sticky="ew", padx=(12, 0), pady=(4, 12))
@@ -10745,6 +11118,7 @@ class App:
         ent = ttk.Entry(topo, width=30)
         ent.grid(row=3, column=0, sticky="ew", pady=(4, 0))
         campos["login"] = ent
+        self._pista_entrada(ent, "Ex.: usuario@exemplo.com")
         NOVO_PESSOA = "＋ Criar novo perfil…"       # mesma ideia do grupo: 1ª opção da lista deixa claro que dá
                                                      # para criar um perfil novo (reclamação real do usuário: a
                                                      # lista de sugestões parecia fechada, sem jeito de adicionar)
@@ -10763,9 +11137,13 @@ class App:
                 cp.focus_set()
         cp.bind("<<ComboboxSelected>>", escolheu_pessoa)
         self._dica(cp, "De quem é esta conta. Escolha da lista, ou '＋ Criar novo perfil…' / digite um nome novo.")
+        self._pista_entrada(cg, "Ex.: Bancos, Redes sociais")
+        self._pista_entrada(cp, "Ex.: Eu, família")
         if reg:
             campos["servico"].insert(0, reg.get("servico", ""))
             campos["login"].insert(0, reg.get("login", ""))
+            for chave in ("servico", "login"):
+                getattr(campos[chave], "_pista_atualizar", lambda: None)()
 
         # Segredos
         cab_seg = ttk.Frame(fr)
@@ -10777,10 +11155,9 @@ class App:
                         command=lambda: alternar()).pack(side="right")
         # Caixas "este item também tem...": cada campo extra só aparece quando a caixa é marcada
         CAMPOS_EXTRA = (("codigos", "Código de recuperação"), ("pin", "PIN"), ("senha_extra", "Senha extra"),
-                        ("chave", "Chave / token"), ("numero_conta", "Número da conta"), ("agencia", "Agência"),
-                        ("notas", "Notas"))
+                        ("chave", "Chave / token"), ("numero_conta", "Número da conta"), ("agencia", "Agência"))
         tem = {k: tk.BooleanVar(value=bool(reg and (reg.get(k) or "").strip())) for k, _ in CAMPOS_EXTRA}
-        marcas = ttk.Frame(fr)
+        marcas = ttk.Frame(fr, style="Card2.TFrame", padding=(_px(14), _px(10)))
         marcas.pack(fill="x", pady=(0, 8))
         ttk.Label(marcas, text="ESTE ITEM TAMBÉM TEM", style="Campo.TLabel").pack(anchor="w", pady=(0, 2))
         linha_marcas = ttk.Frame(marcas)
@@ -10789,7 +11166,7 @@ class App:
             ttk.Checkbutton(linha_marcas, text=rot, variable=tem[k], style="Switch.TCheckbutton",
                             command=lambda: aplicar_campos()).grid(row=i // 3, column=i % 3, sticky="w",
                                                                     padx=(0, 18))
-        grade = ttk.Frame(fr)
+        grade = ttk.Frame(fr, style="Card.TFrame", padding=(_px(12), _px(10)))
         grade.pack(fill="x")
         grade.columnconfigure(0, weight=1, uniform="s")
         grade.columnconfigure(1, weight=1, uniform="s")
@@ -10810,6 +11187,7 @@ class App:
             caixa.pack(side="left", fill="x", expand=True)
             if reg:
                 ent.insert(0, reg.get(chave, ""))
+                getattr(ent, "_pista_atualizar", lambda: None)()
             campos[chave] = ent
             secretos.append(ent)
             if reg:          # item novo: copiar o que acabou de digitar não serve; só a edição tem "Copiar"
@@ -10836,16 +11214,18 @@ class App:
         dicas_item.pack(fill="x", pady=(0, 6))
         if senha_inicial and not reg:
             campos["senha"].insert(0, senha_inicial)
+            getattr(campos["senha"], "_pista_atualizar", lambda: None)()
         for _k in ("senha", "senha_extra", "pin"):
             campos[_k].event_generate("<<AtualizarJa>>")      # painéis de força já prontos no 1º quadro
 
-        extras = ttk.Frame(fr)               # códigos de recuperação: só com a caixa marcada
-        extras_notas = ttk.Frame(fr)         # notas: só com a caixa marcada
+        extras = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
+        extras_notas = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
         extras.pack(fill="x")
         ttk.Label(extras, text=ROTULOS["codigos"].upper(), style="Campo.TLabel").pack(anchor="w", pady=(10, 4))
         fc = ttk.Frame(extras)
         fc.pack(fill="x")
         codigos = self._texto_multilinha(fc, 8, mono=True)
+        atualizar_pista_codigos = self._pista_texto(codigos, "Um código de recuperação por linha")
         barra_cod = ttk.Frame(fc)
         cont_cod = ttk.Label(barra_cod, text="", style="Fraco.TLabel")
 
@@ -10872,6 +11252,7 @@ class App:
             if codigos.get("1.0", "end").strip():
                 codigos.insert("end", "\n" if not codigos.get("1.0", "end").endswith("\n\n") else "")
             codigos.insert("end", "\n".join(novos))
+            atualizar_pista_codigos()
             contar_codigos()
             try:
                 self.root.clipboard_clear()
@@ -10890,6 +11271,7 @@ class App:
         oculto.pack(anchor="w", pady=(2, 0))
         if reg:
             codigos.insert("1.0", reg.get("codigos", ""))
+            atualizar_pista_codigos()
 
         timer_mostrar = {"t": None}
 
@@ -10908,6 +11290,7 @@ class App:
                 oculto.pack_forget()
                 barra_cod.pack(fill="x", pady=(0, 6))
                 codigos.pack(fill="x")
+                atualizar_pista_codigos()
                 timer_mostrar["t"] = self._depois_do_widget(
                     d, self.MOSTRAR_SENHA_MS, lambda: (mostrar.set(False), alternar()))   # volta a esconder
             else:
@@ -10918,8 +11301,10 @@ class App:
         ttk.Label(extras_notas, text="NOTAS", style="Campo.TLabel").pack(anchor="w", pady=(14, 4))
         notas = self._texto_multilinha(extras_notas, 3)
         notas.pack(fill="x")
+        atualizar_pista_notas = self._pista_texto(notas, "Anotações importantes sobre esta conta…")
         if reg:
             notas.insert("1.0", reg.get("notas", ""))
+            atualizar_pista_notas()
 
         def salvar():
             """Valida e grava o item (novo ou editado) numa transação e fecha o formulário."""
@@ -10953,6 +11338,7 @@ class App:
 
         ancora = ttk.Frame(fr, height=1)     # ponto de referência: campos extras entram antes dele
         ancora.pack(fill="x")
+        extras_notas.pack(fill="x", before=ancora)
         ttk.Separator(rodape).pack(fill="x", pady=(0, 10))
         rod = ttk.Frame(rodape)
         rod.pack(fill="x")
@@ -10968,11 +11354,8 @@ class App:
                     except tk.TclError:
                         pass
             extras.pack_forget()
-            extras_notas.pack_forget()
             if tem["codigos"].get():
                 extras.pack(fill="x", before=ancora)
-            if tem["notas"].get():
-                extras_notas.pack(fill="x", before=ancora)
             d.update_idletasks()
             self._centralizar(d)
 
@@ -12039,6 +12422,8 @@ class App:
         e = ttk.Entry(fr, width=40)
         e.insert(0, inicial)
         e.pack(fill="x")
+        if not inicial:
+            self._pista_entrada(e, "Digite aqui")
 
         def ok(event=None):
             """Confirma o texto digitado."""
@@ -12101,6 +12486,7 @@ class App:
                             f"({len(bloco_alvo)} caracteres):").pack(anchor="w", pady=(14, 4))
         conf = ttk.Entry(fr, width=10, font="CofreMono")
         conf.pack(anchor="w")
+        self._pista_entrada(conf, f"Bloco ({len(bloco_alvo)} caracteres)")
         msg = ttk.Label(fr, text="", foreground=CORES["perigo"])
         msg.pack(anchor="w", pady=(4, 0))
 
@@ -12552,6 +12938,8 @@ class App:
         """Ao bloquear: cancela timers e solta tudo o que ainda aponta para dados do cofre
         (lista de contas na tela, campos revelados, resumo do painel de detalhes)."""
         limpar_cache_auditoria()
+        self.__dict__.pop("_cache_auditoria_lista", None)
+        self.__dict__.pop("_cache_lista_ordenada", None)
         for nome in ("_detalhe_pendente", "_timer_aviso", "_timer_busca"):
             t = getattr(self, nome, None)
             if t:

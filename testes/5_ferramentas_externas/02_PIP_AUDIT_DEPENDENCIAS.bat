@@ -22,16 +22,19 @@ if not "%COFRE_ONLINE_AUDIT%"=="1" (
   if not defined COFRE_AUTO pause
   exit /b 9
 )
-call "%~dp0preparar_ambiente_offline.bat"
+call "%~dp0preparar_ambiente_offline.bat" PIP_AUDIT
 if errorlevel 1 (
   if not defined COFRE_AUTO pause
   exit /b 9
 )
+set "PIP_NO_CACHE_DIR=1"
+set "PIP_DEFAULT_TIMEOUT=15"
+set "PIP_RETRIES=0"
 echo Auditando as dependencias declaradas em requirements.txt...
 echo Projeto: %CD% > "%LOG%"
 echo Data: %DATE% %TIME% >> "%LOG%"
 echo. >> "%LOG%"
-"%COFRE_PYTHON%" -m pip_audit -r "requirements.txt" >> "%LOG%" 2>&1
+"%COFRE_PYTHON%" -m pip_audit -r "requirements.txt" --no-deps --disable-pip --timeout 15 >> "%LOG%" 2>&1
 set "RC=%ERRORLEVEL%"
 echo.>> "%LOG%"
 echo Codigo de saida: %RC%>> "%LOG%"

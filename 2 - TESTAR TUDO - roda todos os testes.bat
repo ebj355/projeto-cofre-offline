@@ -7,8 +7,10 @@ rem Cada pasta de teste (testes\1_motor_do_cofre\, testes\4_so_no_windows\, test
 rem .bat individual, para rodar so aquela bateria sozinha (dois cliques direto na pasta dela). Este .bat
 rem aqui e so o atalho GERAL, para rodar as seis baterias de uma vez, sem precisar abrir cada uma.
 rem
-rem Uso: 2 - TESTAR TUDO - roda todos os testes.bat          (nativo testa so o disco do sistema)
-rem      2 - TESTAR TUDO - roda todos os testes.bat H        (nativo testa tambem o pendrive H: - repassado ao teste nativo)
+rem Uso: 2 - TESTAR TUDO - roda todos os testes.bat                 (pip-audit online; nativo testa o disco do sistema)
+rem      2 - TESTAR TUDO - roda todos os testes.bat H               (nativo testa tambem o pendrive H:)
+rem      2 - TESTAR TUDO - roda todos os testes.bat OFFLINE         (pula consultas online do pip-audit)
+rem      2 - TESTAR TUDO - roda todos os testes.bat H OFFLINE       (pendrive H: e sem consultas online)
 chcp 65001 >nul
 setlocal EnableExtensions
 cd /d "%~dp0"
@@ -18,5 +20,5 @@ if not exist "%~dp0testes\6_ferramentas_dos_testes\rodar_todos_windows.bat" (
   pause
   exit /b 1
 )
-call "%~dp0testes\6_ferramentas_dos_testes\rodar_todos_windows.bat" %1
+call "%~dp0testes\6_ferramentas_dos_testes\rodar_todos_windows.bat" %*
 exit /b %errorlevel%

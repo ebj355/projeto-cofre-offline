@@ -16,6 +16,8 @@ tk.Misc.wait_window = lambda self, window=None: None
 def todos(w):
     """Todos os widgets filhos, recursivamente."""
     for x in w.winfo_children():
+        if isinstance(x, tk.Toplevel):
+            continue
         try: yield x; yield from todos(x)
         except tk.TclError: pass
 CLASSES = ("TLabel", "Label", "TButton", "Button", "TCheckbutton", "TRadiobutton", "TEntry", "Entry", "TCombobox")

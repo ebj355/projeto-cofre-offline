@@ -3,8 +3,10 @@ rem Roda as SEIS baterias de teste do Windows real, UMA VEZ cada, uma depois da 
 rem de CADA UMA (nucleo, instalador, nativo, interface, pentest, ferramentas externas). Cada bateria grava o seu PROPRIO resultado,
 rem exatamente como se tivesse sido chamada sozinha - nada aqui muda o comportamento dela.
 rem
-rem Uso: rodar_todos_windows.bat          (nativo testa so o disco do sistema)
-rem      rodar_todos_windows.bat H        (nativo testa tambem o pendrive H: - repassado ao teste nativo)
+rem Uso: rodar_todos_windows.bat                 (nativo testa o disco do sistema; pip-audit consulta a internet)
+rem      rodar_todos_windows.bat H               (nativo testa tambem o pendrive H:)
+rem      rodar_todos_windows.bat OFFLINE         (pula consultas online do pip-audit)
+rem      rodar_todos_windows.bat H OFFLINE       (pendrive H: e sem consultas online)
 rem
 rem Importante (por que todo "call" abaixo tem "< nul" no final):
 rem  - cada ...\teste_*.bat termina com um "pause" (espera uma tecla) para quem roda ele sozinho (clicando duas
@@ -28,6 +30,12 @@ rem para nunca misturar arquivos de "ontem" com os de "hoje". Documentos que est
 rem O log de depuracao (testes\resultados\log_depuracao.txt) e recriado do zero; cada executor acrescenta nele a saida completa de cada teste.
 if not exist "%~dp0..\resultados" mkdir "%~dp0..\resultados"
 set "DRIVE=%~1"
+set "AUDIT_MODO=%~2"
+if /I "%DRIVE%"=="OFFLINE" (
+  set "AUDIT_MODO=OFFLINE"
+  set "DRIVE="
+)
+set "COFRE_ONLINE_AUDIT="
 set "COFRE_OFFLINE=1"
 py -3.13 "%~dp0limpar_resultados.py" 2>nul
 set "FALHAS=0"
@@ -46,7 +54,7 @@ echo  3/6 nativo (atributos/ACL/DPAPI)   4/6 interface (automatico)
 echo  5/6 pentest (injecao, forca bruta, DoS, vazamento de memoria, etc.)
 echo  6/6 ferramentas externas (Bandit, pip-audit, Nmap e ferramentas 05-12)
 echo  Roda UMA vez cada bateria sem baixar dependencias.
-echo  A auditoria pip-audit e pulada offline porque requer dados atuais da internet.
+echo  O pip-audit consulta dados atuais da internet na etapa 6; use OFFLINE para pular.
 echo ============================================================
 echo.
 
@@ -81,6 +89,13 @@ if errorlevel 1 set /a FALHAS+=1
 echo.
 
 echo [6/6] ferramentas externas (testes\5_ferramentas_externas\RODAR ESTA PASTA - ferramentas externas.bat) ...
+if /I "%AUDIT_MODO%"=="OFFLINE" (
+  set "COFRE_ONLINE_AUDIT="
+  echo  Modo OFFLINE: pip-audit sera registrado como PULADO.
+) else (
+  set "COFRE_ONLINE_AUDIT=1"
+  echo  Consultando a base online atual do pip-audit.
+)
 cd /d "%~dp0"
 call "%~dp0..\5_ferramentas_externas\RODAR ESTA PASTA - ferramentas externas.bat" < nul
 if errorlevel 1 set /a FALHAS+=1

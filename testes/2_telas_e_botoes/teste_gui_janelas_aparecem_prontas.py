@@ -67,6 +67,8 @@ def esperar(seg):
     """Roda o laço do Tk por `seg` segundos (timers e idle disparam como no uso real)."""
     t0 = time.time()
     while time.time() - t0 < seg:
+        if "app" in globals() and app.cofre is not None:
+            app._ultimo_tique = time.time()
         root.update(); time.sleep(0.005)
 
 def conferir_janelas(rotulo):

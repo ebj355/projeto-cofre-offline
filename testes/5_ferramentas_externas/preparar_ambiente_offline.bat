@@ -24,9 +24,18 @@ if not exist "%PY%" (
     exit /b 1
   )
 )
-"%PY%" -m pip install --disable-pip-version-check --no-index --find-links "%RAIZ%\pacotes" -q -r "%RAIZ%\requirements-test.txt"
+if /I "%~1"=="PIP_AUDIT" (
+  rem Auditoria precisa apenas do pip-audit; nao deixe uma ferramenta opcional ausente (ex.: Hypothesis) impedir a consulta.
+  "%PY%" -m pip install --disable-pip-version-check --no-index --find-links "%RAIZ%\pacotes" -q "pip-audit==2.10.1"
+) else (
+  "%PY%" -m pip install --disable-pip-version-check --no-index --find-links "%RAIZ%\pacotes" -q -r "%RAIZ%\requirements-test.txt"
+)
 if errorlevel 1 (
-  echo ERRO: faltam pacotes de teste em pacotes\. Rode 3 - BAIXAR PACOTES novamente.
+  if /I "%~1"=="PIP_AUDIT" (
+    echo ERRO: pip-audit ou suas dependencias nao estao em pacotes\. Rode 3 - BAIXAR PACOTES novamente.
+  ) else (
+    echo ERRO: faltam pacotes de teste em pacotes\. Rode 3 - BAIXAR PACOTES novamente.
+  )
   exit /b 1
 )
 endlocal & set "COFRE_PYTHON=%PY%"

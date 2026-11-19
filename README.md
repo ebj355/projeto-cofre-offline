@@ -92,7 +92,7 @@ Em uma frase: **é um cofre que só abre com o que você sabe (senha), o que voc
 | **2. O instalador** | Confere o código por hash, prepara ambiente isolado, compila o `.exe` nativo, testa a criptografia | `1 - INSTALAR O COFRE...bat` + `instalar_cofre.ps1` |
 | **3. A bateria de testes** | Seis baterias (motor, telas, pentest, Windows real, ferramentas externas e executores) + relatórios e cobertura | `testes/` + `2 - TESTAR TUDO...bat` |
 | **4. Ferramentas opcionais do Windows** | Scripts independentes que verificam e reforçam o seu PC (não o cofre) | `ferramentas_windows_opcionais/` |
-| **5. A documentação** | Manual completo, modelo de ameaças, plano de testes, mapa para leigos e histórico | `docs/`, `testes/*.md`, `LEIA PRIMEIRO...md` |
+| **5. A documentação** | Este README é o guia único de entrada; manuais técnicos e plano de testes detalham assuntos específicos | `README.md`, `docs/`, `testes/*.md` |
 
 ---
 
@@ -156,7 +156,10 @@ Em PCs com pouca RAM livre, o programa sugere *Alta* na criação e, antes de qu
 | Grupo | organiza a barra lateral (cada grupo tem sua cor) |
 | Pessoa | de quem é a conta: Eu, Pai, Mãe… |
 
-- **Novo item em tela única:** nome, grupo, usuário, pessoa e senha (com o **Gerar…** no próprio campo). PIN, senha extra, chave, conta/agência, códigos e notas aparecem só ao marcar as caixas de **"Este item também tem"**. O botão **Copiar** só existe ao editar um item existente. `Enter` salva.
+- **Novo item em tela única:** campos organizados em cartões, senha com **Gerar…**, notas sempre visíveis e códigos/PIN/senha extra/chave/conta/agência opcionais. As dicas cinzas nos campos vazios são apenas visuais: nunca entram no valor salvo. O botão **Copiar** só existe ao editar um item existente. `Enter` salva.
+- **Aparência:** seis temas prontos — Roxo (padrão), Obsidiana, Claro, Terminal, Azul e Rosa — disponíveis em `⋯ → Aparência e cores`. A escolha vale para todos os cofres daquele usuário neste computador. Só o nome do tema é salvo separadamente em `%LOCALAPPDATA%\CofreSenhas\preferencias.json`; esse arquivo não contém senhas nem dados do cofre. Não há personalização livre de cores.
+- **Identificação de serviços:** nomes e URLs conhecidos recebem monogramas locais discretos (por exemplo, NU, IG, GD e GH), sem baixar ou copiar logos oficiais e sem conexão de rede. Quando o serviço não é reconhecido, o grupo selecionado pode indicar a categoria; sem correspondência, é usado o avatar genérico.
+- **Avisos e exposição:** alertas mantêm ícone e texto além da cor. O cofre mostra sua tela de desbloqueio ao bloquear e limpa a área de transferência após 15 segundos, ao bloquear ou ao sair.
 - **Pessoas:** um mesmo cofre guarda as senhas de várias pessoas (você, familiares), todas abertas pela mesma senha mestra. Os nomes das pessoas também ficam criptografados. Pessoas e grupos mudam por **transação**: se a gravação falhar, tudo volta ao que era.
 - **Dados bancários:** qualquer item com número da conta e/ou agência **sempre** pede a senha mestra de novo para ser visto, copiado ou editado, mesmo com a "Proteção extra" geral desligada. A liberação dura 30 segundos. A proteção é por **item inteiro**, não por campo.
 - **Proteção extra:** um ajuste único para o cofre inteiro (`⋯ → Proteção extra`) que exige a senha mestra de novo para ver ou copiar qualquer senha. A reconfirmação usa um verificador rápido em memória (HMAC com chave aleatória da sessão), sem repetir o Argon2.
@@ -425,7 +428,7 @@ Transparência faz parte da segurança. O quadro abaixo resume o [`docs/MODELO_D
 - **Espaço livre:** mais de 3 GB no destino durante a compilação (o instalador confere), e de preferência 2 GB ou mais de memória livre.
 - **Para FIDO2:** Windows 10 1903+ e uma chave FIDO2 com **hmac-secret/PRF** e **PIN configurado** (ex.: YubiKey 5, Feitian ePass FIDO2).
 - **Recomendado:** pendrive NTFS com **BitLocker To Go**.
-- **Internet:** use-a uma vez para preparar `pacotes\`; depois, instalação e testes usam o conteúdo local. A checagem opcional de vazamentos e a auditoria online `pip-audit` continuam exigindo rede.
+- **Internet:** use-a uma vez para preparar `pacotes\`; depois, instalação e dependências de teste usam o conteúdo local. A bateria completa do Windows consulta a base atual do `pip-audit` online por padrão (use `rodar_todos_windows.bat OFFLINE` para pular essa consulta); a checagem opcional de vazamentos também exige rede.
 
 ---
 
@@ -612,7 +615,7 @@ O [`PLANO_DE_TESTES.md`](testes/PLANO_DE_TESTES.md) organiza os testes por risco
 
 ### 14.3 Como rodar
 
-**No Windows (mais fácil):** primeiro rode **`3 - BAIXAR PACOTES - so para instalar sem internet.bat`** com internet para preparar os wheels das novas ferramentas; depois dê dois cliques em **`2 - TESTAR TUDO - roda todos os testes.bat`**. Ele executa uma vez as seis baterias: núcleo (incluindo a descoberta do teste Hypothesis), instalador, Windows nativo, interface, pentest e ferramentas externas 01, 02 e 04–12. O pytest 03 fica fora porque repete as baterias 1 e 2. Se Hypothesis ou outra ferramenta opcional não estiver disponível, o relatório marca `[PULADO]` (não é aprovação nem falha). Os resultados ficam diretamente em `testes\resultados\`, sem subpastas por rodada; o arquivo conjunto é `resultado_rodar_todos_windows.txt`. Para incluir um pendrive no teste nativo: `2 - TESTAR TUDO - roda todos os testes.bat H`. Cada pasta de testes também tem o seu `.bat` ("RODAR ESTA PASTA - …") para rodar só aquela bateria.
+**No Windows (mais fácil):** primeiro rode **`3 - BAIXAR PACOTES - so para instalar sem internet.bat`** com internet para preparar os wheels das novas ferramentas; depois dê dois cliques em **`2 - TESTAR TUDO - roda todos os testes.bat`**. Ele executa uma vez as seis baterias: núcleo (incluindo a descoberta do teste Hypothesis), instalador, Windows nativo, interface, pentest e ferramentas externas 01, 02 e 04–12. O pytest 03 fica fora porque repete as baterias 1 e 2. Se Hypothesis ou outra ferramenta opcional não estiver disponível, o relatório marca `[PULADO]` (não é aprovação nem falha). A etapa 6 consulta a base atual do `pip-audit` pela internet para as dependências do programa e de teste. Para rodar sem essa consulta, passe `OFFLINE` ao atalho (`2 - TESTAR TUDO - roda todos os testes.bat OFFLINE`); para incluir um pendrive H: e pular a consulta, use `2 - TESTAR TUDO - roda todos os testes.bat H OFFLINE`. Os resultados ficam diretamente em `testes\resultados\`, sem subpastas por rodada; o arquivo conjunto é `resultado_rodar_todos_windows.txt`. Cada pasta de testes também tem o seu `.bat` ("RODAR ESTA PASTA - …") para rodar só aquela bateria.
 
 **Pela linha de comando:**
 
@@ -632,9 +635,9 @@ Com `pytest`: `pytest testes/6_ferramentas_dos_testes/test_pytest.py -v` (cada `
 - **`resumo_testes.md` / `.json` / `resultados.sarif`**: tabela legível, JSON comparável entre rodadas e SARIF só com as falhas.
 - **Bateria nova substitui a antiga:** `limpar_resultados.py` apaga os resultados anteriores antes de começar, para nunca misturar "ontem" com "hoje". No fim, `limpar_artefatos_testes.py` apaga pastas temporárias órfãs.
 - **Respeito ao seu PC:** os testes rodam em prioridade baixa, esperam haver RAM livre e fazem pausa entre si.
-- **Ferramentas de teste:** dependências de runtime e ferramentas estão em `requirements-test.txt` e são instaladas em ambiente virtual local a partir de `pacotes\`, sem acesso à rede. As ferramentas novas 05–12 usam versões mínimas (`>=`) enquanto seus wheels não estão confirmados no pacote local; rode `3 - BAIXAR PACOTES` e depois fixe as versões `==` correspondentes aos wheels baixados antes de distribuir um wheelhouse reprodutível. Pester também é carregado do pacote local. O Nmap vem como instalador local, mas requer instalação manual e pode solicitar privilégios/Npcap; sem ele, o teste registra `PULADO`. Relatórios ficam diretamente em `testes\resultados\`. Nmap verifica apenas `127.0.0.1`.
+- **Ferramentas de teste:** dependências de runtime e ferramentas estão em `requirements-test.txt` e são instaladas em ambiente virtual local a partir de `pacotes\`, sem acesso à rede. O pentest instala somente as bibliotecas essenciais do programa; ferramentas opcionais ausentes são puladas, sem impedir os demais testes. As ferramentas novas 05–12 usam versões mínimas (`>=`) enquanto seus wheels não estão confirmados no pacote local; rode `3 - BAIXAR PACOTES` e depois fixe as versões `==` correspondentes aos wheels baixados antes de distribuir um wheelhouse reprodutível. Pester também é carregado do pacote local. O Nmap vem como instalador local, mas requer instalação manual e pode solicitar privilégios/Npcap; sem ele, o teste registra `PULADO`. Relatórios ficam diretamente em `testes\resultados\`. Nmap verifica apenas `127.0.0.1`.
 - **Hypothesis:** `teste_propriedades_hypothesis.py` verifica ida e volta de cofres com dados gerados e entradas CSV hostis. O executor tenta instalá-lo do wheelhouse do núcleo quando disponível; se faltar, mostra `PULADO` com código 9, sem contar como aprovado nem como falha. Uma falha real do teste retorna código diferente e reprova a bateria. O atalho 12 permite rodá-lo isoladamente.
-- **Auditoria de dependências offline:** o `pip-audit` está empacotado, mas não consulta uma base de vulnerabilidades embutida; offline ele registra `PULADO` para não apresentar dados antigos como atuais. Com internet, defina `COFRE_ONLINE_AUDIT=1` antes de abrir o BAT da auditoria para consultar a fonte atual.
+- **Auditoria de dependências:** a bateria completa `rodar_todos_windows.bat` define `COFRE_ONLINE_AUDIT=1` na etapa 6 e consulta a base atual do `pip-audit`. `requirements.txt` e as entradas `==` de `requirements-test.txt` são auditadas sem resolução/instalação de pacotes; as ferramentas de teste ainda com faixas `>=` são listadas como puladas até terem versões fixadas. O SBOM CycloneDX usa `requirements.txt`. Sem internet, a consulta registra erro/alerta, não aprovação. Use `rodar_todos_windows.bat OFFLINE` para pular a consulta; ao executar os BATs de auditoria separadamente, defina `COFRE_ONLINE_AUDIT=1` para habilitá-la.
 - **Windows:** o executor não ativa `-X dev`, pois essa opção pode travar alguns builds do Python no Windows; os testes continuam verificando seus resultados e códigos de saída.
 - **Cobertura de código:** `cobertura_codigo_windows.bat` mede quais linhas e ramificações de `cofre_senhas.py` os testes executam e lista as faixas de `except`/`raise` sem teste. Gera `cobertura_codigo.txt`, `cobertura_codigo.json` e `cobertura_html.zip` diretamente em `testes\resultados\` (sem subpastas persistentes). Fica fora do "Testar Tudo" porque é lenta. A medição de 16/11, no Linux e sem interface, foi de **32,1%** (a maior parte do arquivo é interface; o total sobe com `--gui`).
 - **Soak:** o do núcleo faz 1.000 ciclos (~13 s) e o da interface 60 por padrão (`COFRE_SOAK_CICLOS=1000` para a corrida longa). Achado registrado: a memória do Python na interface cresce cerca de 12 KiB por ciclo de desbloquear/bloquear, sem sobrar chaves nem instâncias do cofre.
@@ -662,7 +665,7 @@ A pasta `ferramentas_windows_opcionais/` traz scripts **independentes do cofre**
 ```
 projeto-cofre-offline/
 │
-├── LEIA PRIMEIRO - mapa do projeto.md            # para que serve cada pasta e arquivo (para não programadores)
+├── README.md                                     # guia principal: uso, dependências, testes e mapa do projeto
 ├── 1 - INSTALAR O COFRE - compila e instala.bat  # instalador: dois cliques
 ├── 2 - TESTAR TUDO - roda todos os testes.bat    # roda as 6 baterias de teste no Windows
 ├── 3 - BAIXAR PACOTES - so para instalar sem internet.bat # wheelhouse do cofre e das ferramentas de teste
@@ -697,7 +700,7 @@ projeto-cofre-offline/
 └── logs_de_compilacao/    # (não versionada) um log por instalação
 ```
 
-Cada pasta de testes tem um `INDICE.md` que explica **cada arquivo** (gerado por `python testes\6_ferramentas_dos_testes\gerar_indices.py`, que avisa se algum arquivo ficou sem descrição).
+Este README é o único guia de entrada na raiz e explica os atalhos, arquivos e pastas para quem não é programador. Os manuais especializados em `docs/` e os guias em `testes/` continuam disponíveis para consulta detalhada. Cada pasta de testes tem um `INDICE.md` que explica **cada arquivo**; depois de criar, renomear ou apagar algo em `testes/`, atualize os índices com `python testes\6_ferramentas_dos_testes\gerar_indices.py`.
 
 O programa é **um único arquivo** de propósito. Internamente é organizado em seções: núcleo criptográfico, avaliação de força, impressão, proteções do Windows, classe `Cofre`, importação, FIDO2, tema e ícones, componentes de interface e classe `App`.
 
@@ -707,7 +710,7 @@ O programa é **um único arquivo** de propósito. Internamente é organizado em
 
 | Documento | Para que serve |
 |---|---|
-| [`LEIA PRIMEIRO - mapa do projeto.md`](LEIA%20PRIMEIRO%20-%20mapa%20do%20projeto.md) | Mapa simples, escrito para quem não é programador. Comece por aqui se estiver perdido. |
+| `README.md` (este arquivo) | Guia único de entrada: instalação, uso, dependências, testes, estrutura do projeto e orientação para iniciantes. |
 | [`docs/MANUAL_COMPLETO.md`](docs/MANUAL_COMPLETO.md) | Manual técnico completo: formato do arquivo, detalhes de cada proteção, instalador, tabela de todos os testes e perguntas frequentes. |
 | [`docs/MODELO_DE_AMEACAS.md`](docs/MODELO_DE_AMEACAS.md) | Quem pode atacar, o que cada atacante consegue, onde cada recurso realmente ajuda, o que **não** é defendido e as sugestões avaliadas e recusadas (adendo por adendo). |
 | [`docs/HISTORICO_lista_de_mudancas.md`](docs/HISTORICO_lista_de_mudancas.md) | O que mudou em cada rodada de desenvolvimento. |
@@ -849,7 +852,7 @@ Não: você compila o seu, a partir do `cofre_senhas.py` que pode ler, com bibli
 
 ## 23. Status e honestidade do projeto
 
-- Este é um **projeto pessoal**. Não passou por auditoria de segurança independente. A suíte de testes (motor, interface, ataques simulados e Windows real) e a análise estática (`bandit`) ajudam, mas **não substituem** uma revisão externa. A bateria offline pula o `pip-audit`, pois a base de vulnerabilidades não está incluída; só uma execução online consulta dados atuais.
+- Este é um **projeto pessoal**. Não passou por auditoria de segurança independente. A suíte de testes (motor, interface, ataques simulados e Windows real) e a análise estática (`bandit`) ajudam, mas **não substituem** uma revisão externa. A bateria completa do Windows consulta o `pip-audit` online por padrão; no modo `OFFLINE`, essa consulta é pulada porque a base atual de vulnerabilidades não está incluída localmente.
 - Nas rodadas de teste no Windows real foram confirmados atributos de arquivo, ACL por `icacls`, UUID do SMBIOS, DPAPI, computador autorizado de ponta a ponta, blindagens do processo (incluindo as DLLs pré-carregadas da System32) e WebAuthn (0 falhas). Também foram feitas rodadas de instalação limpa em Windows Sandbox.
 - **Ainda não verificado em Windows real** (ou só parcialmente): o instalador de ponta a ponta em todos os cenários (modo no computador, ARM64), a assinatura digital opcional do `.exe` e o uso com uma **chave FIDO2/PRF física real**.
 - A cobertura de código medida no Linux (motor + pentest, sem interface) foi de 32,1%; as faixas sem teste estão listadas por `cobertura_codigo_windows.bat`.

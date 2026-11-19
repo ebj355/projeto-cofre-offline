@@ -507,7 +507,7 @@ Não existem mais duas pastas separadas.
 CofreSenhas-Instalador/  (= cofre-de-senhas/ no GitHub)
 │
 │   --- o que o usuário final realmente precisa (ver 5. e 7.) ---
-├── LEIA PRIMEIRO - mapa do projeto.md     # para que serve cada pasta e cada arquivo (comece por aqui)
+├── README.md                              # guia único de entrada: uso, dependências, testes e estrutura
 ├── 1 - INSTALAR O COFRE - compila e instala.bat    # ÚNICO instalador: dois cliques (confere, registra e chama o instalar_cofre.ps1)
 ├── 2 - TESTAR TUDO - roda todos os testes.bat      # roda as 6 baterias de teste no Windows e junta os resultados
 ├── 3 - BAIXAR PACOTES - so para instalar sem internet.bat   # baixa (com hash conferido) as bibliotecas para pacotes\

@@ -29,12 +29,16 @@ vis = lambda: [str(w.cget("text")) for w in todos(d) if w.winfo_class() in ("TLa
 v = " | ".join(vis())
 ok("NOME DO SITE OU APP" in v and "USUÁRIO OU E-MAIL" in v and "SENHA" in v, "mostra nome, usuário e senha")
 ok("GRUPO" in v and "PESSOA" in v, "mostra GRUPO e PESSOA (sem botão de modo)")
-for escondido in ("PIN", "NOTAS", "SENHA EXTRA"):
+for escondido in ("PIN", "SENHA EXTRA"):
     ok(escondido not in v, f"extras escondidos até marcar a caixa: {escondido}")
+ok("NOTAS" in v, "notas visíveis como seção própria")
 ok(achar(d, "Mais opções") is None and achar(d, "Menos opções") is None, "NÃO existe botão 'Mais/Menos opções'")
 ok(achar(d, "Criar uma senha forte") is None, "não há botão extra 'Criar uma senha forte' (o 'Gerar…' do campo basta)")
 ok(achar(d, "Copiar") is None, "item novo não tem botões 'Copiar'")
 ents = [w for w in todos(d) if w.winfo_class() == "TEntry" and w.winfo_ismapped()]
+ok(all(not e.get() for e in ents[:3]), "dicas visuais não são gravadas nos campos vazios")
+notas_vazio = next(w for w in todos(d) if w.winfo_class() == "Text" and w.winfo_ismapped())
+ok(not notas_vazio.get("1.0", "end-1c").strip(), "dica de notas não é gravada no conteúdo")
 ents[0].insert(0, "Banco Azul"); ents[1].insert(0, "maria@exemplo.com")
 senha_campo = ents[2]; senha_campo.insert(0, c.gerar_senha(20, True, True)); root.update()
 achar(d, "Salvar").invoke(); root.update()
@@ -43,11 +47,11 @@ ok(len(regs) == 1 and regs[0]["servico"] == "Banco Azul" and regs[0]["login"] ==
    "salvou nome, usuário e senha")
 ok(not erros, "sem erro ao salvar")
 d = novo()
-for rot in ("PIN", "Notas"):                       # extras: só aparecem quando a caixa 'este item também tem' é marcada
+for rot in ("PIN",):                               # extras: só aparecem quando a caixa 'este item também tem' é marcada
     achar(d, rot, "TCheckbutton").invoke(); root.update()
 v = " | ".join(vis())
-for aparece in ("PIN", "NOTAS"):
-    ok(aparece in v, f"marcar a caixa mostra {aparece}")
+ok("PIN" in v, "marcar a caixa mostra PIN")
+ok("NOTAS" in v, "notas continuam visíveis sem caixa adicional")
 d.destroy(); root.update()
 # editar abre completo
 app.dialogo_registro(regs[0]); root.update(); root.update()
