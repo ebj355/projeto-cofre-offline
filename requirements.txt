@@ -1,6 +1,6 @@
 # Versões FIXAS, as mesmas testadas com este cofre. O instalador instala exatamente estas, com hash
 # (pip --require-hashes), e inclui também as dependências indiretas abaixo.
-cryptography==50.0.1
+cryptography==50.0.2
 argon2-cffi==25.1.0
 argon2-cffi-bindings==26.1.0
 openpyxl==3.1.5

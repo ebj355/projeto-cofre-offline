@@ -5,7 +5,8 @@
 #   2. instala o Python 3.13 se não houver (winget ou python.org, com assinatura e SHA-256 conferidos)
 #   3. instala as bibliotecas em versões FIXAS e com hash (pip --require-hashes)
 #   4. compila o CofreSenhas.exe (código nativo) DENTRO DO PENDRIVE, a partir de uma pasta limpa
-#   5. deixa o .exe diretamente na raiz do pendrive (<pendrive>:\), grava o SHA-256 dele e mostra na tela
+#   5. deixa o .exe no destino escolhido e mostra o SHA-256; ao detectar a instalação antiga em
+#      <pendrive>:\CofreSenhas, oferece atualizá-la no mesmo local sem apagar os dados
 #  O instalador PERGUNTA onde instalar: (1) pendrive/disco externo, recomendado, ou (2) uma pasta no computador.
 #  Em qualquer dos dois a compilação roda DENTRO do destino escolhido (e não em %LOCALAPPDATA%): nada do cofre,
 #  nem restos de compilação, vai parar em outro lugar. No pendrive ela é mais lenta (veja os tempos).
@@ -18,7 +19,7 @@
 # ============================================================================
 
 # ----------------------------------------------------------------------------
-#  Funções auxiliares PURAS (sem efeito colateral): são testadas pelo Pester em testes\4_so_no_windows\instalador.Tests.ps1.
+#  Funções auxiliares PURAS (sem efeito colateral): são testadas pelo Pester em testes\4_TESTE_so_no_windows\instalador.Tests.ps1.
 #  Carregar este arquivo com ". .\instalar_cofre.ps1" só define as funções; não instala nada.
 # ----------------------------------------------------------------------------
 function Test-PrefixoSha256([string]$hashCompleto, [string]$digitado) {
@@ -113,6 +114,43 @@ function Ocultar-Apoio([string]$pasta) {
         if ($ok) { $n++ } else { $falhou += $i.Name }
     }
     return @{ n = $n; falhou = $falhou }
+}
+function Get-InstalacaoLegada([string]$destino) {
+    $pasta = Join-Path $destino 'CofreSenhas'
+    if (-not (Test-Path -LiteralPath $pasta -PathType Container)) { return $null }
+    $itemPasta = Get-Item -LiteralPath $pasta -Force -ErrorAction Stop
+    $itens = @(Get-ChildItem -LiteralPath $pasta -Force -File -ErrorAction Stop)
+    $nomesPrograma = @('CofreSenhas.exe', 'CofreSenhas-arm64.exe', 'Abrir_Cofre.bat',
+                       'CofreSenhas.sha256', 'CofreSenhas-arm64.sha256', 'cofre_senhas.py')
+    $programas = @($itens | Where-Object { $_.Name -in $nomesPrograma } | ForEach-Object { $_.Name })
+    $cofres = @($itens | Where-Object { $_.Name -like 'cofre.dat*' } | ForEach-Object { $_.Name })
+    $chaves = @($itens | Where-Object { $_.Extension -ieq '.key' } | ForEach-Object { $_.Name })
+    if ($programas.Count -eq 0 -and $cofres.Count -eq 0 -and $chaves.Count -eq 0) { return $null }
+    return [pscustomobject]@{
+        Path = $pasta
+        Programas = $programas
+        Cofres = $cofres
+        Chaves = $chaves
+        ReparsePoint = [bool]($itemPasta.Attributes -band [IO.FileAttributes]::ReparsePoint)
+    }
+}
+function Remove-ProgramaLegado([string]$pasta) {
+    $nomes = @('CofreSenhas.exe', 'CofreSenhas-arm64.exe', 'Abrir_Cofre.bat',
+               'CofreSenhas.sha256', 'CofreSenhas-arm64.sha256', 'cofre_senhas.py')
+    $removidos = @()
+    $falhas = @()
+    foreach ($nome in $nomes) {
+        $caminho = Join-Path $pasta $nome
+        if (-not (Test-Path -LiteralPath $caminho -PathType Leaf)) { continue }
+        try {
+            Remove-Item -LiteralPath $caminho -Force -ErrorAction Stop
+            if (Test-Path -LiteralPath $caminho) { $falhas += $nome }
+            else { $removidos += $nome }
+        } catch {
+            $falhas += "$nome ($($_.Exception.Message))"
+        }
+    }
+    return [pscustomobject]@{ Removidos = @($removidos); Falhas = @($falhas) }
 }
 
 function Instalar-Cofre([string]$LetraPedida = '') {
@@ -341,6 +379,66 @@ function Instalar-Cofre([string]$LetraPedida = '') {
         Write-Host ""
     }
     $destino = if ($modoPc) { $pastaPc } else { "$($letra):\" }
+    $confirmouVersaoAnterior = $false
+    $instalacaoLegada = Get-InstalacaoLegada $destino
+    if ($instalacaoLegada) {
+        if ($instalacaoLegada.ReparsePoint) {
+            Info "Encontrei $($instalacaoLegada.Path), mas ela é um link/junção. Por segurança, não vou atualizar nem apagar o conteúdo dela."
+        } else {
+            Write-Host ""
+            Write-Host "   Encontrei uma versão/pasta antiga em $($instalacaoLegada.Path)." -ForegroundColor Yellow
+            if ($instalacaoLegada.Cofres.Count -gt 0 -or $instalacaoLegada.Chaves.Count -gt 0) {
+                Write-Host "   Há $($instalacaoLegada.Cofres.Count) arquivo(s) do cofre e $($instalacaoLegada.Chaves.Count) chave(s)." -ForegroundColor Yellow
+                Write-Host "   Atualizar não apaga o cofre, os backups nem as chaves; a próxima tela oferece separadamente a opção APAGAR." -ForegroundColor Green
+            }
+            Write-Host "     1 = ATUALIZAR nessa pasta (ENTER = 1): substitui o programa antigo e mantém os dados"
+            Write-Host "     2 = Instalar em $destino e deixar a pasta antiga intacta"
+            if ($instalacaoLegada.Programas.Count -gt 0) {
+                Write-Host "     3 = Apagar só os arquivos antigos do programa; manter cofre, backups e chaves"
+            }
+            if ($testeSandbox) {
+                $opcaoLegada = '1'
+                Info "[MODO TESTE] atualizando no local antigo; dados preservados."
+            } else {
+                $opcaoLegada = (Read-Host "   Escolha 1, 2 ou 3").Trim()
+                if (-not $opcaoLegada) { $opcaoLegada = '1' }
+            }
+            if ($opcaoLegada -eq '1') {
+                $destino = $instalacaoLegada.Path
+                $confirmouVersaoAnterior = $true
+                [void](Revelar-Apoio $destino)
+                Ok "a instalação antiga será atualizada no mesmo local; os arquivos do cofre serão mantidos"
+            } elseif ($opcaoLegada -eq '2') {
+                Info "A pasta antiga será mantida intacta; o novo programa será instalado em $destino."
+            } elseif ($opcaoLegada -eq '3' -and $instalacaoLegada.Programas.Count -gt 0) {
+                if (-not $testeSandbox -and (Read-Host "Para apagar somente o programa antigo, digite APAGAR") -cne 'APAGAR') {
+                    Info "Cancelado: a versão antiga, o cofre, os backups e as chaves foram mantidos. Instalação interrompida."
+                    return
+                }
+                [void](Revelar-Apoio $instalacaoLegada.Path)
+                $remocao = Remove-ProgramaLegado $instalacaoLegada.Path
+                if ($remocao.Falhas.Count -gt 0) {
+                    Erro "Não consegui remover todos os arquivos antigos do programa: $($remocao.Falhas -join ', '). Nada do cofre foi apagado."
+                    return
+                }
+                Ok "arquivos antigos do programa removidos; cofre, backups e chaves permanecem em $($instalacaoLegada.Path)"
+            } else {
+                Erro "Escolha inválida. Nada da instalação antiga foi alterado."
+                return
+            }
+        }
+    }
+    $exeExistente = Join-Path $destino 'CofreSenhas.exe'
+    if (-not $confirmouVersaoAnterior -and (Test-Path -LiteralPath $exeExistente -PathType Leaf)) {
+        Write-Host ""
+        Write-Host "   Já existe uma versão do programa em $destino." -ForegroundColor Yellow
+        Write-Host "   A atualização substituirá somente o CofreSenhas.exe; o cofre e as cópias serão mantidos."
+        if (-not $testeSandbox -and (Read-Host "   Continuar e atualizar? [ENTER = sim, N = cancelar]").Trim() -match '^[nN]$') {
+            Info "Atualização cancelada; nenhum arquivo existente foi alterado."
+            return
+        }
+        if ($testeSandbox) { Info "[MODO TESTE] confirmando atualização do executável existente." }
+    }
     $raizObra = if ($modoPc) { $pastaPc } else { "$($letra):" }
     # Compilação dentro do pendrive, numa pasta de nome CURTO na raiz: o compilador C tem arquivos de nome
     # muito comprido, e caminhos longos passam do limite de 260 caracteres do Windows.
@@ -559,8 +657,8 @@ function Instalar-Cofre([string]$LetraPedida = '') {
 
     # ------------------------------------------------------------------
     Etapa "2/5  Verificando o Python"
-    # Arquitetura do computador (x64 ou ARM64): decide qual Python procurar/baixar. O programa é compilado para a
-    # arquitetura do Python usado (um Python x64 num computador ARM64 gera um programa x64, que roda por emulação).
+    # O build usa Python x64 em todas as máquinas. No Windows ARM64, o x64 roda por emulação; o pacote ARM64
+    # de cryptography disponível tem vulnerabilidades corrigidas apenas em versões sem wheel ARM64 publicado.
     $osArq = ''
     try { $osArq = [string][System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture } catch {}
     if (-not $osArq) { $osArq = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE } }
@@ -585,23 +683,20 @@ function Instalar-Cofre([string]$LetraPedida = '') {
             if ($c -and (Test-Path -LiteralPath $c)) {
                 $r = & $c -I -c "import sys, sysconfig, tkinter; print(sysconfig.get_platform() if (3,11) <= sys.version_info[:2] <= (3,13) else 'x')" 2>$null
                 $plataforma = "$r".Trim()
-                if ($LASTEXITCODE -eq 0 -and $plataforma -match '^win-(amd64|arm64)$' -and (-not $exigir -or $plataforma -eq $exigir)) { return $c }
+                if ($LASTEXITCODE -eq 0 -and $plataforma -eq 'win-amd64' -and (-not $exigir -or $plataforma -eq $exigir)) { return $c }
             }
         }
         return $null
     }
-    # num computador ARM64 prefere um Python ARM64 (programa nativo); se só houver x64, usa esse mesmo
+    # Usa Python x64 também em hosts ARM64 para manter a mesma dependência criptográfica corrigida.
     function Achar-Preferido {
-        $p = $null
-        if ($hostArm) { $p = Achar-Python 'win-arm64' }
-        if (-not $p) { $p = Achar-Python '' }
-        return $p
+        return Achar-Python 'win-amd64'
     }
 
     $python = Achar-Preferido
     if (-not $python) {
-        $sufixo = if ($hostArm) { 'arm64' } else { 'amd64' }
-        $shaPython = if ($hostArm) { '3089a1977c32b26f5078e5a7d0285b7a861b8c96250c5dac3b6af59fbe9e9a75' } else { '5da012101ba2e17113a9a1cd901e9ce1441086f2b7ecb5de06ec94163899a190' }
+        $sufixo = 'amd64'
+        $shaPython = '5da012101ba2e17113a9a1cd901e9ce1441086f2b7ecb5de06ec94163899a190'
         $instLocal = Join-Path (Join-Path $pasta 'pacotes') "python-3.13.17-$sufixo.exe"
         if (Test-Path -LiteralPath $instLocal) {
             $shaLocal = (Get-FileHash -LiteralPath $instLocal -Algorithm SHA256).Hash
@@ -663,15 +758,15 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     $versao = (& $python -I --version 2>&1 | Out-String).Trim()
     Ok "$versao em $python"
     $plat = (& $python -I -c "import sysconfig; print(sysconfig.get_platform())" 2>$null | Out-String).Trim()
-    if ($plat -notmatch '^win-(amd64|arm64)$') { Erro "Este Python ($plat) não é x64 nem ARM64; instale o Python 3.13 de 64 bits em python.org e rode de novo."; return }
-    $arq = if ($plat -eq 'win-arm64') { 'arm64' } else { 'amd64' }
+    if ($plat -ne 'win-amd64') { Erro "Este build requer Python x64 (win-amd64); no Windows ARM64, use o x64 sob emulação."; return }
+    $arq = 'amd64'
     # O nome do programa é SEMPRE CofreSenhas.exe (sem sufixo de arquitetura nem arquivo nenhum ao lado dele):
     # reinstalar numa outra arquitetura substitui o programa anterior. Não há mais nada "de fora" que precise
     # escolher entre dois arquivos -- o único arquivo fora do cofre.dat nesta pasta é o próprio programa.
     $nomeFinal = 'CofreSenhas.exe'
     $final = Join-Path $destino $nomeFinal
     Info "Arquitetura: programa para $arq (computador: $osArq) -> $nomeFinal"
-    if ($hostArm -and $arq -eq 'amd64') { Info "Aviso: só há Python x64 neste computador ARM64; o programa será x64 (roda por emulação, mais lento). Para a versão nativa, instale o Python ARM64 e rode de novo." }
+    if ($hostArm) { Info "Windows ARM64: o programa x64 será executado por emulação; build nativo ARM64 não é suportado." }
     Marca '2/5 Python'
 
     # ------------------------------------------------------------------
@@ -691,8 +786,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     $reqNuitka = Join-Path $req 'nuitka.txt'
     $reqZig = Join-Path $req 'zig.txt'
     @'
-cryptography==50.0.1 ; platform_machine == "AMD64" --hash=sha256:aed8db4f6d71c51efb89530e12d9464e7bf2923d46c3205dc794a2a93f8c0648 --hash=sha256:55d16b1ef3ee0958d893a977b19777887e546c9954ea81b200c3301a864013f2
-cryptography==46.0.3 ; platform_machine == "ARM64" --hash=sha256:5d7f93296ee28f68447397bf5198428c9aeeab45705a55d53a6343455dcb2c3c --hash=sha256:d89c3468de4cdc4f08a57e214384d0471911a3830fcdaf7a8cc587e42a866372
+cryptography==50.0.2 --hash=sha256:7afa5a6602a9f29af1f3a2965f831bae7c9d5d597b7cbb716d41ab3b7d89879c
 argon2-cffi==25.1.0 --hash=sha256:fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741
 argon2-cffi-bindings==26.1.0 --hash=sha256:2c36ff87b5dfaa477d0bd51e9d7f6abdae7c8955d2983c97419085d842154b3e --hash=sha256:f9c4420a7a864fe1b86ce35befc95b8e39fb852493b81cf798671ddc265de638
 openpyxl==3.1.5 --hash=sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2
@@ -741,9 +835,31 @@ ziglang==0.16.0 --hash=sha256:089a16a4eb5a2f45151993342f8fabad24ff1a0723dc146642
         $okFinal = $true
         return
     }
-    if ((Test-Path -LiteralPath $pacotes) -and @(Get-ChildItem -LiteralPath $pacotes -File -ErrorAction SilentlyContinue).Count -gt 0) {
+    function Testar-Pacotes-Offline([string]$arquivo, [string[]]$opcoes) {
+        $argumentos = @(
+            '-I', '-m', 'pip', 'install', '--dry-run', '--disable-pip-version-check',
+            '--isolated', '--no-index', '--find-links', $pacotes, '--require-hashes', '--no-deps'
+        ) + $opcoes + @('-r', $arquivo)
+        $saidaTeste = & $python @argumentos 2>&1
+        if ($LASTEXITCODE -eq 0) { return $true }
+        foreach ($linha in ($saidaTeste | Select-Object -Last 3)) {
+            Info "Wheelhouse: $linha"
+        }
+        return $false
+    }
+
+    $offlineCompleto = $false
+    if (Test-Path -LiteralPath $pacotes) {
+        $offlineCompleto = (Testar-Pacotes-Offline $reqBin @('--only-binary=:all:')) `
+            -and (Testar-Pacotes-Offline $reqBuild @('--only-binary=:all:')) `
+            -and (Testar-Pacotes-Offline $reqNuitka @('--no-build-isolation')) `
+            -and (Testar-Pacotes-Offline $reqZig @('--only-binary=:all:'))
+    }
+    if ($offlineCompleto) {
         $pip += @('--no-index', '--find-links', $pacotes)
-        Info "Modo OFFLINE: usando os pacotes da pasta 'pacotes' (sem internet). Cada arquivo continua conferido por hash."
+        Info "Modo OFFLINE: todos os pacotes exigidos foram encontrados e conferidos em 'pacotes'."
+    } elseif (Test-Path -LiteralPath $pacotes) {
+        Info "Wheelhouse incompleto para esta arquitetura/Python; continuarei com o indice online."
     }
     if (-not (Pip-Tentar @('--only-binary=:all:', '-r', $reqBin) 'as bibliotecas')) { Erro "Falha ao instalar as bibliotecas (veja as mensagens acima). Verifique a internet e rode de novo: o que já baixou fica guardado."; return }
     # ferramentas de montagem do Nuitka (que só existe como código-fonte), também com hash; sem baixar nada na montagem

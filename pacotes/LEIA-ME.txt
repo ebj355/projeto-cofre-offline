@@ -1,0 +1,18 @@
+PASTA "pacotes"  -  instalar e testar SEM internet (preparada pelo atalho 3)
+
+Para que serve
+  Esta pasta recebe as bibliotecas do cofre, Nuitka, Zig, ferramentas Python de teste, o instalador oficial do Python,
+  Pester e o instalador do Nmap. Rode "3 - BAIXAR PACOTES..." com internet antes de copiar o projeto para o PC offline.
+  Os arquivos baixados ficam listados em SHA256.txt; Python, Nmap, Pester e as dependencias do instalador tambem
+  passam por verificacao de hash, e o Python por assinatura digital.
+
+O que continua precisando de fora
+  - Para compilar, o instalador usa o Python empacotado se nao encontrar um compativel instalado.
+  - Para rodar as baterias, instale o Python de python-3.13.17-*.exe se ainda nao houver Python 3.13.
+  - Nmap requer instalacao manual a partir de nmap-7.993-setup.exe; isso pode pedir permissao e Npcap.
+  - pip-audit precisa de internet para obter dados atuais de vulnerabilidades; offline a auditoria e pulada.
+
+Limites
+  - Computador ARM64: rode o atalho 3 nesse computador para preparar os wheels da arquitetura correta.
+  - Para atualizar os pacotes (versoes novas), rode o atalho 3 com internet.
+  - Para voltar ao modo normal (com internet), esvazie ou apague esta pasta.

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Cofre de Senhas — gerenciador de senhas 100% local, criptografado, com autodestruição.
-Não usa internet em nenhum momento.
+Não faz conexões automaticamente. A consulta opcional de senhas vazadas usa HTTPS
+somente quando solicitada; envia apenas o prefixo de 5 caracteres do SHA-1.
 
 Desbloqueio (escolhido ao criar o cofre):
   - DOIS FATORES: senha mestra E chave de acesso (token) obrigatórias juntas; ou
@@ -33,6 +34,8 @@ Armazenamento: "cofre.dat" na MESMA pasta do programa, ou outro caminho:
 Importação: planilhas Excel (.xlsx/.xlsm) e CSV (inclusive exportações do Chrome/Samsung Pass).
 
 Dependências:  pip install cryptography argon2-cffi openpyxl defusedxml fido2
+
+Mapa das seções, responsabilidades e fluxos: documentacao/GUIA_TECNICO_DO_CODIGO.md
 """
 import os
 import glob
@@ -297,7 +300,7 @@ def sessao_remota():
 
 # ----------------------------------------------------------------------------
 # Blindagem do processo (Windows): memória trancada, anti-injeção,
-# sem despejo de memória em travamento e detecção de ferramentas espiãs
+# supressão de algumas caixas de erro e detecção de ferramentas espiãs
 # ----------------------------------------------------------------------------
 # Ninguém além do SYSTEM pode ler/escrever a memória, injetar código ou mudar
 # estas regras; os outros programas só podem ver que o cofre existe e fechá-lo.
@@ -419,7 +422,7 @@ def blindar_processo():
             BLINDAGEM.append("busca_dll")
     except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
         pass
-    # 3b) DLLs do sistema que NÃO são "conhecidas" do Windows (dwmapi, wer, wtsapi32, webauthn) já entram agora pelo
+    # 3b) DLLs do sistema que NÃO são "conhecidas" do Windows (wer, wtsapi32, dwmapi, webauthn) já entram agora pelo
     #     caminho completo da System32: quando o código pedir só o nome, o Windows reaproveita a que já está carregada
     #     e uma DLL falsa colocada ao lado do programa (pendrive) nunca é consultada.
     try:
@@ -434,17 +437,13 @@ def blindar_processo():
                     pass
     except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
         pass
-    # 4) se o cofre travar, o Windows não grava a memória dele (com senhas) em disco
+    # 4) remove a exclusão WER persistente criada por versões antigas; não adiciona nada ao Registro.
     try:
         k.SetErrorMode(0x0001 | 0x0002 | 0x8000)
         wer = ctypes.WinDLL("wer.dll")
-        wer.WerAddExcludedApplication.argtypes = [wintypes.LPCWSTR, wintypes.BOOL]
-        wer.WerAddExcludedApplication.restype = ctypes.c_long
-        buf = ctypes.create_unicode_buffer(1024)
-        k.GetModuleFileNameW.argtypes = [ctypes.c_void_p, wintypes.LPWSTR, wintypes.DWORD]
-        if k.GetModuleFileNameW(None, buf, 1024):
-            if wer.WerAddExcludedApplication(os.path.basename(buf.value), False) >= 0:
-                BLINDAGEM.append("sem_despejo")
+        wer.WerRemoveExcludedApplication.argtypes = [wintypes.LPCWSTR, wintypes.BOOL]
+        wer.WerRemoveExcludedApplication.restype = ctypes.c_long
+        wer.WerRemoveExcludedApplication("CofreSenhas.exe", False)
     except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
         pass
     return BLINDAGEM
@@ -1291,6 +1290,28 @@ def _diag_abrir(priv_bytes, reg):
     return ChaCha20Poly1305(chave).decrypt(nonce, ct, DIAG_MAGIC)
 
 
+def _gravar_diag_atomico(arq, dados):
+    """Troca o arquivo de diagnóstico por um temporário exclusivo na mesma pasta."""
+    pasta = os.path.dirname(arq) or "."
+    fd, tmp = tempfile.mkstemp(prefix=os.path.basename(arq) + ".", suffix=".tmp", dir=pasta)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(dados)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, arq)
+    except OSError:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def _com_apoio_liberado(f):
     """Decorador: roda a função dentro de apoio_liberado() (definida mais abaixo; é procurada só na hora da chamada).
     Serve para as operações que gravam no cofre ou perto dele, que precisam do arquivo liberado por instantes."""
@@ -1320,18 +1341,10 @@ def diag_iniciar(caminho_cofre, pub):
                     return
         except OSError:
             pass
-        tmp = arq + ".tmp"
         try:
-            with open(tmp, "wb") as f:
-                f.write(DIAG_MAGIC + pub)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp, arq)
+            _gravar_diag_atomico(arq, DIAG_MAGIC + pub)
         except OSError:
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+            pass
 
 
 def _diag_rotacionar(arq):
@@ -1341,18 +1354,7 @@ def _diag_rotacionar(arq):
     corpo = bruto[DIAG_CAB:]
     n = len(corpo) // DIAG_TAM
     novo = bruto[:DIAG_CAB] + corpo[max(0, n - DIAG_MANTER) * DIAG_TAM:n * DIAG_TAM]
-    tmp = arq + ".tmp"
-    try:
-        with open(tmp, "wb") as f:
-            f.write(novo)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, arq)
-    except OSError:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
+    _gravar_diag_atomico(arq, novo)
 
 
 @_com_apoio_liberado
@@ -1425,12 +1427,7 @@ def diag_limpar(caminho_cofre, priv_bytes):
     arq = os.path.abspath(caminho_cofre) + ".diag"
     with _TRAVA_DIAG:
         _DIAG["arq"], _DIAG["pub"] = arq, pub
-        tmp = arq + ".tmp"
-        with open(tmp, "wb") as f:
-            f.write(DIAG_MAGIC + pub)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, arq)
+        _gravar_diag_atomico(arq, DIAG_MAGIC + pub)
 
 
 def diag_descrever(codigo, err):
@@ -1454,6 +1451,7 @@ def _copias(caminho):
 def _todas_as_copias(caminho):
     """Tudo que guarda uma versão antiga do cofre ao lado dele (inclusive o arquivo danificado)."""
     return (_copias(caminho) + [caminho + ".danificado", caminho + ".pre-v5", caminho + ".tmp"]
+            + glob.glob(glob.escape(caminho) + ".*.danificado")
             + glob.glob(glob.escape(caminho) + ".*.tmp"))        # sobras de gravações interrompidas (um .tmp por processo)
 
 
@@ -1464,18 +1462,20 @@ def destruir_arquivo(caminho):
 
 @_com_apoio_liberado
 def destruir(caminho):
-    """Autodestruição do COFRE: sobrescreve o cofre e as cópias de segurança dele e apaga tudo."""
+    """Autodestruição do cofre: sobrescreve o conteúdo e as cópias; arquivos auxiliares de trava podem permanecer."""
     for extra in _todas_as_copias(caminho):
         if os.path.exists(extra):
             try:
                 _destruir_um(extra)
             except OSError:
                 pass
-    for extra in (caminho + ".diag", caminho + ".diag.tmp"):        # o registro de diagnóstico também some
+    for extra in [caminho + ".diag", caminho + ".diag.tmp"] + \
+            glob.glob(glob.escape(caminho) + ".diag.*.tmp"):        # o registro de diagnóstico também some
         try:
             _destruir_um(extra)
         except OSError:
             pass
+    # Não desvincule as travas: outro processo pode estar usando o mesmo arquivo para sincronizar gravações.
     _destruir_um(caminho)
 
 
@@ -1525,10 +1525,13 @@ def _rodar_copias(caminho):
         diag_registrar(DIAG_COPIA, ex)             # cópia de segurança é bônus; nunca impede salvar
 
 
-def restaurar_copia(caminho):
+def restaurar_copia(caminho, ignoradas=()):
     """Troca o cofre danificado pela cópia de segurança válida mais recente. Retorna o nome usado ou None.
     O arquivo danificado é guardado como .danificado (nada é apagado)."""
+    ignoradas = set(ignoradas)
     for b in _copias(caminho):
+        if os.path.basename(b) in ignoradas:
+            continue
         try:
             with open(b, "rb") as f:
                 dados = f.read(LIMITE_COFRE)
@@ -1537,7 +1540,10 @@ def restaurar_copia(caminho):
             continue
         try:
             if os.path.exists(caminho):
-                os.replace(caminho, caminho + ".danificado")
+                danificado = caminho + ".danificado"
+                if os.path.exists(danificado):
+                    danificado = caminho + "." + secrets.token_hex(4) + ".danificado"
+                os.replace(caminho, danificado)
             _gravar_atomico(caminho, dados)
         except OSError:
             return None
@@ -2809,6 +2815,40 @@ def isolar_temporarios(base=None):
 _TRAVA_ARQ = {"fd": None, "caminho": None}
 
 
+@contextlib.contextmanager
+def _trava_gravacao(caminho):
+    """Serializa a conferência de versão e a troca atômica entre processos."""
+    caminho_trava = caminho + ".gravar.lock"
+    fd = os.open(caminho_trava, os.O_RDWR | os.O_CREAT, 0o600)
+    travado = False
+    try:
+        if os.fstat(fd).st_size == 0:
+            os.write(fd, b"\0")
+        os.lseek(fd, 0, os.SEEK_SET)
+        if EH_WINDOWS:
+            import msvcrt
+            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        travado = True
+        yield
+    finally:
+        if travado:
+            try:
+                if EH_WINDOWS:
+                    import msvcrt
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        else:
+            os.close(fd)
+
+
 def _trava_de_arquivo(caminho):
     """Trava de arquivo ENTRE PROCESSOS (vale entre sessões do Windows, entre letras de unidade e em qualquer
     sistema): cria/abre `<cofre>.lock` (arquivo vazio) e pede uma trava exclusiva e imediata. O sistema operacional
@@ -3011,7 +3051,8 @@ def _clipboard_set(formato, dados):
         _anotar_erro_clip("GlobalLock")
         _k32.GlobalFree(h)
         return False
-    ctypes.memmove(p, dados, len(dados))
+    origem = (ctypes.c_ubyte * len(dados)).from_buffer(dados) if isinstance(dados, bytearray) else dados
+    ctypes.memmove(p, origem, len(dados))
     _k32.GlobalUnlock(h)
     if not _u32.SetClipboardData(formato, h):
         _anotar_erro_clip("SetClipboardData")
@@ -3034,7 +3075,11 @@ def copiar_seguro_windows(texto, dono_alternativo=None):
         ok = False
         try:
             _u32.EmptyClipboard()
-            ok = _clipboard_set(13, (texto + "\0").encode("utf-16-le"))   # CF_UNICODETEXT
+            dados = bytearray((texto + "\0").encode("utf-16-le"))
+            try:
+                ok = _clipboard_set(13, dados)   # CF_UNICODETEXT
+            finally:
+                dados[:] = b"\0" * len(dados)
             if ok:
                 zero = struct.pack("<I", 0)
                 for nome in ("ExcludeClipboardContentFromMonitorProcessing",
@@ -3458,34 +3503,35 @@ class Cofre:
             # subchaves por operação: mesmo tratamento do resto dos segredos (eram as únicas que escapavam da zeragem)
             zerar_objeto(k_cha)
             zerar_objeto(k_aes)
-        b1 = self.caminho + ".bak1"                 # cópia de segurança: no máx. 1 a cada 10 min
-        try:
-            velha = (not os.path.exists(b1)) or time.time() - os.path.getmtime(b1) > 600
-        except OSError:
-            velha = True
-        # Outra janela/programa gravou no cofre depois que este foi aberto? Recusa, para não apagar
-        # em silêncio o que foi salvo lá.
-        assin = getattr(self, "_assin", None)
-        if assin is not None:
-            try:
-                with open(self.caminho, "rb") as f:
-                    atual = f.read(LIMITE_COFRE)
-            except FileNotFoundError:
-                diag_registrar(DIAG_CONFLITO)
-                raise ErroGravacao("O arquivo do cofre não está mais no lugar (o pendrive foi removido ou trocado?). "
-                                   "Nada foi gravado. Encaixe o pendrive de novo e tente outra vez; se ele estiver "
-                                   "encaixado, feche e abra o cofre.")
-            if _assinatura(atual) != assin:
-                diag_registrar(DIAG_CONFLITO)
-                raise ConflitoGravacao("O arquivo do cofre foi alterado por outra janela ou programa depois "
-                                       "que você o abriu. Nada foi gravado. Bloqueie e abra o cofre de novo.")
-        if velha or forcar_copia:
-            _rodar_copias(self.caminho)
         saida = cab + bytes([self.max_t]) + secao + externo
-        _gravar_atomico(self.caminho, saida)
-        self._assin = _assinatura(saida)
-        self._seq = seq
-        self.meta["seq"] = seq
+        with _trava_gravacao(self.caminho):
+            b1 = self.caminho + ".bak1"                 # cópia de segurança: no máx. 1 a cada 10 min
+            try:
+                velha = (not os.path.exists(b1)) or time.time() - os.path.getmtime(b1) > 600
+            except OSError:
+                velha = True
+            # A trava abrange esta checagem e a substituição: sem ela, dois processos podiam
+            # validar a mesma assinatura e o último a renomear apagava a gravação do primeiro.
+            assin = getattr(self, "_assin", None)
+            if assin is not None:
+                try:
+                    with open(self.caminho, "rb") as f:
+                        atual = f.read(LIMITE_COFRE)
+                except FileNotFoundError:
+                    diag_registrar(DIAG_CONFLITO)
+                    raise ErroGravacao("O arquivo do cofre não está mais no lugar (o pendrive foi removido ou trocado?). "
+                                       "Nada foi gravado. Encaixe o pendrive de novo e tente outra vez; se ele estiver "
+                                       "encaixado, feche e abra o cofre.")
+                if _assinatura(atual) != assin:
+                    diag_registrar(DIAG_CONFLITO)
+                    raise ConflitoGravacao("O arquivo do cofre foi alterado por outra janela ou programa depois "
+                                           "que você o abriu. Nada foi gravado. Bloqueie e abra o cofre de novo.")
+            if velha or forcar_copia:
+                _rodar_copias(self.caminho)
+            _gravar_atomico(self.caminho, saida)
+            self._assin = _assinatura(saida)
+            self._seq = seq
+            self.meta["seq"] = seq
 
     def confere_chave_acesso(self, texto):
         """Confere se o texto digitado é a chave de acesso DESTE cofre (abre o cadeado dela no cabeçalho). Não gasta
@@ -7420,6 +7466,7 @@ class App:
         self.em_uso = em_uso
         diag_definir(caminho)                  # onde guardar o registro de diagnóstico (cifrado) deste cofre
         self.cofre = None
+        self._restauracoes_tentadas = None
         self.frame = None
         self._timer_bloqueio = None
         self._timer_clip = None
@@ -7463,7 +7510,8 @@ class App:
         root.update()
         self.protegido = proteger_contra_captura(root)
         barra_titulo_escura(root)
-        root.bind("<Map>", lambda e: proteger_contra_captura(root) if e.widget is root else None, add="+")
+        root.bind("<Map>", lambda e=None: proteger_contra_captura(root) if e is None or e.widget is root else None,
+                  add="+")
         self.mostrar_inicio()
 
     # ---------- utilidades ----------
@@ -8003,6 +8051,10 @@ class App:
                   image=imagem_icone(self.root, "cadeado", C["prim_txt"], 16), compound="left").pack(anchor="w")
         ttk.Label(esq, text="Se esquecer esta senha, não será possível recuperar o cofre.",
                   style="C.Suave.TLabel", wraplength=_px(340), justify="left").pack(anchor="w", pady=(4, 14))
+        ttk.Label(esq, text="Faça um backup cifrado fora do pendrive. "
+                  "As cópias locais também são apagadas após erros de senha.",
+                  style="C.Suave.TLabel", wraplength=_px(340), justify="left",
+                  foreground=C["alerta"]).pack(anchor="w", pady=(0, 12))
         self._rotulo_campo(esq, f"Nova senha  (mínimo {MIN_SENHA} caracteres)").pack(anchor="w")
         l1fr = ttk.Frame(esq, style="C.TFrame")
         l1fr.pack(fill="x", pady=(4, 0))
@@ -8032,12 +8084,12 @@ class App:
             if modo.get() == MODO_S:
                 texto = "Depois de criar, o cofre abrirá com a senha mestra."
             elif modo.get() == MODO_E:
-                texto = "Depois de criar, guarde a chave de acesso: ela será mostrada uma única vez."
+                texto = "Guarde a chave de acesso; ela aparece uma vez."
             else:
-                texto = "Depois de criar, guarde a chave: ela também poderá abrir o cofre sozinha."
+                texto = "A chave: ela também poderá abrir o cofre sozinha."
             if usar_fido.get():
                 texto += " O cadastro da chave física será solicitado."
-            proximo.config(text="PRÓXIMO PASSO  ·  " + texto)
+            proximo.config(text="PRÓXIMO PASSO: " + texto)
 
         cab_modo = ttk.Frame(dir_, style="C.TFrame")
         cab_modo.pack(anchor="w", fill="x")
@@ -8427,6 +8479,7 @@ class App:
                 if erro is not None:
                     raise erro
                 self.cofre = cofre
+                self._restauracoes_tentadas = None
                 self._erros_formato = 0
                 if self.em_uso:
                     self.cofre.motivo_consulta = "em_uso"
@@ -8482,6 +8535,23 @@ class App:
             except ArquivoCorrompido as ex:
                 self._ocupado(False)
                 diag_registrar(DIAG_INTEGRIDADE, ex)
+                if self._restauracoes_tentadas is not None:
+                    usada = restaurar_copia(self.caminho, ignoradas=self._restauracoes_tentadas)
+                    if usada:
+                        self._restauracoes_tentadas.append(usada)
+                        messagebox.showwarning(
+                            "Outra cópia selecionada",
+                            "A cópia restaurada não passou pela verificação de integridade após a senha ser "
+                            "confirmada. Selecionei a próxima cópia automática; digite a senha novamente. "
+                            "Nenhuma tentativa foi gasta.")
+                    else:
+                        self._restauracoes_tentadas = None
+                        messagebox.showerror(
+                            "Cópias automáticas danificadas",
+                            "A cópia restaurada também está danificada e não há outra cópia automática legível. "
+                            "Use o backup cifrado externo.")
+                    self.mostrar_inicio()
+                    return
                 self._oferecer_restauracao(str(ex))
                 return
             except ErroGravacao as ex:
@@ -8794,6 +8864,7 @@ class App:
                 "(O arquivo danificado fica guardado ao lado, como .danificado.)"):
             usada = restaurar_copia(self.caminho)
             if usada:
+                self._restauracoes_tentadas = [usada]
                 messagebox.showinfo("Cofre restaurado", "Pronto. Digite a senha para abrir o cofre restaurado.")
                 self.mostrar_inicio()
             else:
@@ -9224,7 +9295,7 @@ class App:
         d.update_idletasks()
         proteger_contra_captura(d)
         barra_titulo_escura(d)
-        d.bind("<Map>", lambda e: proteger_contra_captura(d) if e.widget is d else None, add="+")
+        d.bind("<Map>", lambda e=None: proteger_contra_captura(d) if e is None or e.widget is d else None, add="+")
         d.after_idle(lambda: self._revelar_dialogo(d))
         return d
 

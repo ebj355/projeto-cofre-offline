@@ -1,0 +1,92 @@
+BATERIA 5 - FERRAMENTAS EXTERNAS DO COFRE DE SENHAS
+===================================================
+
+ONDE FICA
+Esta pasta fica em testes\5_TESTE_ferramentas_externas\. Os .bat entram sozinhos
+na raiz do projeto (onde esta o cofre_senhas.py), entao nao precisam ficar
+soltos ao lado dele.
+
+COMO USAR
+- Tudo junto: o "2 - TESTAR TUDO - roda todos os testes.bat" da raiz ja roda
+  esta bateria como etapa 6/6: 01, 02, 04, 05, 08-10, 12 e 13.
+- Os testes que precisam do executavel compilado ficam separados em
+  testes\7_TESTE_de_compilacao\. Compile primeiro e rode o BAT dessa pasta;
+  no Testar Tudo, acrescente POS-COMPILACAO para incluir a etapa opcional 7.
+- So esta pasta, sem menu: RODAR ESTA PASTA - ferramentas externas.bat
+- Uma ferramenta por vez: 00_MENU_TESTES_FERRAMENTAS.bat
+
+O QUE CADA ARQUIVO FAZ
+- 01_BANDIT_CODIGO.bat: analisa estaticamente o cofre_senhas.py.
+- 02_PIP_AUDIT_DEPENDENCIAS.bat: procura vulnerabilidades conhecidas nas
+  bibliotecas do requirements.txt. Por padrao pula offline; com internet,
+  defina COFRE_ONLINE_AUDIT=1 antes de abrir o BAT.
+- 03_PYTEST_PROJETO.bat: roda a ponte pytest. So no menu: ela repete as
+  baterias 1 e 2, entao nao entra no TESTAR TUDO.
+- 04_NMAP_PORTAS_LOCAIS.bat: verifica as 100 portas TCP mais comuns SOMENTE
+  em 127.0.0.1 (este proprio computador).
+- 05_PSSCRIPTANALYZER.bat: analisa os scripts PowerShell do projeto.
+- 08_SEGREDOS_NO_REPOSITORIO.bat: procura cofres, chaves e segredos antes do Git.
+- 13_INTEGRIDADE_REPOSITORIO.bat: verifica residuos gerados contra o .gitignore e
+  consistencia dos pins/hashes do build; falha tambem se Git ou detect-secrets nao rodarem.
+- 09_QUALIDADE_EXTRA.bat: executa Ruff, mypy, Radon e Vulture.
+- 10_PIP_AUDIT_TESTE_E_SBOM.bat: audita dependencias de teste e gera SBOM;
+  exige internet para consultar vulnerabilidades atuais.
+- 12_HYPOTHESIS_PROPRIEDADES.bat: testa ida e volta e entradas CSV hostis com
+  dados gerados pelo Hypothesis.
+- 00_MENU_TESTES_FERRAMENTAS.bat: menu para rodar cada um.
+- RODAR ESTA PASTA - ferramentas externas.bat: roda 01, 02, 04, 05, 08-10,
+  12 e 13 sem menu.
+  O pytest (03) fica fora porque repete as baterias 1 e 2.
+
+RESULTADOS
+- Resumo: testes\resultados\resultado_ferramentas_externas_windows.txt
+- Relatorios completos: diretamente em testes\resultados\
+- [OK] = sem alertas | [ALERTA] = ha achados para revisar | [PULADO] =
+  pre-requisito ausente ou auditoria offline; nunca significa aprovado. O motivo
+  especifico fica no relatorio individual em testes\resultados\.
+  Falhas de Hypothesis, segredos ou integridade sao `[FALHOU]` e reprovam a etapa.
+
+REQUISITOS / MODO OFFLINE
+- Rode 3 - BAIXAR PACOTES enquanto houver internet e copie o projeto inteiro,
+  incluindo pacotes\, para o computador offline.
+- Os .bat criam/atualizam testes\ambiente_virtual_ferramentas (NAO MEXER) usando somente os wheels de
+  pacotes\ e requirements-test-lock.txt; nao alteram o Python do sistema.
+- **Nao renomeie, mova ou apague** `testes\ambiente_virtual_ferramentas (NAO MEXER)`:
+  os atalhos dependem desse caminho. O ambiente pode ser recriado pelo BAT se estiver faltando.
+- Os caches/temporarios ficam em `testes\CACHE\<execucao>` e sao removidos ao fim;
+  os relatorios em `testes\resultados\` permanecem.
+- As entradas diretas ficam em requirements-test-direct.in; requirements-test-lock.txt contem
+  o lock com hashes usado pela instalacao offline. Depois de alterar o .in,
+  gere o lock com:
+  pip-compile --allow-unsafe --generate-hashes --output-file=requirements-test-lock.txt requirements-test-direct.in
+- Depois, rode 3 - BAIXAR PACOTES com internet para atualizar o wheelhouse.
+- Se nao houver Python 3.13 instalado, execute o instalador python-3.13.17-*.exe
+  de pacotes\ antes dos testes.
+- Pester e importado de pacotes\powershell-modules.
+- O Nmap fica em pacotes\nmap-7.993-setup.exe, mas precisa ser instalado
+  manualmente (pode exigir permissao e Npcap). Sem ele o teste 04 e pulado.
+- pip-audit esta empacotado, mas precisa de internet para dados atuais de CVEs;
+  sem rede a auditoria e marcada como [PULADO], nunca como "limpa".
+- PSScriptAnalyzer exige o download pelo script `baixar_psscriptanalyzer.ps1`;
+  confira e fixe o SHA-512 mostrado antes de distribuir o modulo offline.
+- pefile ja esta no lock e no wheelhouse. As verificacoes de PE e Defender da
+  pasta 7 exigem um `CofreSenhas.exe` compilado; o Defender tambem precisa estar
+  disponivel no Windows. A verificacao de rede exige o executavel aberto.
+  Baixar mais pacotes nao substitui esses pre-requisitos do Windows/programa.
+
+LIMITES IMPORTANTES
+- Bandit e pip-audit analisam codigo e bibliotecas; alertas precisam de
+  avaliacao humana. Estes testes nao provam que o cofre e invulneravel.
+- Nmap nao testa o codigo Python: so mostra servicos de rede escutando
+  neste computador.
+- Burp Suite nao foi incluido: o cofre e um aplicativo local, sem servidor
+  HTTP, entao nao ha alvo para ele.
+- TryHackMe, Hack The Box, PicoCTF, OverTheWire, VulnHub, Root-Me,
+  CyberDefenders e Blue Team Labs Online sao sites de treino: nao executam
+  auditoria automatica no cofre.
+
+SEGURANCA
+- Feche o cofre antes de testar e tenha um backup separado.
+- Nunca entregue cofre.dat, arquivos .key, senha mestra ou codigos de
+  recuperacao a nenhum scanner.
+- Nao execute o Nmap contra redes ou computadores de terceiros.

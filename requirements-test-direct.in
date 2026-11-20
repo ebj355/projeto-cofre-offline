@@ -1,0 +1,25 @@
+# Entradas diretas do ambiente de testes; requirements-test-lock.txt e o lock final com hashes.
+# Manter os pacotes de runtime alinhados com requirements.txt e as ferramentas em versoes exatas.
+cryptography==50.0.2
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+openpyxl==3.1.5
+defusedxml==0.7.1
+fido2==2.2.1
+cffi==2.1.1
+pycparser==3.12
+et-xmlfile==2.0.0
+bandit==1.9.4
+coverage==7.17.3
+flake8==7.5.0
+pip-audit==2.10.1
+pytest==9.2.0
+hypothesis==6.170.16
+ruff==0.17.6
+mypy==2.4.1
+radon==6.0.1
+vulture==2.16
+detect-secrets==1.5.0
+pefile==2024.8.26
+pytest-timeout==2.4.0
+pytest-randomly==5.1.0

@@ -15,10 +15,14 @@ logs/instalacao-*.log
 logs/instalacao_detalhada.log
 logs_de_compilacao/
 testes/resultados/
-testes/_venv_ferramentas/
+testes/CACHE/
+testes/ambiente_virtual_ferramentas (NAO MEXER)/
 
 # Cofre de teste e arquivos de apoio que os testes criam/usam (nunca o cofre de verdade de alguém)
 *.dat
+*.danificado
+*.pre-v5
+*.tmp
 *.bak1
 *.bak2
 *.bak3
@@ -27,6 +31,7 @@ testes/_venv_ferramentas/
 *.lock
 *.diag
 avisos_vistos.json
+.tmp_cofre/
 
 # Chave de acesso e planilhas: podem conter senhas reais de quem está usando/testando o cofre —
 # NUNCA sobem para o git, mesmo que alguém esqueça e crie um desses na pasta do projeto por engano.
@@ -41,8 +46,11 @@ relatorio_seguranca.txt
 relatorio_nucleo.txt
 modelo_placa_mae.txt
 
-# Pacotes binários reais baixados por 3 - BAIXAR PACOTES - so para instalar sem internet.bat (grandes; cada um verificado por hash
-# na hora da instalação). Mantemos no git só o LEIA-ME.txt e o SHA256.txt; os binários, não.
+# Pacotes baixados para instalação offline. Só o LEIA-ME e o manifesto de hashes são versionados;
+# wheels, instaladores e módulos extraídos permanecem locais.
+pacotes/*
+!pacotes/LEIA-ME.txt
+!pacotes/SHA256.txt
 pacotes/*.whl
 pacotes/*.tar.gz
 pacotes/*.exe
@@ -53,6 +61,7 @@ pacotes/zig*/
 .venv/
 venv/
 .pytest_cache/
+.mypy_cache/
 .ruff_cache/
-
-pacotes/
+.hypothesis/
+testes/_cache_*/
