@@ -10,6 +10,15 @@ Describe 'instalar_cofre.ps1: funções auxiliares' {
         . $script:instalador      # só define as funções: o arquivo não instala nada quando é carregado assim
     }
 
+    It 'Confirmar-PalavraApagar aceita maiúsculas e minúsculas, mas exige a palavra exata' {
+        foreach ($valor in 'APAGAR', 'apagar', 'ApAgAr') {
+            if (-not (Confirmar-PalavraApagar $valor)) { throw "devia aceitar: '$valor'" }
+        }
+        foreach ($valor in '', 'APAGA', 'APAGAR ') {
+            if (Confirmar-PalavraApagar $valor) { throw "devia recusar: '$valor'" }
+        }
+    }
+
     It 'Test-PrefixoSha256 aceita 16+ caracteres iguais ao início do hash (sem diferenciar maiúsculas)' {
         $h = 'A1B2C3D4E5F60718293A4B5C6D7E8F90A1B2C3D4E5F60718293A4B5C6D7E8F90' # pragma: allowlist secret
         if (-not (Test-PrefixoSha256 $h 'a1b2c3d4e5f60718')) { throw 'devia aceitar' } # pragma: allowlist secret

@@ -22,6 +22,10 @@
 #  Funções auxiliares PURAS (sem efeito colateral): são testadas pelo Pester em testes\4_TESTE_so_no_windows\instalador.Tests.ps1.
 #  Carregar este arquivo com ". .\instalar_cofre.ps1" só define as funções; não instala nada.
 # ----------------------------------------------------------------------------
+function Confirmar-PalavraApagar([string]$valor) {
+    return $valor -ieq 'APAGAR'
+}
+
 function Test-PrefixoSha256([string]$hashCompleto, [string]$digitado) {
     # Confere o que foi digitado (mín. 16 caracteres) com o início do SHA-256 calculado.
     $d = "$digitado".Trim()
@@ -411,7 +415,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
             } elseif ($opcaoLegada -eq '2') {
                 Info "A pasta antiga será mantida intacta; o novo programa será instalado em $destino."
             } elseif ($opcaoLegada -eq '3' -and $instalacaoLegada.Programas.Count -gt 0) {
-                if (-not $testeSandbox -and (Read-Host "Para apagar somente o programa antigo, digite APAGAR") -cne 'APAGAR') {
+                if (-not $testeSandbox -and -not (Confirmar-PalavraApagar (Read-Host "Para apagar somente o programa antigo, digite APAGAR"))) {
                     Info "Cancelado: a versão antiga, o cofre, os backups e as chaves foram mantidos. Instalação interrompida."
                     return
                 }
@@ -505,7 +509,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
         if ($respZero.Trim() -eq '2') {
             Write-Host "   Isso apaga TODAS as suas senhas guardadas neste cofre. Se tem backup, ótimo; se não tem, pare agora." -ForegroundColor Red
             $confZero = Read-Host "   Para confirmar digite a palavra APAGAR (qualquer outra coisa mantém o cofre)"
-            if ($confZero -ceq 'APAGAR') {
+            if (Confirmar-PalavraApagar $confZero) {
                 $faltou = @()
                 foreach ($arq in $arqsCofre) {
                     try {
