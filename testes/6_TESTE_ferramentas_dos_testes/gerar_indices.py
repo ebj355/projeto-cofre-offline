@@ -16,7 +16,8 @@ PASTAS = {
     "7_TESTE_de_compilacao": ("Testes do EXECUTÁVEL COMPILADO (pós-compilação)", "Verificam o executável gerado: proteções PE, varredura do Defender e conexões de rede do processo. Compile o programa antes; esta pasta pode ser incluída opcionalmente no Testar Tudo com POS-COMPILACAO."),
 }
 MANUAL = {   # arquivos que não são .py (ou que não têm texto de abertura): para que serve + por que está aqui
-    "6_TESTE_ferramentas_dos_testes/rodar_todos_windows.bat": "Roda as 6 baterias no Windows; a pasta 7 é opcional e pode ser incluída com POS-COMPILACAO, depois de compilar o executável. Junta os resultados em testes/resultados/.",
+    "6_TESTE_ferramentas_dos_testes/rodar_todos_windows.bat": "Roda as 6 baterias no Windows; a pasta 7 é opcional e pode ser incluída com POS-COMPILACAO, depois de compilar o executável. Junta os resultados em testes/resultados/ e gera RESULTADO COMPLETO.txt.",
+    "6_TESTE_ferramentas_dos_testes/consolidar_resultados.py": "Gera resumo_testes.md, resumo_testes.json, resultados.sarif e RESULTADO COMPLETO.txt, que reúne o conteúdo de todos os arquivos individuais resultado_*.txt.",
     "6_TESTE_ferramentas_dos_testes/cobertura_codigo_windows.bat": "Atalho de dois cliques para medir a cobertura de código no Windows (chama cobertura_codigo.py). Fora do Testar_Tudo de propósito: é lento.",
     "2_TESTE_telas_e_botoes/RODAR ESTA PASTA - testes das telas e botoes.bat": "Atalho de dois cliques da bateria de INTERFACE no Windows (chama teste_gui_windows.ps1).",
     "2_TESTE_telas_e_botoes/teste_gui_windows.ps1": "Prepara um ambiente Python temporário e roda a bateria de interface (rodar_todos.py --so gui) no Windows, gravando o resultado.",

@@ -90,7 +90,7 @@ execução focada de 2026-11-20 passou 12/12. A escolha interativa entre atualiz
 e uma compilação/instalação ponta a ponta ainda precisam de validação separada.
 
 ## Acréscimos de 2026-11-16
-Novos testes: concorrência real entre processos, objetos sensíveis no coletor de lixo, esquema hostil de itens, mensagens da chave FIDO (sem PIN / PIN bloqueado), caminhos especiais, superfície do instalador, rede bloqueada, resíduos em disco com entropia, ocultação contínua e resiliência da interface (cliques frenéticos, texto absurdo, perda de foco, ciclos sem vazamento, janelas modais, tela de integridade, aviso do pendrive). Detalhes e justificativas em README (seção 9) e MODELO_DE_AMEACAS (adendos 22 e 23). Saídas de depuração: `log_depuracao.txt`, `resumo_testes.md/json`, `resultados.sarif`.
+Novos testes: concorrência real entre processos, objetos sensíveis no coletor de lixo, esquema hostil de itens, mensagens da chave FIDO (sem PIN / PIN bloqueado), caminhos especiais, superfície do instalador, rede bloqueada, resíduos em disco com entropia, ocultação contínua e resiliência da interface (cliques frenéticos, texto absurdo, perda de foco, ciclos sem vazamento, janelas modais, tela de integridade, aviso do pendrive). Detalhes e justificativas em README (seção 9) e MODELO_DE_AMEACAS (adendos 22 e 23). Saídas de depuração: `log_depuracao.txt`, `RESULTADO COMPLETO.txt` (conteúdo de todos os relatórios individuais), `resumo_testes.md/json` e `resultados.sarif`.
 
 ## Acréscimos de 2026-11-19
 `teste_propriedades_hypothesis.py` gera casos para ida e volta dos registros e CSVs hostis; é descoberto automaticamente

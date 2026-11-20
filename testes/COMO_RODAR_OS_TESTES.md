@@ -114,6 +114,7 @@ A bateria 5 do Testar Tudo roda as ferramentas 01, 02, 04, 05, 08–10, 12 e 13.
 ## Log de depuração, resumos e limpeza (2026-11-16)
 Além de um `resultado_<teste>.txt` por teste, a pasta `testes/resultados/` guarda:
 - `testes/resultados/log_depuracao.txt` — saída COMPLETA (com tracebacks), horário, duração e comando de cada teste; recriado do zero a cada rodada. É o arquivo para abrir quando algo falha.
+- `testes/resultados/RESULTADO COMPLETO.txt` — conteúdo de todos os resultados individuais `resultado_*.txt` da rodada, com separadores e o nome de cada arquivo. É criado pelo Testar Tudo no Windows; os arquivos individuais continuam disponíveis.
 - `resumo_testes.md` / `resumo_testes.json` / `resultados.sarif` — gerados por `testes/6_TESTE_ferramentas_dos_testes/consolidar_resultados.py` (tabela legível, JSON comparável e SARIF só com falhas).
 - `limpeza_artefatos.txt` — relatório de `testes/6_TESTE_ferramentas_dos_testes/limpar_artefatos_testes.py`, que apaga pastas temporárias órfãs (prefixos dos nossos testes, mais velhas que 5 min).
 Os testes novos criam pastas temporárias por `_resultado.pasta_temporaria()`, que as apaga ao terminar mesmo se o teste falhar.

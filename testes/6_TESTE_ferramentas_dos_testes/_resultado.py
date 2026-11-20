@@ -237,7 +237,8 @@ def baixa_prioridade():
 
 
 # arquivos GERADOS por uma bateria (cada bateria nova apaga os da anterior, para nunca misturar "ontem" com "hoje")
-_GERADOS = ("resultado_*.txt", "resumo_testes.md", "resumo_testes.json", "resultados.sarif", "log_depuracao*.txt",
+_GERADOS = ("resultado_*.txt", "RESULTADO COMPLETO.txt", "resumo_testes.md", "resumo_testes.json",
+            "resultados.sarif", "log_depuracao*.txt",
             "limpeza_artefatos.txt", "cobertura_codigo.*", "cobertura_html.zip", ".coverage*", ".coveragerc", "*.tmp")
 
 

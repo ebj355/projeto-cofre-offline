@@ -1,9 +1,10 @@
-"""Junta os resultados individuais (testes/resultados/resultado_*.txt) em três relatórios, para ler tudo de uma vez:
+"""Junta os resultados individuais (testes/resultados/resultado_*.txt) em quatro relatórios, para ler tudo de uma vez:
   - resumo_testes.md     : tabela legível (um teste por linha, com contagem de [OK]/[FALHOU] e as linhas que falharam);
   - resumo_testes.json   : o mesmo em formato de máquina (para comparar uma rodada com a outra);
-  - resultados.sarif     : formato SARIF 2.1.0 (só as falhas), aceito por ferramentas de revisão de código.
-Uso: python testes/6_TESTE_ferramentas_dos_testes/consolidar_resultados.py        Sai com código 1 se algum teste falhou.
-Não altera nenhum resultado individual; se a pasta não puder ser gravada, imprime o resumo na tela e segue."""
+  - resultados.sarif     : formato SARIF 2.1.0 (só as falhas), aceito por ferramentas de revisão de código;
+  - RESULTADO COMPLETO.txt: conteúdo de todos os arquivos individuais resultado_*.txt.
+Uso: python testes/6_TESTE_ferramentas_dos_testes/consolidar_resultados.py        Sai com código 1 se algum teste falhou ou não puder gerar o TXT completo.
+Não altera resultados individuais. Os resumos auxiliares são opcionais; falha ao gravar o TXT completo é informada."""
 import datetime, glob, json, os, re, sys
 
 PASTA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "resultados")
@@ -12,7 +13,7 @@ RUIM = re.compile(r"\[FALHOU\]|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]")
 INCOMPLETO = re.compile(r"\bKeyboardInterrupt\b|\bTimeoutExpired\b", re.I)
 OK = re.compile(r"\[OK\]|^\s*\[\s*ok\s*\]", re.I)
 PULADO = re.compile(r"^\s*\[PULADO\]", re.I)
-IGNORAR = ("resultado_rodar_todos_windows.txt",)          # é só a junção dos outros
+IGNORAR = ("resultado_rodar_todos_windows.txt", "RESULTADO COMPLETO.txt")
 BATERIAS = (
     ("1_TESTE_motor_do_cofre", "resultado_nucleo_windows.txt"),
     ("2_TESTE_telas_e_botoes", "resultado_teste_gui_windows.txt"),
@@ -39,6 +40,35 @@ def analisa(caminho):
             "pulados": n_pulados, "linhas_ruins": ruins[:20],
             "estado": "FALHOU" if ruins else "PULADO" if n_pulados and not n_ok else
                       "ok (com testes pulados)" if n_pulados else "ok"}
+
+
+def gravar_resultado_completo(arqs, quando, total_ok, total_pulados, total_falhas):
+    """Concatena os relatórios individuais em um TXT, sem carregar tudo na memória."""
+    destino = os.path.join(PASTA, "RESULTADO COMPLETO.txt")
+    with open(destino, "w", encoding="utf-8", errors="replace", newline="\n") as saida:
+        saida.write("RESULTADO COMPLETO - Cofre de Senhas\n")
+        saida.write("Gerado em: %s\n" % quando)
+        saida.write("Arquivos individuais incluídos: %d\n" % len(arqs))
+        saida.write("Verificações [OK]: %d | puladas: %d | relatórios com falha/interrupção: %d\n" %
+                    (total_ok, total_pulados, total_falhas))
+        saida.write("Este arquivo reúne os resultados individuais da rodada; cada arquivo original continua separado.\n")
+        if not arqs:
+            saida.write("\nNenhum arquivo individual resultado_*.txt foi encontrado.\n")
+        for numero, caminho in enumerate(arqs, 1):
+            saida.write("\n" + "=" * 78 + "\n")
+            saida.write("ARQUIVO %d/%d: %s\n" % (numero, len(arqs), os.path.basename(caminho)))
+            saida.write("-" * 78 + "\n")
+            ultima = ""
+            with open(caminho, encoding="utf-8", errors="replace") as origem:
+                while True:
+                    bloco = origem.read(64 * 1024)
+                    if not bloco:
+                        break
+                    saida.write(bloco)
+                    ultima = bloco[-1]
+            if ultima not in ("\n", "\r"):
+                saida.write("\n")
+    return destino
 
 
 def main():
@@ -93,7 +123,8 @@ def main():
         md += ["", "## O que falhou"]
         for i in ruins:
             md += ["", "### " + i["nome"]] + ["- `%s`" % l.replace("`", "'") for l in i["linhas_ruins"]]
-    md += ["", "Detalhes completos (saída inteira, tracebacks): `testes/resultados/log_depuracao.txt` (pasta logs, na raiz do projeto)."]
+    md += ["", "TXT com os resultados individuais: `testes/resultados/RESULTADO COMPLETO.txt`.",
+           "Detalhes completos (saída inteira, tracebacks): `testes/resultados/log_depuracao.txt`."]
     sarif = {"version": "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
              "runs": [{"tool": {"driver": {"name": "testes-cofre-de-senhas", "rules": [{"id": "TESTE-FALHOU"}]}},
                        "results": [{"ruleId": "TESTE-FALHOU", "level": "error",
@@ -111,7 +142,13 @@ def main():
             json.dump(sarif, f, ensure_ascii=False, indent=1)
     except OSError as ex:
         print("(não foi possível gravar os relatórios: %s)" % ex)
-    return 1 if ruins else 0
+    completo_ok = False
+    try:
+        gravar_resultado_completo(arqs, quando, total_ok, total_pulados, len(ruins))
+        completo_ok = True
+    except OSError as ex:
+        print("ERRO: não foi possível gerar RESULTADO COMPLETO.txt: %s" % ex, file=sys.stderr)
+    return 1 if ruins or not completo_ok else 0
 
 
 if __name__ == "__main__":

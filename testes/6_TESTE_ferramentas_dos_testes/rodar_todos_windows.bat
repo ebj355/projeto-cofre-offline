@@ -133,9 +133,7 @@ if "%RODAR_POS_COMPILACAO%"=="1" (
   echo.
 )
 
-rem relatorios finais: resumo legivel (.md), em JSON, em SARIF e a limpeza de sobras dos testes em %TEMP%.
-rem Sao uma conveniencia: se falharem, nada muda no resultado das baterias.
-py -3.13 "%~dp0consolidar_resultados.py" >nul 2>nul
+rem limpeza de sobras dos testes em %TEMP%; os relatorios consolidados sao gerados apos juntar as baterias.
 py -3.13 "%~dp0limpar_artefatos_testes.py" >nul 2>nul
 
 cd /d "%~dp0"
@@ -170,6 +168,12 @@ if "%RODAR_POS_COMPILACAO%"=="1" (
   echo ====== etapa 7 opcional: nao solicitada ====== >> "%TUDO%"
   echo [PULADO] Para executar, compile o CofreSenhas.exe e passe POS-COMPILACAO ao Testar Tudo. >> "%TUDO%"
 )
+py -3.13 "%~dp0consolidar_resultados.py" >nul 2>nul
+if errorlevel 1 set /a FALHAS+=1
+if not exist "%~dp0..\resultados\RESULTADO COMPLETO.txt" (
+  echo ERRO: nao foi possivel gerar testes\resultados\RESULTADO COMPLETO.txt.
+  set /a FALHAS+=1
+)
 exit /b 0
 
 :fim
@@ -190,8 +194,9 @@ if "%FALHAS%"=="0" (
   echo  nem sempre e exato - o que vale e o conteudo do arquivo^).
 )
 echo.
-echo  Resultado (baterias e etapa 7 opcional): testes\resultados\resultado_rodar_todos_windows.txt
-echo  Resumo: resumo_testes.md  ^|  Log de depuracao completo: testes\resultados\log_depuracao.txt
+echo  Resultado completo (arquivos individuais): testes\resultados\RESULTADO COMPLETO.txt
+echo  Resultado por baterias: testes\resultados\resultado_rodar_todos_windows.txt
+echo  Resumo: resumo_testes.md  ^|  Log de depuracao: testes\resultados\log_depuracao.txt
 echo ============================================================
 set "COFRE_OFFLINE="
 echo Pressione uma tecla para fechar esta janela.

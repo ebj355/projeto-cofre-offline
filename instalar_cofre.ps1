@@ -1096,7 +1096,9 @@ print(a)
 
     # ------------------------------------------------------------------
     try {
-        New-Item -ItemType Directory -Path $destino -Force -ErrorAction Stop | Out-Null
+        if (-not (Test-Path -LiteralPath $destino -PathType Container)) {
+            New-Item -ItemType Directory -Path $destino -Force -ErrorAction Stop | Out-Null
+        }
         Move-Item $exe $final -Force -ErrorAction Stop
     }
     catch {
