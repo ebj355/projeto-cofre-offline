@@ -90,9 +90,42 @@ Em uma frase: **é um cofre que só abre com o que você sabe (senha), o que voc
 |---|---|---|
 | **1. O programa** | O cofre inteiro: criptografia, arquivo, interface, importação, FIDO2, proteções do Windows | `cofre_senhas.py` |
 | **2. O instalador** | Confere o código por hash, prepara ambiente isolado, compila o `.exe` nativo, testa a criptografia | `1 - INSTALAR O COFRE...bat` + `instalar_cofre.ps1` |
-| **3. A bateria de testes** | Seis baterias (motor, telas, pentest, Windows real, ferramentas externas e executores) + relatórios e cobertura | `testes/` + `2 - TESTAR TUDO...bat` |
+| **3. Testes e executor** | Seis etapas obrigatórias; a pasta 6 contém o executor, não uma bateria. A etapa 7 é opcional e pós-compilação. | `testes/` + `2 - TESTAR TUDO...bat` |
 | **4. Ferramentas opcionais do Windows** | Scripts independentes que verificam e reforçam o seu PC (não o cofre) | `ferramentas_windows_opcionais/` |
 | **5. A documentação** | Este README é o guia único de entrada; manuais técnicos e plano de testes detalham assuntos específicos | `README.md`, `documentacao/`, `testes/*.md` |
+
+### Fluxo de compilação e testes
+
+```text
+FONTE DO PROGRAMA
+cofre_senhas.py + requirements.txt
+          │
+          ▼
+1 - INSTALAR O COFRE - compila e instala.bat ──► instalar_cofre.ps1
+                               │
+                               ├─ confere o hash do código com você
+                               ├─ prepara Python e dependências fixadas
+                               ├─ executa o teste de criptografia
+                               └─ compila com Nuitka + Zig
+                                          │
+                                          ▼
+                                  CofreSenhas.exe
+
+2 - TESTAR TUDO - roda todos os testes.bat
+          │
+          ▼
+rodar_todos_windows.bat
+  ├─ 1 núcleo
+  ├─ 2 instalador
+  ├─ 3 Windows nativo
+  ├─ 4 interface
+  ├─ 5 pentest
+  ├─ 6 ferramentas externas
+  ├─ resultados em testes\resultados\
+  └─ POS-COMPILACAO ──► etapa opcional 7 (depois de compilar)
+```
+
+O executor `rodar_todos_windows.bat` fica em `testes\6_TESTE_ferramentas_dos_testes\`; os seis números acima indicam a ordem das etapas, não o número da pasta. O fluxo de testes não compila o aplicativo: a etapa 7 só verifica um executável já compilado e pode ser incluída com `POS-COMPILACAO`.
 
 ---
 
@@ -194,6 +227,30 @@ O sorteio usa o gerador criptográfico do sistema (`secrets`). A força mostrada
 - **Importação segura (padrão):** o cofre só aceita a planilha **gerada por ele mesmo** (`⋯ → Baixar modelo de planilha`), que leva um selo HMAC (aba oculta `_selo_cofre`) ligado ao *seu* cofre. Planilhas comuns, CSV, modelos adulterados ou de outro cofre são recusados antes de ler qualquer dado. Para aceitar planilhas comuns (Chrome, Samsung Pass), mude `IMPORTAR_SOMENTE_COM_SELO = False` no topo do código e recompile, sabendo que isso reduz a proteção.
 - Os campos de dados bancários não existem na planilha de propósito (o selo depende do cabeçalho fixo): só o formulário manual os preenche.
 
+```text
+arquivo escolhido
+      │
+      ▼
+validar tipo, limites e política de selo ──► varrer e ler isolado
+      │                                             │
+      └──────── arquivo recusado ◄─────────────────┘
+                                                    ▼
+                                  converter colunas e sanear registros
+                                                    │
+                                                    ▼
+                           comparar com o cofre: novos / iguais / conflitos
+                                                    │
+                                                    ▼
+                                           prévia para o usuário
+                                                    │ confirmar
+                                                    ▼
+                          incluir/atualizar → salvar cifrado
+                               │                       │
+                   falha: restaura a lista       sucesso: atualiza a tela
+                                                       │
+                                      oferece apagar a planilha em claro
+```
+
 ### 4.6 Cópia segura e impressão
 
 - **Copiar** envia o texto para a área de transferência **fora** do histórico do Windows (Win+V) e da nuvem, marcado para ser ignorado por monitores, e **apaga sozinho em 15 segundos**. Se o Windows não conseguir a cópia protegida, o programa **recusa copiar** em vez de usar a área comum.
@@ -242,6 +299,30 @@ Uma faixa amarela avisa que é **MODO CONSULTA**; as ações que alteram dados e
 | **Botão `?`** | Passeio guiado desta tela · Guia de uso e atalhos |
 | **Barra superior** | Bloquear (`Ctrl+L`) · Chave FIDO · Novo item (`Ctrl+N`) |
 
+### Fluxo de uma sessão do aplicativo
+
+```text
+main()
+  │ verificações do ambiente + trava de instância
+  ▼
+App.mostrar_inicio()
+  ├─ cofre.dat não existe ─► tela_criar() ─► Cofre.criar()
+  │                                               └─► exibe a chave uma vez (quando existe) ─► tela principal
+  │
+  └─ cofre.dat existe ────► tela_desbloqueio() ─► Cofre.abrir()
+                                                  ├─ fatores incorretos ─► mensagem; continua bloqueado
+                                                  ├─ modo consulta ──────► pode ver/copiar, não grava
+                                                  └─ abertura válida ────► tela principal
+                                                                              │
+                                               novo/editar/excluir ──────────┤
+                                                                              ▼
+                                                            salvar alterações de forma cifrada
+                                                                              │
+                                               bloquear/sair ─► limpar segredos da memória
+```
+
+O modo consulta aparece quando o cofre já está aberto em outra instância ou quando o dispositivo não permite gravação. Ele não deve ser confundido com uma sessão normal: alterações não são persistidas e tentativas não são contadas. O bloqueio retorna à tela de desbloqueio; sair encerra a sessão.
+
 ---
 
 ## 5. Como a segurança funciona
@@ -249,21 +330,32 @@ Uma faixa amarela avisa que é **MODO CONSULTA**; as ações que alteram dados e
 ### 5.1 Visão geral das chaves
 
 ```
-  senha mestra ──Argon2id──► chave da senha ──┐
-                                              ├─(modo E)─► chave combinada ──┐
-  chave de acesso ──HKDF──► chave da chave ───┘                              │
-  (160 bits)                                                                 ▼
-                                        AES-256-GCM "embrulha" ──►  DEK (chave interna,
-                                                                    256 bits aleatórios)
-  chave FIDO2 ──hmac-secret/PRF──► segredo F ──HKDF(DEK ‖ F)──────────────────┤
-  (opcional)                                                                 ▼
-                                                                    chave dos dados
-                                                                    │              │
-                                                               HKDF │              │ HKDF
-                                                                    ▼              ▼
-                                              ChaCha20-Poly1305 ──► AES-256-GCM
-                                               (camada interna)    (camada externa)
+senha mestra ─Argon2id─► K_senha ────────────┐
+chave de acesso ─HKDF──► K_chave ───────────┤
+                                             ├─ modo S: K_senha (fator principal)
+                                             ├─ modo OU: K_senha OU K_chave
+                                             └─ modo E: HKDF(K_senha ‖ K_chave)
+                                                       │
+                                                       ▼
+                                      AES-GCM abre o embrulho da DEK
+                                                       │
+                                                       ▼
+                                      DEK (chave interna aleatória)
+                                                       │
+                  ┌────────────────────────────────────┴────────────────────┐
+                  │                                                         │
+        FIDO2 (se ativado)                                      PC autorizado (se ativado)
+        chave física ou recuperação                            identidade local ou recuperação
+                  └──────────────────────────┬──────────────────────────────┘
+                                             ▼
+                          DEK + fator(es) extras ─HKDF*─► K_dados
+                                             │
+                              HKDF gera K_cha e K_aes independentes
+                                             │
+JSON + preenchimento ─ChaCha20-Poly1305(K_cha)─► AES-256-GCM(K_aes) ─► arquivo
 ```
+
+`*` Com FIDO ou computador autorizado, HKDF combina os fatores extras com a DEK; sem eles, `K_dados = DEK`. Nos modos **E** e **OU**, a chave de acesso não tem o mesmo papel: no modo E, as duas entradas são combinadas para abrir um único embrulho; no modo OU, cada entrada pode abrir seu próprio embrulho da mesma DEK. No modo S, só a senha é usada como fator principal. FIDO2 e computador autorizado são fatores adicionais: não substituem a senha nem a chave de acesso. O código de recuperação substitui esses fatores extras, não os fatores principais.
 
 | Peça | Algoritmo | Detalhes |
 |---|---|---|
@@ -273,7 +365,7 @@ Uma faixa amarela avisa que é **MODO CONSULTA**; as ações que alteram dados e
 | Dados | **ChaCha20-Poly1305 dentro de AES-256-GCM** | Duas cifras de famílias diferentes, com subchaves independentes. Uma falha futura em uma delas não expõe os dados. |
 | Fator FIDO2 | Extensão **hmac-secret / PRF** | A chave física devolve um segredo que nunca sai do chip. |
 | Tamanho do arquivo | Preenchimento em blocos de **4 KiB** | O tamanho não revela quantos itens existem. |
-| Integridade | Cabeçalho e seção FIDO autenticados (AAD) | Qualquer alteração é detectada. |
+| Integridade | Cabeçalho e seção de fatores autenticados como AAD; checksum simples para dano acidental | AEAD detecta alteração dos dados associados; o checksum não é um MAC. |
 | Arquivo de chave `.key` | ChaCha20-Poly1305 selado com dados do cabeçalho | Só o cofre dono decifra; outro cofre ou byte alterado é recusado sem gastar tentativa. |
 | Diagnóstico `.diag` | X25519 + ChaCha20-Poly1305 | Registros só com números; só o cofre aberto lê. |
 
@@ -282,22 +374,53 @@ Todo nonce é aleatório e novo a cada gravação. Senhas com acento funcionam e
 ### 5.2 Formato do arquivo (`COFRE05`)
 
 ```
-┌────────────────────────── cabeçalho fixo (autenticado) ──────────────────────────┐
-│ MAGIC "COFRE05" │ t │ m │ p │ max_tentativas │ modo │                            │
-│ sal_senha(16) │ nonce(12) │ embrulho_senha(48) │                                 │
-│ sal_chave(16) │ nonce(12) │ embrulho_chave(48) │ nonce_chacha(12) │ nonce_aes(12)│
-│ checksum(8): SHA-256 truncado de cabeçalho + seção FIDO (só detecta bit-rot)       │
-├──────────────────────────────────────────────────────────────────────────────────┤
-│ contador de tentativas restantes (1 byte, fora da autenticação, conferido)       │
-├──────────────────────── seção FIDO (autenticada) ────────────────────────────────┤
-│ ativo │ nº de chaves │ sal │ embrulho do código de recuperação │                 │
-│ para cada chave: nome │ ID da credencial │ nonce │ embrulho de F                 │
-├──────────────────────── dados ───────────────────────────────────────────────────┤
-│ AES-256-GCM( ChaCha20-Poly1305( JSON {itens, histórico} + preenchimento 4 KiB ) ) │
-└──────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────── cabeçalho fixo (HEADER_FMT5) ────────────────────────────────────┐
+│ MAGIC "COFRE05\0"(8) │ t │ m │ p │ max_tentativas │ modo │                       │
+│ sal_senha(16) │ nonce_senha(12) │ embrulho_senha(48) │                            │
+│ sal_chave(16) │ nonce_chave(12) │ embrulho_chave(48) │                           │
+│ nonce_chacha(12) │ nonce_aes(12) │ checksum(8) │                                  │
+├──────────────── contador (1 byte; fora do AAD) ──────────────────────────────────┤
+│ tentativas restantes; conferido e decrementado antes de testar a senha            │
+├──────────────── seção de fatores extras (incluída no AAD) ───────────────────────┤
+│ flags: 0=nenhum │ 1=FIDO │ 2=computadores │ 3=FIDO + computadores                 │
+│ FIDO: nº de chaves + sal + recuperação + [nome, credencial, nonce, embrulho]      │
+│ PC: nº de PCs + sal + recuperação + [nome, ID, nonce, embrulho]                   │
+├────────────────────── payload cifrado (AEAD) ─────────────────────────────────────┤
+│ AES-256-GCM(ChaCha20-Poly1305(JSON {itens, meta, n, h} + padding em 4 KiB))        │
+└───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-O cabeçalho começa com `COFRE05` e mostra modo, limite de tentativas e se há FIDO. Isso identifica o arquivo como cofre, mas não vaza dados. O tamanho máximo aceito para um cofre é 200 MiB. Cofres de formatos anteriores (`COFRE01` a `COFRE04`) são abertos e **convertidos automaticamente** para o atual; a cópia de segurança da migração guarda o original.
+`AAD` (dados associados autenticados) = cabeçalho completo + seção de fatores extras; o byte do contador fica de fora. O checksum é SHA-256 truncado dos bytes do cabeçalho sem o próprio checksum mais a seção de fatores. Esse checksum rápido detecta danos acidentais, mas **não é um MAC** e não substitui a autenticação AEAD. A seção sempre existe: a flag indica se há FIDO, computadores autorizados, ambos ou nenhum. O modo S mantém os campos de chave de acesso preenchidos com ruído.
+
+O cabeçalho identifica o formato, o modo e o limite de tentativas; FIDO e computadores são descritos na seção de fatores, não em um indicador do cabeçalho. O manifesto cifrado valida contagem e IDs dos registros; `meta` guarda dados internos, incluindo o histórico. O tamanho máximo aceito para um cofre é 200 MiB. Cofres de formatos anteriores (`COFRE01` a `COFRE04`) são abertos e **convertidos automaticamente** para o atual; a cópia de segurança da migração guarda o original.
+
+### Fluxo de desbloqueio e tentativas
+
+```text
+ler cabeçalho + checksum
+        │
+        ├─ arquivo inválido/danificado ─► preservar arquivo; não contar tentativa
+        ▼
+validar fatores exigidos + computador autorizado + memória disponível
+        │
+        ├─ falta/erro de fator, PC não autorizado ou memória insuficiente
+        │       └─► recusar antes da tentativa
+        ▼
+FIDO: pedir toque (se exigido) ──► cancelar/credencial não cadastrada: recusar sem contar
+        │
+        ▼
+gravar contador decrementado (exceto modo consulta)
+        │
+        ├─ senha/chave errada ─► informar tentativas restantes
+        │                         └─ chegou a zero ─► autodestruição (melhor esforço)
+        ▼
+abrir DEK ─► obter fator(es) extras ─► autenticar e decifrar os dados
+        │
+        ├─ dados não conferem ─► devolver tentativa; preservar e oferecer cópia
+        └─ dados válidos ──────► carregar cofre; registrar abertura se gravável
+```
+
+No modo consulta não há gravação do contador nem salvamento. Cancelar o toque FIDO, faltar memória ou falhar a autorização do computador também não gasta tentativa. Erros de formato da chave de acesso têm a tolerância da interface descrita em [4.1](#41-formas-de-desbloquear); a verificação do conteúdo do código de recuperação e dos segredos FIDO/PC ocorre depois que a tentativa é gravada, então um código incorreto conta como tentativa errada. Corrupção do payload após os fatores corretos é tratada de forma diferente: devolve a tentativa e preserva o arquivo.
 
 ### 5.3 Camadas de segurança (visão organizada)
 
@@ -342,6 +465,27 @@ Erros que também **não** gastam tentativa: chave de acesso mal digitada (forma
 ## 6. Integridade e resiliência dos dados
 
 O cofre foi desenhado para **não perder o que você guardou**, mesmo com pendrive barato, antivírus xereta ou queda de energia.
+
+```text
+alteração na memória
+        │
+        ▼
+operações transacionais guardam o estado anterior (quando aplicável)
+        │
+        ▼
+JSON + manifesto + preenchimento 4 KiB
+        │
+        ▼
+ChaCha20-Poly1305 ─► AES-256-GCM (cabeçalho e fatores como AAD)
+        │
+        ▼
+trava + conferir se o arquivo não mudou + renovar cópia quando necessário
+        │
+        ▼
+.tmp → fsync → reler/conferir SHA-256 → os.replace
+        ├─ sucesso ─► confirmar a gravação
+        └─ falha ───► arquivo anterior continua intacto; transação desfaz a memória quando aplicável
+```
 
 | Mecanismo | O que faz |
 |---|---|
@@ -590,7 +734,9 @@ O programa **não usa** `eval`, `exec`, `pickle` nem `shell=True`, não guarda s
 
 O projeto tem uma bateria grande de testes, organizada por assunto. Cada teste trabalha numa pasta temporária (**nunca toca no seu `cofre.dat`**), termina com `TODOS OK` e devolve código de saída 0 (sucesso) ou 1 (falha), o que permite usar em integração contínua.
 
-### 14.1 As seis baterias obrigatórias e a etapa opcional 7
+### 14.1 As seis etapas obrigatórias e a etapa opcional 7
+
+Os números **1 a 6** abaixo são a ordem de execução do BAT, não o prefixo das pastas. Por exemplo, a etapa 2 (instalador) e a etapa 3 (Windows nativo) usam arquivos da pasta `4_TESTE_so_no_windows/`; a pasta `6_TESTE_ferramentas_dos_testes/` guarda o executor e scripts auxiliares/de relatório, não uma bateria. Os resultados gerados ficam em `testes/resultados/`.
 
 | Pasta | O que testa |
 |---|---|
@@ -599,7 +745,7 @@ O projeto tem uma bateria grande de testes, organizada por assunto. Cada teste t
 | `testes/3_TESTE_ataques_simulados/` | **Ataques simulados** (pentest): injeção, SSRF, força bruta/spraying, DoS, forense de memória, bypass de contador/autodestruição, engenharia reversa, fuzzing adversarial/Unicode, SAST (`bandit`), dependências (`pip-audit`), canal lateral de tempo, exfiltração pela rede, link simbólico, superfície do instalador e resíduos em disco. Relatório em `testes/3_TESTE_ataques_simulados/relatorio_pentest.md`. |
 | `testes/4_TESTE_so_no_windows/` | O que só vale no **Windows real**: sintaxe e funções do instalador (Pester), atributos de arquivo, ACL, SMBIOS × PowerShell, DPAPI, computador autorizado de ponta a ponta, blindagens/DLLs, WebAuthn e Windows Sandbox limpo. |
 | `testes/5_TESTE_ferramentas_externas/` | Ferramentas independentes do executável compilado: Bandit, pip-audit, Nmap local, PSScriptAnalyzer, busca de segredos, qualidade extra, SBOM, Hypothesis e verificação de integridade do repositório. O pytest é opcional no menu e repete as baterias 1 e 2. |
-| `testes/6_TESTE_ferramentas_dos_testes/` | **Não são testes:** executores, ajudantes, limpeza, relatórios, cobertura e ponte para o `pytest`. |
+| `testes/6_TESTE_ferramentas_dos_testes/` | **Não são testes:** executores, ajudantes, limpeza, geradores de relatórios, cobertura e ponte para o `pytest`. |
 | `testes/7_TESTE_de_compilacao/` | **Opcional, depois de compilar:** confere proteções PE com pefile, varre o executável com o Windows Defender e verifica as conexões do processo aberto. Os resultados ficam em `testes/resultados/`. |
 | `testes/resultados/` | Tudo que os testes geram (resultado de cada bateria, `resumo_testes.md/json`, `resultados.sarif`, `log_depuracao.txt`). Os arquivos ficam diretamente nesta pasta, sem subpasta por rodada (não vai para o Git). |
 
@@ -719,6 +865,20 @@ projeto-cofre-offline/
 Este README é o único guia de entrada na raiz e explica os atalhos, arquivos e pastas para quem não é programador. Os manuais especializados em `documentacao/` e os guias em `testes/` continuam disponíveis para consulta detalhada. Cada pasta de testes tem um `INDICE.md` que explica **cada arquivo**; depois de criar, renomear ou apagar algo em `testes/`, atualize os índices com `python testes\6_TESTE_ferramentas_dos_testes\gerar_indices.py`.
 
 O programa é **um único arquivo** de propósito. Internamente é organizado em seções: núcleo criptográfico, avaliação de força, impressão, proteções do Windows, classe `Cofre`, importação, FIDO2, tema e ícones, componentes de interface e classe `App`.
+
+```text
+cofre_senhas.py
+├── início e proteções do processo
+├── criptografia, formato, armazenamento e fatores do Windows
+├── class Cofre                 ← estado, desbloqueio e persistência
+├── campos e importação         ← validação e conversão de CSV/Excel
+├── FIDO2
+└── interface
+    ├── tema e componentes
+    └── class App               ← telas e ações; coordena a interface com Cofre
+```
+
+As pastas numeradas de teste descrevem **assuntos**; a numeração do executor descreve **ordem de execução**. Por isso, a etapa 6 é a bateria de ferramentas externas, mas o executor fica na pasta `6_TESTE_ferramentas_dos_testes/`. A etapa 7 fica separada porque exige um executável já compilado.
 
 Quem vai ler ou manter a implementação pode começar pelo [guia técnico do código](documentacao/GUIA_TECNICO_DO_CODIGO.md), que mapeia as responsabilidades e os fluxos principais sem exigir a leitura linear do arquivo inteiro.
 
