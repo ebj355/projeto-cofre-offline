@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Gerador de senhas, avaliação de força, tempo para quebrar e estruturas de impressão.
 Uso:  python testes/teste_forca.py"""
 import os, sys, tempfile

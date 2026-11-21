@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Teste severo do arquivo: vira 1 bit em posições aleatórias, trunca, enche de lixo, falha no replace e migra o formato antigo (v4); nunca destrói nem gasta tentativa."""
 import sys, os, random, tempfile, shutil, json, importlib.util, struct, string, time, threading
 spec=importlib.util.spec_from_file_location('c',os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','..','cofre_senhas.py'));c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)

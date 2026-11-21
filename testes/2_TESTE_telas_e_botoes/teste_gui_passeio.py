@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Teste de interface: passeio guiado (retângulo amarelo + escurecimento + Próximo), oferta na 1ª abertura,
 passeio do formulário de item e limpeza das janelas auxiliares. Roda no Linux com xvfb-run."""
 import os, sys, tempfile

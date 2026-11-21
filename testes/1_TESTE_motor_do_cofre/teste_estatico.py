@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Teste estático: nomes não definidos (NameError só apareceria na tela, em tempo de uso) e sintaxe."""
 import os, subprocess, sys
 f = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cofre_senhas.py")

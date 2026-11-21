@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Teste de interface (Tk): menu ⋯ › Diagnóstico mostra os registros cifrados (só com o cofre aberto), pendrive removido
 durante uma gravação mostra mensagem clara (sem caminho) e não perde nada na memória. Veja testes/COMO_RODAR_OS_TESTES.md."""
 import os as _os, sys as _sys, tempfile as _tf

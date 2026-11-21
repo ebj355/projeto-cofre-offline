@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Vazamento e resíduos de memória (sem interface): ciclos abrir -> editar -> buscar -> fechar com tracemalloc,
 teto do cache de força, zeragem de buffers e ausência de Cofre "órfão" depois de fechado."""
 import gc, os, sys, tempfile, time, tracemalloc, weakref

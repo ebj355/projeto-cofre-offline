@@ -1,12 +1,13 @@
-# Plano de testes — Cofre de Senhas (por risco, ISO 25010 / ISTQB)
+<!-- ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt -->
+# Plano de testes — Arca (por risco, ISO 25010 / ISTQB)
 
 ## QA1 — Revisão do recurso (testes estáticos)
-**Recurso:** cofre local de senhas em um arquivo (`cofre.dat`), aberto por senha mestra e/ou chave de acesso e/ou chave FIDO2,
+**Produto:** Arca, cofre local de segurança da Arca Sistemas. **Recurso:** cofre de senhas em um arquivo (`cofre.dat`), aberto por senha mestra e/ou chave de acesso e/ou chave FIDO2,
 distribuído como `CofreSenhas.exe` compilado num pendrive com BitLocker.
 **Lacunas conhecidas (aceitas, ver MODELO_DE_AMEACAS.md):** malware/keylogger no PC; FAT/exFAT sem ACL; sem Authenticode;
 janela TOCTOU entre conferir e abrir o .exe; texto não-ASCII e cópias do Tcl/Tk/pagefile na memória; smoke test automático
 do executável, máquina limpa, pendrive físico, memória baixa, mutação, Atheris e SmartScreen ainda não foram validados.
-A bateria completa registrada em 2026-11-20 teve 2.321 verificações OK, zero falhas e três pulos condicionais (pefile e
+A bateria completa registrada em 2026-11-20 teve 2.344 verificações OK e 9 relatórios com falha/interrupção (pefile e
 Defender sem `.exe` compilado; conexões do processo sem o executável aberto); PSScriptAnalyzer e qualidade extra geraram
 alertas que impedem declarar Go até serem revisados. Houve validações focadas posteriores, mas
 a bateria completa não foi repetida depois delas. Não há evidência registrada de execução no Windows Sandbox.
@@ -54,11 +55,15 @@ Windows. Windows 11 ARM64 pode usar o executável x64 sob emulação; build nati
 | TC16 | Desempenho | Média | abrir 3000 itens ≈ 0,5 s; salvar ≈ 0,02 s; Argon2 "alto" ≈ 0,5 s | medido (não-gate) |
 | TC17 | Ida e volta e entrada CSV arbitrária | Média | Hypothesis gera textos/itens para criar, salvar e reabrir; bytes hostis no CSV não podem gerar exceção não tratada | `teste_propriedades_hypothesis.py` (opcional; `[PULADO]` se Hypothesis indisponível) |
 | TC18 | Backup externo e restauração | Alta | criar um cofre descartável, salvar backup cifrado em outro dispositivo, simular perda do original e restaurar/abrir o backup | ensaio manual pendente |
-| TC19 | Instalação legada | Alta | detectar `<destino>\CofreSenhas`; oferecer atualização no local ou manter a pasta antiga; remoção exige `APAGAR` e preserva cofre, backups e chaves | Pester (`instalador.Tests.ps1`, auxiliares; 12/12 em execução focada) |
+| TC19 | Instalação legada | Alta | detectar `<destino>\CofreSenhas`; oferecer atualização no local ou manter a pasta antiga; remoção exige `APAGAR` e preserva cofre, backups e chaves | Pester (`instalador.Tests.ps1`, auxiliares; 14/14 em execução focada) |
+| TC20 | Relógio e fuso horário | Alta | alterar hora/fuso em cenários controlados; backup, sequência e bloqueios devem continuar corretos | `teste_nucleo_relogio_e_fuso.py` |
+| TC21 | Vetores criptográficos publicados | Alta | comparar AES-GCM, ChaCha20-Poly1305, HKDF e Argon2id com vetores publicados e decifrar um cofre real independentemente | `teste_nucleo_vetores_publicados.py` |
+| TC22 | Importação de formatos reais | Alta | ler arquivos fictícios no formato Chrome/Edge, Firefox, Bitwarden, LastPass, 1Password, KeePassXC, Excel/LibreOffice e CSV aleatórios | `teste_nucleo_importacao_formatos_reais.py` |
+| TC23 | Marcas e autocompletar offline | Média | resolver aliases sem sobrescrever marcas existentes, ignorar destinos inválidos e gerar ícones locais sem rede | `teste_autocompletar.py`, `teste_icones.py` |
 
 ## Rastreabilidade e lacunas
 Todo risco R1–R7 tem mitigação ou teste, mas nem todos têm automação. **Lacunas abertas:** smoke do `.exe`, instalação em
-máquina limpa, pendrive removido durante gravação, FAT32/exFAT/NTFS, memória de 4 GB, vetores publicados AES/ChaCha/Argon2,
+máquina limpa, pendrive removido durante gravação, FAT32/exFAT/NTFS, memória de 4 GB,
 teste de mutação, Atheris, SmartScreen, leitor de tela e DPI alto; FIDO2 real só com chave física. A rodada Windows de
 2026-11-20 registra edição/build e versão do Python; futuras execuções devem manter essa identificação.
 
@@ -74,8 +79,10 @@ com consulta online atualizada. Ausência de ferramenta ou erro nesses testes é
 O workflow Windows deve ficar verde em cada pull request; sua configuração, por si só, não conta como resultado aprovado.
 
 **Condicionais, com justificativa registrada:** 04 (Nmap, se instalado); as verificações de PE, Defender e rede do
-processo ficam separadas em `7_TESTE_de_compilacao/` e só rodam no Testar Tudo quando solicitado por
-`POS-COMPILACAO`. Compile o `.exe` primeiro; pefile/Defender exigem o executável compilado e a rede exige que ele esteja
+processo ficam separadas em `7_TESTE_de_compilacao/` e são chamadas automaticamente pelo Testar Tudo. Se o serviço do
+Defender estiver desativado ou uma política de segurança bloquear o executável, as verificações afetadas registram
+`[PULADO]` sem contornar a proteção.
+Compile o `.exe` primeiro; pefile/Defender exigem o executável compilado e a rede exige que ele esteja
 aberto. Verificações físicas de FIDO2, pendrive e Windows Sandbox também dependem dos respectivos dispositivos/ambientes.
 `OFFLINE` pula a consulta do `pip-audit` e não equivale a uma aprovação de segurança. TC14 é manual: abrir diretamente
 `CofreSenhas.exe`, comparar o SHA-256 mostrado ao anotado fora do pendrive, criar um item, fechar e reabrir. Não há
@@ -86,11 +93,11 @@ programa, renomeie o arquivo de teste original e restaure a cópia pelo fluxo do
 registros estão íntegros. Nunca faça o ensaio com o cofre real nem provoque erros de senha no cofre de produção.
 
 **TC19 é um teste auxiliar, não um ensaio destrutivo:** o Pester chama funções isoladas e usa caminhos temporários; a
-execução focada de 2026-11-20 passou 12/12. A escolha interativa entre atualizar, manter ou remover a instalação antiga
+execução focada de 2026-11-20 passou 14/14. A escolha interativa entre atualizar, manter ou remover a instalação antiga
 e uma compilação/instalação ponta a ponta ainda precisam de validação separada.
 
 ## Acréscimos de 2026-11-16
-Novos testes: concorrência real entre processos, objetos sensíveis no coletor de lixo, esquema hostil de itens, mensagens da chave FIDO (sem PIN / PIN bloqueado), caminhos especiais, superfície do instalador, rede bloqueada, resíduos em disco com entropia, ocultação contínua e resiliência da interface (cliques frenéticos, texto absurdo, perda de foco, ciclos sem vazamento, janelas modais, tela de integridade, aviso do pendrive). Detalhes e justificativas em README (seção 9) e MODELO_DE_AMEACAS (adendos 22 e 23). Saídas de depuração: `log_depuracao.txt`, `RESULTADO COMPLETO.txt` (conteúdo de todos os relatórios individuais), `resumo_testes.md/json` e `resultados.sarif`.
+Novos testes: concorrência real entre processos, objetos sensíveis no coletor de lixo, esquema hostil de itens (normalização de campos e `ativo` booleano com compatibilidade legada), mensagens da chave FIDO (sem PIN / PIN bloqueado), caminhos especiais, superfície do instalador, rede bloqueada, resíduos em disco com entropia, ocultação contínua e resiliência da interface (cliques frenéticos, texto absurdo, perda de foco, ciclos sem vazamento, janelas modais, tela de integridade, aviso do pendrive). Detalhes e justificativas em README (seção 9) e MODELO_DE_AMEACAS (adendos 22 e 23). Saídas de depuração: `log_depuracao.txt`, `resultado completo/RESULTADO COMPLETO.txt` (conteúdo de todos os relatórios individuais), `resumo_testes.md/json` e `resultados.sarif`.
 
 ## Acréscimos de 2026-11-19
 `teste_propriedades_hypothesis.py` gera casos para ida e volta dos registros e CSVs hostis; é descoberto automaticamente
@@ -100,10 +107,11 @@ O pytest (03) continua fora do Testar Tudo por repetir núcleo e interface. As f
 em `requirements-test-lock.txt`; o wheelhouse offline contém os pacotes e seu manifesto SHA-256.
 
 ## Acréscimos de 2026-11-20
-A bateria completa registrada no Windows 11 Pro 10.0.26300 / Python 3.13.9 AMD64 teve 2.321 verificações OK, zero
-falhas e três pulos condicionais (pefile e Defender sem `.exe` compilado; conexões do processo sem o executável aberto). PSScriptAnalyzer
+A bateria inclui os testes visuais novos: queda de energia simulada no núcleo, varredura Tk em 100/125/150/200% na interface e smoke visual do `.exe` na etapa pós-compilação 7. As janelas Tk e o EXE temporário são postos em segundo plano sem ativar o foco do aplicativo em uso.
+A bateria completa registrada no Windows 11 Pro 10.0.26300 / Python 3.13.9 AMD64 teve 2.344 verificações OK e 9
+relatórios com falha/interrupção. PSScriptAnalyzer
 e qualidade extra terminaram com `[ALERTA]`, então o resultado não libera Go até a revisão desses achados. Depois dessa
-rodada foram validados focadamente o Pester do instalador (12/12), o teste Hypothesis e a limpeza dos caches; a bateria
+rodada foram validados focadamente o Pester do instalador (14/14), o teste Hypothesis e a limpeza dos caches; a bateria
 completa ainda não foi repetida após essas mudanças. TC19 registra a cobertura adicionada para detectar instalação
 legada e preservar os dados do cofre.
 

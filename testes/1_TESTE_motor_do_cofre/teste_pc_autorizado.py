@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Fator extra 'computador autorizado' (MachineGuid + UUID da placa-mãe): o computador entra na derivação da chave.
 Computadores simulados trocando c.identidades_do_pc. Verifica: abre só em computador autorizado, outro computador é
 recusado SEM gastar tentativa, o código de recuperação abre em qualquer um, vários computadores, remover/desativar,

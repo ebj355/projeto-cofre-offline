@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Confere o .gitignore com residuos reais de cofre e valida os pins usados pelo build."""
 import hashlib
 import importlib.util

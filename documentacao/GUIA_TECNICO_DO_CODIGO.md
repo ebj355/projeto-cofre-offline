@@ -1,6 +1,7 @@
+<!-- ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt -->
 # Guia técnico para ler o código
 
-Este guia ajuda quem vai ler, manter ou testar a implementação do Cofre. O programa foi mantido intencionalmente em um único arquivo, `cofre_senhas.py`; por isso, as partes são organizadas por seções e funções, não por módulos separados.
+Este guia ajuda quem vai ler, manter ou testar a implementação da **Arca**, produto da **Arca Sistemas**. O programa foi mantido intencionalmente em um único arquivo, `cofre_senhas.py`; por isso, as partes são organizadas por seções e funções, não por módulos separados.
 
 O objetivo é mostrar por onde começar, qual parte é responsável por cada assunto e como os fluxos principais se conectam. Não é uma lista de cada função auxiliar: detalhes locais continuam documentados nas docstrings e nos comentários junto ao código.
 
@@ -30,7 +31,7 @@ Os títulos das seções no próprio `cofre_senhas.py` são os pontos de referê
 | Senhas e diagnósticos | Geração e avaliação de senhas, auditoria opcional, erros e diagnóstico cifrado. | `gerar_senha()`, `gerar_frase()`, `avaliar_forca()`, `auditar_cofre()`, `diag_registrar()` |
 | Modelo dos itens e importação | Campos do registro, validação, leitura e conferência de CSV/Excel. | `CAMPOS`, `CAMPOS_SECRETOS`, `ROTULOS`, `novo_item()`, `ler_planilha()`, `sanear_registros()`, `classificar_importacao()` |
 | Objeto do cofre | Estado aberto em memória, fatores de desbloqueio, tentativas, transações e persistência. | `class Cofre`, `Cofre.criar()`, `Cofre.abrir()`, `Cofre.salvar()`, `Cofre.transacao()`, `Cofre.fechar()` |
-| Aparência e componentes | Tema, desenho de controles, ícones e componentes visuais reutilizados. | `aplicar_tema()`, `_Tela`, `BarraLateral`, `ListaContas`, `PainelForca` |
+| Aparência e componentes | Tema, controles, lista de marcas, ícones locais e sugestões offline do campo Serviço. | `aplicar_tema()`, `_Tela`, `BarraLateral`, `ListaContas`, `PainelForca`, `icones_marcas.py` (`MARCAS`, `ALIASES`, `AutocompletarMarcas`) |
 | Interface e ações | Telas, diálogos, eventos, ações sobre itens, bloqueio e coordenação com o cofre. | `class App`, `tela_criar()`, `tela_desbloqueio()`, `tela_principal()`, `dialogo_registro()`, `importar()` |
 | Inicialização do programa | Modo consulta, preparação das proteções e início do laço da interface. | `_so_com_escrita()`, `main()`, `root.mainloop()` |
 

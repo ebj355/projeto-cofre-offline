@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem pefile: confere ASLR, DEP, High-Entropy ASLR e CFG do CofreSenhas.exe compilado.
 rem Uso: 06_PEFILE_EXE.bat [caminho\CofreSenhas.exe]  (ou defina COFRE_EXE)

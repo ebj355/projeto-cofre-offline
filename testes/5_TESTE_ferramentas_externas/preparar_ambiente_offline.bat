@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0..\.."

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Varredura de memória com 'palavras-isca': depois de fechar o cofre e varrer a memória livre, as iscas de itens
 (senha e PIN) não podem sobrar no processo além do piso do próprio teste (argv do sistema). Linux/CPython."""
 import os, re, secrets, subprocess, sys, tempfile

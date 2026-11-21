@@ -1,4 +1,5 @@
-﻿# ============================================================================
+﻿# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
+# ============================================================================
 #  Verificação de segurança do Windows — SOMENTE LEITURA (não altera nada)
 #  Gera relatório na tela e salva uma cópia em: Área de Trabalho\relatorio_seguranca.txt
 # ============================================================================

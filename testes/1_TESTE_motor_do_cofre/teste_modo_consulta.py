@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """MODO CONSULTA: pendrive protegido contra gravação. Simula a proteção bloqueando TODA escrita (open para gravar, replace,
 rename, remove) dentro da pasta do cofre. Confere: a abertura normal falha com mensagem clara SEM gastar tentativa; o modo
 consulta abre e mostra os itens SEM gravar nada (arquivo idêntico, byte a byte); qualquer salvamento é recusado e desfeito

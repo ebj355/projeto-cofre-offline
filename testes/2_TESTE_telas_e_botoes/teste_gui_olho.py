@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Botão do 'olho' (mostrar/ocultar a senha): mostra, esconde sozinho depois de um tempo e continua sem permitir copiar."""
 import os as _os, sys as _sys, tempfile as _tf, subprocess as _sp
 _RAIZ = _os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))

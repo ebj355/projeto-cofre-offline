@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Autodestruição sem resíduos: apaga cofre, cópias e temporários; mantém apenas a trava de gravação, necessária
 para serializar processos e sem conteúdo secreto. Nenhum texto conhecido aparece em arquivo algum da pasta; o
 arquivo do cofre nunca guarda texto legível; e, no Linux, a memória do processo (/proc/self/mem) não guarda os

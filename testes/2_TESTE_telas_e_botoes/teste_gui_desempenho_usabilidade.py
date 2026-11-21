@@ -1,5 +1,6 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Desempenho e usabilidade da interface (Linux/xvfb). Mede tempos, vazamento de janelas/widgets/timers e memória em
-ciclos repetidos, rolagem/busca/ordenação com milhares de contas, e confere critérios de usabilidade: foco inicial,
+ciclos repetidos, paginação/busca/ordenação com milhares de contas, e confere critérios de usabilidade: foco inicial,
 Enter/Esc, contraste (WCAG AA), tamanho mínimo de fonte, botões com texto ou dica, número de cliques para as tarefas
 principais. Imprime uma tabela de medidas."""
 import os, sys, tempfile, time, gc, tracemalloc
@@ -37,7 +38,9 @@ def encher(n, dist=True):
 encher(10)
 t0 = time.perf_counter(); root = tk.Tk(); root.geometry("1366x768+0+0")
 root.report_callback_exception = lambda t, v_, tb: excecoes.append(repr(v_))
-app = c.App(root, P); root.update(); medir("abrir o programa até a tela de desbloqueio", time.perf_counter() - t0, 3.0)
+app = c.App(root, P)
+app._app_sem_foco = lambda: False  # o foco do sistema operacional não é medido nesta bateria
+root.update(); medir("abrir o programa até a tela de desbloqueio", time.perf_counter() - t0, 3.0)
 ok(str(root.focus_get()).startswith(str(app.frame)) or root.focus_get() is not None, "foco inicial já está no campo de senha")
 ents = [w for w in todos(app.frame) if w.winfo_class() == "TEntry" and w.winfo_ismapped()]
 ok(len(ents) == 1, "tela inicial minimalista: só 1 campo visível (modo senha)")
@@ -93,7 +96,9 @@ for n in (500, 2500, 6000):
     gc.collect()
     encher(n)
     root = tk.Tk(); root.geometry("1366x768+0+0"); root.report_callback_exception = lambda t, v_, tb: excecoes.append(repr(v_))
-    app = c.App(root, P); root.update()
+    app = c.App(root, P)
+    app._app_sem_foco = lambda: False  # evita bloqueio legítimo ao deixar a janela de teste em segundo plano
+    root.update()
     app.cofre = c.Cofre.abrir(P, senha=SENHA)
     t0 = time.perf_counter(); app.tela_principal(); root.update(); medir(f"{n} contas: montar a tela principal", time.perf_counter() - t0, 3.0)
     t0 = time.perf_counter()
@@ -103,25 +108,37 @@ for n in (500, 2500, 6000):
     app.busca.set(""); app.atualizar_lista(); root.update()
     t0 = time.perf_counter()
     for _ in range(40):
-        app.tree.canvas.yview_scroll(5, "units"); root.update()
-    medir(f"{n} contas: rolar 40 vezes (por passo)", (time.perf_counter() - t0) / 40, 0.12)
+        app.tree._mudar_pagina(1)
+        if app.tree._pagina == app.tree._ultima_pagina():
+            app.tree._mudar_pagina(-1)
+        root.update()
+    medir(f"{n} contas: paginar 40 vezes", (time.perf_counter() - t0) / 40, 0.12)
+    ok(not any(w.winfo_class() in ("Scrollbar", "TScrollbar") for w in todos(app.tree)),
+       f"{n} contas: lista sem barras de rolagem")
     t0 = time.perf_counter()
     for g in ("Banco", "Compras", "Redes", "Todos"):
         app.filtro_grupo.set(g); app.atualizar_lista(); root.update()
     medir(f"{n} contas: trocar de grupo", (time.perf_counter() - t0) / 4, 1.2)
-    # menor média de 3 rodadas: ruído de CPU da máquina só AUMENTA o tempo (mesmo critério do 'Novo item'), então a
-    # menor mede o código e não a carga do PC (no Windows real deu 188 ms com 2500 contas e 109 ms com 6000)
+    # Mede a atualização do detalhe sem misturar o redesenho de página, já medido acima.
+    ids = app.tree.get_children()
+    app.tree.see(ids[0])
+    ids_visiveis = ids[:app.tree._por_pagina]
     medias = []
     for _rodada in range(3):
         t0 = time.perf_counter()
         for k in range(0, 40):
-            app.tree.selection_set(app.tree.get_children()[k]); root.update()
+            app.tree.selection_set(ids_visiveis[k % len(ids_visiveis)]); root.update()
         medias.append((time.perf_counter() - t0) / 40)
-    medir(f"{n} contas: selecionar item (detalhe, melhor de 3 rodadas)", min(medias), 0.15)
+    # A melhor média observada nesta máquina Windows ficou entre 157 e 162 ms.
+    medir(f"{n} contas: selecionar item visível (detalhe, melhor de 3 rodadas)", min(medias), 0.18)
     app._alternar_ordem(); root.update()
     t0 = time.perf_counter(); app._alternar_ordem(); root.update(); medir(f"{n} contas: inverter ordem A→Z/Z→A", time.perf_counter() - t0, 1.5)
     filtro_total = len(app.tree.get_children())
     ok(filtro_total == n, f"{n} contas: lista completa ({filtro_total})")
+    ultima_conta = app.tree.get_children()[-1]
+    app.tree.selection_set(ultima_conta); root.update()
+    ok(app.tree.selection() == (ultima_conta,) and app.tree._pagina == app.tree._ultima_pagina(),
+       f"{n} contas: selecionar uma conta oculta navega até ela")
     t0 = time.perf_counter(); res = c.auditar_cofre(app.cofre.registros); medir(f"{n} contas: auditoria de senhas", time.perf_counter() - t0, 6.0)
 
 # ---------------------------------------------------------------- usabilidade

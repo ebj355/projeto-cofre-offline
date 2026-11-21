@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Janelas e telas aparecem PRONTAS: mede cada janela no instante em que ela é mostrada e de novo depois que "assenta"
 (0,8 s). Se o tamanho da janela ou a posição/tamanho de QUALQUER botão, texto ou campo mudar depois de aparecer, é o
 defeito visual de "janela que aparece cortada/montando e depois se ajeita" (o teste de recorte espera a janela firmar e por

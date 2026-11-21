@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Acessibilidade: navegação completa SEM MOUSE (só teclado). `teste_gui_desempenho_usabilidade.py` já confere
 contraste, tamanho de fonte e número de cliques; `teste_gui_efeitos.py` já confere Esc fechando diálogos. O que
 falta e este arquivo cobre: alguém que não consegue (ou não quer) usar o mouse tem de conseguir operar o cofre

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Ponte para o PYTEST: cada arquivo teste_*.py do projeto vira um caso do pytest (rodando em processo separado, com os
 mesmos parâmetros do rodar_todos.py). Uso:  pytest testes/6_TESTE_ferramentas_dos_testes/test_pytest.py -v   (ou  -k trava  para escolher um)
 Os testes de interface (gui/) precisam de tela: no Linux usam o xvfb-run; sem ele são pulados."""

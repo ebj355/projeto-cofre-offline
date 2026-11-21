@@ -1,6 +1,12 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 chcp 65001 >nul
 setlocal
+if not defined COFRE_TEST_MINIMIZADO (
+  set "COFRE_TEST_MINIMIZADO=1"
+  start "" /min cmd.exe /d /c ""%~f0" %*"
+  exit /b
+)
 rem Teste NATIVO no Windows (atributos, ACL, SMBIOS, DPAPI, PC autorizado, DLLs). Offline: usa a pasta pacotes.
 rem Uso: B - testar atributos e permissoes do Windows.bat          (so o disco do sistema)
 rem      B - testar atributos e permissoes do Windows.bat H        (testa tambem os atributos no pendrive H:)
@@ -23,7 +29,7 @@ where py >nul 2>nul || (echo  Python nao encontrado. Instale o Python 3.13 e rod
 if not exist "%RAIZ%\pacotes\*.whl" (echo  Dependencias offline nao encontradas em pacotes\. Rode primeiro 3 - BAIXAR PACOTES. & pause & exit /b 9)
 if exist "%VENV%" rmdir /s /q "%VENV%"
 py -3.13 -m venv "%VENV%" || (echo  Falhou criar o ambiente Python 3.13. & pause & exit /b 9)
-"%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml
+"%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml pillow
 if errorlevel 1 (echo  Falhou instalar as bibliotecas. & pause & exit /b 9)
 "%VENV%\Scripts\python.exe" -X utf8 "%~dp0teste_nativo_windows.py" %* > "%SAIDA%" 2>&1
 set "COD=%errorlevel%"

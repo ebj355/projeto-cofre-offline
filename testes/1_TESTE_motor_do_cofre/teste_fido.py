@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Chaves FIDO2 (com uma YubiKey simulada): cadastro, várias chaves, código de recuperação, remoção.
 Uso:  python testes/teste_fido.py"""
 import os, sys, tempfile
@@ -168,7 +169,7 @@ from fido2.ctap2.extensions import AuthenticatorExtensionsPRFOutputs, Authentica
 import inspect
 src = inspect.getsource(c.fido_registrar) + inspect.getsource(c.fido_obter)
 # reconstrói os dicionários usados pelo cofre e valida no parser oficial
-opc = {"rp": {"id": c.RP_ID, "name": "Cofre de Senhas"}, "user": {"id": b"1"*16, "name": "cofre", "displayName": "x"},
+opc = {"rp": {"id": c.RP_ID, "name": "Arca"}, "user": {"id": b"1"*16, "name": "cofre", "displayName": "x"},
        "challenge": b"2"*32, "pubKeyCredParams": [{"type": "public-key", "alg": -7}], "timeout": 120000,
        "authenticatorSelection": {"authenticatorAttachment": "cross-platform", "residentKey": "discouraged",
                                   "userVerification": "required"}, "attestation": "none",

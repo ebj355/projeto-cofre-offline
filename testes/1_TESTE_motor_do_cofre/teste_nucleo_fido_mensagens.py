@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """MENSAGENS DE ERRO DA CHAVE FIDO (sem precisar da chave física nem do Windows).
 
 `_msg_fido()` traduz o erro do Windows/FIDO numa frase que diz o PRÓXIMO PASSO. Confere os casos que a chave real

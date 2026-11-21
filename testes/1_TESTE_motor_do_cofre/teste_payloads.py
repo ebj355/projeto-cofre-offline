@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Payloads hostis nos campos (10 mil caracteres, nulos, quebras de linha, HTML/SQL, bidi, emoji): têm de ir e voltar
 do arquivo cifrado sem erro e sem alteração do que é seguro guardar; e a importação tem de sanear os campos."""
 import os, sys, tempfile

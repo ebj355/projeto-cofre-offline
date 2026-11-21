@@ -1,18 +1,19 @@
+<!-- ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt -->
 > **Para a visão geral do projeto, consulte o `README.md` na raiz. Para saber o que cada arquivo de teste faz, abra o `INDICE.md` da pasta numerada (1 a 7).**
 
-# Testes do Cofre de Senhas
+# Testes da Arca
 
-Tudo que é teste está nesta pasta. Os testes trabalham em pastas temporárias: **nunca tocam no seu `cofre.dat`**.
+Tudo que é teste do cofre de segurança Arca está nesta pasta. Os testes trabalham em pastas temporárias: **nunca tocam no seu `cofre.dat`**.
 
 ## Preparar para rodar sem internet
 
 1. Em um computador com internet, execute na raiz `3 - BAIXAR PACOTES - so para instalar sem internet.bat`.
 2. Copie o projeto inteiro, inclusive `pacotes\`, para o computador sem internet. Os binários de `pacotes\` são ignorados pelo Git e não vêm em uma clonagem nova.
-3. Se o computador não tiver Python 3.13, execute `pacotes\python-3.13.17-*.exe`. As baterias instalam dependências com `--no-index` e não tentam baixar nada. Para mudar dependências, edite `requirements-test-direct.in`, regenere `requirements-test-lock.txt` com hashes e rode novamente o item 1 para atualizar o wheelhouse.
+3. Se o computador não tiver Python 3.13, execute `pacotes\python-3.13.17-*.exe`. As baterias instalam dependências com `--no-index` e não tentam baixar nada. Para mudar dependências, edite `requirements-test-direct.in`, regenere `requirements-test-lock.txt` com hashes e rode novamente o item 1 para atualizar o wheelhouse. Pillow é necessário para as capturas da varredura visual; ele já faz parte do lock de testes.
 4. Pester é carregado do pacote local. Nmap está em `pacotes\nmap-7.993-setup.exe`, mas requer instalação manual e pode precisar de privilégios/Npcap.
 5. O `pip-audit` não inclui uma base de vulnerabilidades local. A auditoria precisa de internet para consultar a base atual; sem rede, use `rodar_todos_windows.bat OFFLINE` e registre que a auditoria foi pulada. As versões das ferramentas estão fixadas em `==`; a verificação de segredos e a de integridade do repositório são obrigatórias e falham se não puderem concluir.
 
-Para rodar as seis baterias obrigatórias no Windows, execute `testes\6_TESTE_ferramentas_dos_testes\rodar_todos_windows.bat`. A etapa 6 audita online as dependências do programa e de testes, além de gerar o SBOM. A pasta opcional `7_TESTE_de_compilacao` verifica o executável compilado: compile primeiro e acrescente `POS-COMPILACAO` para incluí-la (por exemplo, `rodar_todos_windows.bat H OFFLINE POS-COMPILACAO`). Também pode rodar somente `testes\7_TESTE_de_compilacao\RODAR ESTA PASTA - testes de compilacao.bat`. Sem o executável ou sem o processo aberto, as verificações correspondentes aparecem como `[PULADO]`. Para testar um pendrive, passe a letra como argumento; `OFFLINE` pula a consulta online.
+Para rodar as sete baterias no Windows, execute `testes\6_TESTE_ferramentas_dos_testes\rodar_todos_windows.bat`. A etapa 6 audita online as dependências do programa e de testes, além de gerar o SBOM. A etapa 7 `7_TESTE_de_compilacao` já é chamada automaticamente e verifica o executável compilado. Compile primeiro; sem o executável ou sem o processo aberto, as verificações correspondentes aparecem como `[PULADO]`. `POS-COMPILACAO` continua aceito por compatibilidade, mas não é mais necessário. Para testar um pendrive, passe a letra como argumento; `OFFLINE` pula a consulta online.
 
 ## Rodar tudo
 
@@ -25,9 +26,10 @@ python testes/6_TESTE_ferramentas_dos_testes/rodar_todos.py --so nucleo --filtro
 ```
 
 No Linux sem tela, a interface roda dentro do `xvfb-run`. No Windows, as janelas de teste ficam atrás do aplicativo em uso e não ativam o foco. Para diagnosticar um teste que dependa de foco real, `COFRE_GUI_TESTS_FOREGROUND=1` restaura o comportamento antigo. O resumo mostra `ok`, `PULADO` ou `FALHOU` por teste; opcional ausente (como Hypothesis, código 9) é `PULADO`, nunca aprovado. O código de saída é 0 se não houver falhas.
+No Windows, `COFRE_TEST_HIGH_PRIORITY=1` executa os subprocessos do `rodar_todos.py` em prioridade alta; por padrão eles continuam em prioridade baixa. Isso não ativa nem traz as janelas GUI para frente.
 Linhas `Traceback` em testes marcados `ok` são ruído do modo `-W error` (avisos de recurso), não falha.
 
-Os caches transitórios de Python, Hypothesis (incluindo os dados globais), Ruff, mypy, pytest e os arquivos temporários dos testes ficam em `testes\CACHE\<execução>` e são removidos ao fim da bateria. Assim, os testes não deixam `.hypothesis` ou `.ruff_cache` na raiz do projeto. A pasta `CACHE` é removida quando fica vazia; execuções simultâneas usam subpastas próprias. Os resultados em `testes\resultados\` são mantidos.
+Os caches transitórios de Python, Hypothesis (incluindo os dados globais), Ruff, mypy, pytest e os arquivos temporários das baterias ficam em `testes\CACHE\<execução>` e são removidos ao fim. Execuções diretas do programa direcionam bytecode a `testes\CACHE\pycache`, e Ruff usa `testes\CACHE\ruff`. Assim, não são criados `.hypothesis` ou `.ruff_cache` na raiz. Execuções simultâneas da bateria usam subpastas próprias; os resultados em `testes\resultados\` são mantidos.
 
 ## Pastas
 
@@ -37,10 +39,10 @@ Os caches transitórios de Python, Hypothesis (incluindo os dados globais), Ruff
 | `2_TESTE_telas_e_botoes/` | Interface (Tk): abrir/criar, editar, copiar, pessoas, importação, FIDO, alerta de tentativas, bloqueio, olho, navegação, energia, "macaco", segurança extra, acessibilidade por teclado, fluidez/glitches visuais. No Windows, as janelas automatizadas ficam atrás do app em uso e não ativam o foco. `RODAR ESTA PASTA - testes das telas e botoes.bat` roda só esta bateria no **Windows real** |
 | `4_TESTE_so_no_windows/` | `A - testar o instalador.bat`: roda no **Windows real** só os testes do instalador/SO (sintaxe do `instalar_cofre.ps1`, import do programa, Pester) - a bateria do núcleo **não** roda mais aqui, veja `1_TESTE_motor_do_cofre/`. `B - testar atributos e permissoes do Windows.bat`: atributos, ACL, SMBIOS, DPAPI, PC autorizado, DLLs |
 | `3_TESTE_ataques_simulados/` | Pentest dedicado (`teste_pentest_*.py`): injeção de código, SSRF, força bruta/spraying, DoS, vazamento de memória (forense de RAM), bypass de contador/autodestruição, engenharia reversa, fuzzing adversarial/Unicode, SAST (bandit/flake8), dependências (pip-audit), canal lateral de tempo, exfiltração pela rede e link simbólico (achado real, corrigido), além da documentação explícita do que é fora de escopo. O BAT instala somente as bibliotecas essenciais do programa a partir de `pacotes\`; ferramentas opcionais ausentes são puladas, sem bloquear o pentest. `rodar_pentest.py` roda só esta bateria; `RODAR ESTA PASTA - testes de ataque simulado.bat` roda no **Windows real**. Relatório: `resultados/relatorio_pentest.md` |
-| `resultados/` | Onde **todo** `resultado_*.txt` é gravado (de qualquer um dos `.bat` acima ou do `rodar_todos_windows.bat`) - uma pasta só para ver tudo, nunca sobrescrevendo (cada bateria tem seu próprio nome de arquivo). Não cria subpastas por rodada. |
+| `resultados/` | Onde ficam os relatórios individuais, resumos, SARIF e log. Os consolidados ficam em `resultados/resultado completo/`; a bateria nova substitui a anterior. |
 | `5_TESTE_ferramentas_externas/` | Ferramentas independentes do executável compilado: Bandit, pip-audit, Nmap, PSScriptAnalyzer, busca de segredos, qualidade extra, SBOM, Hypothesis e integridade do repositório. O `03_PYTEST_PROJETO.bat` é opcional e fica fora da bateria geral por repetir núcleo e interface. |
-| `6_TESTE_ferramentas_dos_testes/` | O que **organiza** os testes, sem ser um teste em si: `rodar_todos.py` e `rodar_todos_windows.bat` (executores das 6 baterias obrigatórias e da etapa 7 opcional), `test_pytest.py` (ponte opcional para o pytest), `_util_mem.py`, limpeza e relatórios. |
-| `7_TESTE_de_compilacao/` | Verificações opcionais após compilar o programa: pefile, Windows Defender e conexões TCP/UDP do processo. O BAT da pasta agrega os resultados em `testes\resultados\resultado_cofre_compilado_windows.txt`. |
+| `6_TESTE_ferramentas_dos_testes/` | O que **organiza** os testes, sem ser um teste em si: `rodar_todos.py` e `rodar_todos_windows.bat` (executores das 7 baterias), `test_pytest.py` (ponte opcional para o pytest), `_util_mem.py`, limpeza e relatórios. |
+| `7_TESTE_de_compilacao/` | Verificações opcionais após compilar o programa: smoke visual, pefile, Windows Defender e conexões TCP/UDP do processo. O smoke e o teste de rede abrem o EXE em modo não ativável e o mantêm atrás do aplicativo em uso. Se o Defender estiver desativado ou uma política de segurança bloquear a execução, registra `[PULADO]` sem executar/contornar o bloqueio. O BAT da pasta agrega os resultados em `testes\resultados\resultado_cofre_compilado_windows.txt`. |
 | `CACHE/` | Só existe durante a execução de testes que precisam gravar caches/temporários; o executor remove sua própria subpasta e apaga `CACHE` se estiver vazia. Não contém relatórios. |
 | `ambiente_virtual_ferramentas (NAO MEXER)/` | Ambiente virtual persistente de ferramentas, fora do cache temporário. Não renomear, mover ou apagar; os atalhos dependem do caminho exato. |
 | `PECA_DE_TESTE_cofre_versao_4_antiga.py` | Versão antiga do formato, usada pelo teste de migração (fica em `1_TESTE_motor_do_cofre/`, junto do teste que a usa) |
@@ -54,8 +56,14 @@ Os caches transitórios de Python, Hypothesis (incluindo os dados globais), Ruff
 
 
 ## Testes do instalador (Windows)
-`testes\4_TESTE_so_no_windows\instalador.Tests.ps1` é uma suíte **Pester** das funções auxiliares do `instalar_cofre.ps1` (conferência do hash digitado, arquitetura, sistema de arquivos, espaço em disco, certificado, limpeza de caminhos, detecção da instalação antiga e preservação do cofre/backups/chaves). O `A - testar o instalador.bat` carrega o Pester 5.7.1 empacotado em `pacotes\powershell-modules`. Carregar o instalador com `. .\instalar_cofre.ps1` só define as funções, não instala nada. Em 2026-11-20, uma execução focada dos testes atualizados passou: 12/12. Isso não valida a compilação e instalação completa ponta a ponta.
+`testes\4_TESTE_so_no_windows\instalador.Tests.ps1` é uma suíte **Pester** das funções auxiliares do `instalar_cofre.ps1` (conferência do hash digitado, arquitetura, sistema de arquivos, espaço em disco, certificado, limpeza de caminhos, detecção da instalação antiga e preservação do cofre/backups/chaves). O `A - testar o instalador.bat` carrega o Pester 5.7.1 empacotado em `pacotes\powershell-modules`. Carregar o instalador com `. .\instalar_cofre.ps1` só define as funções, não instala nada. Em 2026-11-20, uma execução focada dos testes atualizados passou: 14/14. Isso não valida a compilação e instalação completa ponta a ponta.
 
+## Testes visuais e manuais novos
+
+- `testes\1_TESTE_motor_do_cofre\teste_queda_de_energia_simulada.py`: roda automaticamente na bateria do núcleo e simula 30 quedas brutas de processo.
+- `testes\2_TESTE_telas_e_botoes\teste_gui_visual_varredura.py`: roda na bateria de interface em 100%, 125%, 150% e 200% do Windows. Pillow permite capturar telas; comparação pixel a pixel só ocorre quando há imagens de referência revisadas.
+- `testes\2_TESTE_telas_e_botoes\teste_autocompletar.py` e `teste_icones.py`: conferem resolução de marcas/aliases e geração de ícones local, sem tráfego de rede.
+- `testes\7_TESTE_de_compilacao\teste_exe_visual_smoke_windows.py`: roda na etapa pós-compilação 7; sem `.exe`, registra `[PULADO]`.
 ## Status do Windows e versões
 
 Esta tabela é a fonte única do status de execução; “ambiente disponível” não significa que a bateria completa passou.
@@ -63,8 +71,8 @@ Esta tabela é a fonte única do status de execução; “ambiente disponível�
 | Data | Ambiente | O que foi executado / status |
 |---|---|---|
 | 2026-11-19 | Windows 11 Pro 10.0.26300, Python 3.13.9 | Ambiente identificado; nenhuma bateria completa ou Pester executado nessa data. |
-| 2026-11-20, 04:38 | Windows 11 Pro 10.0.26300, Python 3.13.9 AMD64 | Bateria completa de seis etapas: 111 resultados, 2.321 verificações `[OK]`, zero falhas/interrupções e três pulos condicionais: pefile e Defender (sem `.exe` compilado) e teste de rede do processo (sem executável aberto). A etapa externa também marcou PSScriptAnalyzer e qualidade extra como `[ALERTA]`; esses achados precisam de revisão e não devem ser tratados como aprovação de Go/No-Go. |
-| 2026-11-20, após mudanças posteriores | Windows 11 Pro 10.0.26300 | Validações focadas: Pester do instalador 12/12; teste Hypothesis executado isoladamente sem falhas; limpeza dos caches temporários conferida. A bateria completa não foi repetida depois dessas alterações. |
+| 2026-11-20 | Windows 11 Pro 10.0.26300, Python 3.13.9 AMD64 | Bateria completa registrada: 111 resultados, 2.344 verificações `[OK]` e 9 relatórios com falha/interrupção. Quatro sondas `-X dev` falharam com `-1073741819` mesmo em comandos mínimos; PSScriptAnalyzer e qualidade extra também ficaram como `[ALERTA]`. Resultado: No-Go. Não valida o ambiente final nem permite atribuir a causa definitivamente ao Windows ou ao Python. |
+| 2026-11-20, após mudanças posteriores | Windows 11 Pro 10.0.26300 | Validações focadas: Pester do instalador 14/14, engenharia reversa sem falhas, integridade dos pacotes sem falhas e limpeza dos caches temporários conferida. A bateria completa não foi repetida depois dessas alterações. |
 | — | Windows Sandbox | Sem evidência de execução; não testado. |
 | — | Windows 10 | Sem evidência de execução; não testado. |
 | — | Windows 11 ARM64 | Build nativo não suportado. O projeto declara uso do Python/executável x64 sob emulação; não há ensaio ARM64 registrado. |
@@ -80,7 +88,7 @@ substitui os resultados locais acima; este registro não inclui evidência de um
 - `teste_checksum_v5.py`: setor zerado/0xFF, cabeçalho apagado, corte, lixo no fim, arquivo vazio e setores trocados: nunca gasta tentativa nem apaga, e a cópia restaura.
 - Análise estática: Bandit e Flake8 são instalados do `pacotes\` preparado por `3 - BAIXAR PACOTES`; o BAT de Bandit cria `testes\ambiente_virtual_ferramentas (NAO MEXER)` sem rede.
 - **pytest:** o BAT correspondente usa o mesmo ambiente offline (`testes\ambiente_virtual_ferramentas (NAO MEXER)`): `03_PYTEST_PROJETO.bat` roda `test_pytest.py`, cada `teste_*.py` como um caso. A ponte repete as baterias 1 e 2.
-- **Testes condicionais do executável:** a pasta `7_TESTE_de_compilacao/` agrega proteções PE (pefile), Windows Defender e conexões do processo. pefile e Defender precisam do `CofreSenhas.exe` compilado; o teste de rede exige que ele esteja aberto. Baixar dependências não substitui esses pré-requisitos. Cada relatório individual registra o que faltou.
+- **Testes condicionais do executável:** a pasta `7_TESTE_de_compilacao/` agrega smoke visual, proteções PE (pefile), Windows Defender e conexões do processo. O smoke e o teste de rede abrem uma instância temporária com `COFRE_GUI_TESTS_BACKGROUND=1`, sem ativar a janela nem tirar o foco do aplicativo em uso; pefile e Defender só precisam do executável compilado. Se o Defender estiver desativado ou uma política de segurança bloquear a execução, registra `[PULADO]` e não contorna o bloqueio. Baixar dependências não substitui esses pré-requisitos. Cada relatório individual registra o que faltou.
 - `teste_queda_pontos_exatos.py` (queda de energia em cada `fsync`/`os.replace`) e `teste_fuzz_cabecalho.py` (cada byte do cabeçalho v5 e da seção FIDO): nada gasta tentativa, nada se perde.
 - `2_TESTE_telas_e_botoes/teste_gui_fontes.py`: fontes nomeadas podem ser preparadas mais de uma vez.
 - `teste_host_e_politica.py`: pasta temporária privada no pendrive (rastros no host) e política opcional de exigir NTFS.
@@ -96,7 +104,7 @@ substitui os resultados locais acima; este registro não inclui evidência de um
 - `2_TESTE_telas_e_botoes/teste_gui_fluidez_animacoes.py`: regressão de glitches relatados de verdade: gerador de senhas fecha ANTES de preencher o campo (sem recentralizar o diálogo de baixo com o gerador ainda em cima); bloco destacado do código de recuperação sorteado e do tamanho certo; rajada de `<Configure>` (teclado virtual) vira poucas reconfigurações do Canvas (debounce); cartão do passeio guiado arrasta pelo título; varredura geral sem Toplevel/widget sobrando.
 
 ## Ferramentas externas e testes pós-compilação
-A bateria 5 do Testar Tudo roda as ferramentas 01, 02, 04, 05, 08–10, 12 e 13. O pytest (03) fica somente no menu por repetir as baterias 1 e 2. As verificações 06 (pefile), 07 (Defender) e 11 (rede do processo) foram movidas para `7_TESTE_de_compilacao/`: são opcionais no Testar Tudo, acionadas com `POS-COMPILACAO`; compile o executável primeiro. A pasta 7 também pode ser rodada pelo seu próprio BAT. As ferramentas usam dependências em `requirements-test-lock.txt`; rode `3 - BAIXAR PACOTES` com internet antes de usar em modo offline. Até os wheels estarem no pacote, ausência de ferramenta é `[PULADO]`; o Hypothesis é descoberto pelo executor do núcleo e código 9 é skip, enquanto falha real retorna código de falha. O atalho 12 é também uma forma de rodar esse teste isoladamente.
+A bateria 5 do Testar Tudo roda as ferramentas 01, 02, 04, 05, 08–10, 12 e 13. O pytest (03) fica somente no menu por repetir as baterias 1 e 2. As verificações 06 (pefile), 07 (Defender) e 11 (rede do processo) foram movidas para `7_TESTE_de_compilacao/`: compile o executável primeiro. A verificação 11 abre uma instância temporária do próprio EXE com um caminho de cofre temporário, confere que não há conexões e fecha só essa instância, sem roubar o foco. A pasta 7 também pode ser rodada pelo seu próprio BAT. As ferramentas usam dependências em `requirements-test-lock.txt`; rode `3 - BAIXAR PACOTES` com internet antes de usar em modo offline. Até os wheels estarem no pacote, ausência de ferramenta é `[PULADO]`; o Hypothesis é descoberto pelo executor do núcleo e código 9 é skip, enquanto falha real retorna código de falha. O atalho 12 é também uma forma de rodar esse teste isoladamente.
 
 - `teste_planilha_selo.py`: modelo selado e **importação estrita** (só o que o cofre gerou); `teste_nivel_protecao.py`: ranking de proteção; `teste_backup_chave.py`: backup exige a chave de acesso.
 - `2_TESTE_telas_e_botoes/teste_gui_teclado_virtual.py`: teclado virtual sem recriar teclas (sem piscar), com contagem e Esc; `2_TESTE_telas_e_botoes/teste_gui_ajustes_ui.py`: senhas sempre ocultas até o olho e painel de nível de proteção.
@@ -114,7 +122,7 @@ A bateria 5 do Testar Tudo roda as ferramentas 01, 02, 04, 05, 08–10, 12 e 13.
 ## Log de depuração, resumos e limpeza (2026-11-16)
 Além de um `resultado_<teste>.txt` por teste, a pasta `testes/resultados/` guarda:
 - `testes/resultados/log_depuracao.txt` — saída COMPLETA (com tracebacks), horário, duração e comando de cada teste; recriado do zero a cada rodada. É o arquivo para abrir quando algo falha.
-- `testes/resultados/RESULTADO COMPLETO.txt` — conteúdo de todos os resultados individuais `resultado_*.txt` da rodada, com separadores e o nome de cada arquivo. É criado pelo Testar Tudo no Windows; os arquivos individuais continuam disponíveis.
+- `testes/resultados/resultado completo/RESULTADO COMPLETO.txt` — conteúdo de todos os resultados individuais `resultado_*.txt` da rodada, com separadores e o nome de cada arquivo. É criado pelo Testar Tudo no Windows; os arquivos individuais continuam disponíveis.
 - `resumo_testes.md` / `resumo_testes.json` / `resultados.sarif` — gerados por `testes/6_TESTE_ferramentas_dos_testes/consolidar_resultados.py` (tabela legível, JSON comparável e SARIF só com falhas).
 - `limpeza_artefatos.txt` — relatório de `testes/6_TESTE_ferramentas_dos_testes/limpar_artefatos_testes.py`, que apaga pastas temporárias órfãs (prefixos dos nossos testes, mais velhas que 5 min).
 Os testes novos criam pastas temporárias por `_resultado.pasta_temporaria()`, que as apaga ao terminar mesmo se o teste falhar.

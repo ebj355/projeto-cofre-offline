@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Testes técnicos de sistema (equivalentes locais dos testes de pentest de aplicativo de PC):
 1) rede: nenhuma conexão é aberta em criar/abrir/salvar/backup/exportar/importar/trocar senha/computador/FIDO;
    a única exceção é a consulta opcional HIBP, que só sai com 5 caracteres de hash;

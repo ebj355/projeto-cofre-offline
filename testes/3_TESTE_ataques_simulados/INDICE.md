@@ -1,4 +1,4 @@
-# Testes de SEGURANÇA ofensiva (pentest)
+# Testes da Arca — SEGURANÇA (pentest)
 
 **Para que serve esta pasta:** Tentam ATACAR o cofre (injeção, força bruta, DoS, vazamento de memória, engenharia reversa, rede, instalador) para provar que as defesas funcionam.
 

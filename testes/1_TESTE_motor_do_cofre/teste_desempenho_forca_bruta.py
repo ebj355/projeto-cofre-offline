@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Desempenho e força bruta (núcleo, sem janelas): custo do Argon2id por nível, abrir/salvar com milhares de itens,
 tamanho do arquivo, esforço do atacante (tentativas por segundo contra o arquivo), 100 senhas erradas seguidas e
 autodestruição, ciclos repetidos sem crescimento de memória, entradas absurdas que não podem travar o programa.

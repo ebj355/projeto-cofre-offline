@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """CONCORRÊNCIA ENTRE VÁRIOS PROCESSOS no mesmo cofre (mais pesado que o teste de 2 instâncias).
 
 O que já existia: `teste_trava_instancias.py` (2-3 processos pedem a trava) e `teste_queda_e_memoria.py` (2 instâncias

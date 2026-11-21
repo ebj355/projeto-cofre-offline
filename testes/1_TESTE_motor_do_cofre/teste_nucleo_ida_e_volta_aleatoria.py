@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Ida e volta com dados ALEATÓRIOS (como o Hypothesis, sem depender dele; semente fixa e mostrada para repetir): vários ciclos de criar/editar/apagar itens
 com textos de todo tipo (acentos, emoji, chinês, controle, vazio), salvar, fechar e reabrir: o que volta é IDÊNTICO ao que foi guardado. Depois vira bits do arquivo:
 abrir nunca pode devolver dados DIFERENTES em silêncio, nem estourar erro não tratado (IndexError, KeyError, struct.error...)."""

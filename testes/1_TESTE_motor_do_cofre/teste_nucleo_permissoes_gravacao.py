@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """PERMISSÕES: gravar o cofre onde não se pode (pasta somente leitura, arquivo somente leitura, acesso negado no meio da
 troca). O programa tem de devolver ErroGravacao com mensagem clara (nunca PermissionError solto), marcar 'protegido' quando
 for proteção de escrita (a interface então oferece o MODO CONSULTA), não deixar .tmp para trás e manter o cofre anterior

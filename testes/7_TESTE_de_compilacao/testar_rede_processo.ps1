@@ -1,0 +1,123 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
+param([Parameter(Mandatory = $true)][string]$Executavel)
+$ErrorActionPreference = 'Stop'
+
+function Obter-ArvoreProcessos([int]$Raiz) {
+    $todos = @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop)
+    $ids = @($Raiz)
+    do {
+        $novos = @($todos | Where-Object {
+            $ids -contains [int]$_.ParentProcessId -and $ids -notcontains [int]$_.ProcessId
+        } | ForEach-Object { [int]$_.ProcessId })
+        if ($novos.Count) { $ids += $novos }
+    } while ($novos.Count)
+    return $ids
+}
+
+function Testar-AcessoNegado($erro) {
+    $ex = $erro.Exception
+    while ($ex) {
+        if ($ex -is [System.ComponentModel.Win32Exception] -and $ex.NativeErrorCode -eq 5) { return $true }
+        if ($ex.Message -match '(?i)\baccess denied\b|\bacesso negado\b') { return $true }
+        $ex = $ex.InnerException
+    }
+    return $false
+}
+
+if (-not (Test-Path -LiteralPath $Executavel -PathType Leaf)) {
+    Write-Output "[FALHOU] Executavel inexistente: $Executavel"
+    exit 1
+}
+
+$pasta = Join-Path $env:TEMP ("cofre_rede_teste_" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $pasta -ErrorAction Stop | Out-Null
+$cofreTeste = Join-Path $pasta 'cofre.dat'
+$processo = $null
+$codigo = 1
+$backgroundOriginal = $env:COFRE_GUI_TESTS_BACKGROUND
+if ($null -eq $backgroundOriginal) {
+    $tinhaBackground = $false
+} else {
+    $tinhaBackground = $true
+}
+$env:COFRE_GUI_TESTS_BACKGROUND = '1'
+try {
+    $argumento = '"' + $cofreTeste + '"'
+    try {
+        $processo = Start-Process -FilePath $Executavel -ArgumentList $argumento `
+            -WorkingDirectory (Split-Path -Parent $Executavel) -PassThru -ErrorAction Stop
+    } catch {
+        if (Testar-AcessoNegado $_) {
+            Write-Output '[PULADO] O Windows ou uma politica de seguranca bloqueou a inicializacao do executavel (acesso negado); nenhum bloqueio foi contornado.'
+            $codigo = 9
+        } else {
+            throw
+        }
+    }
+    if ($processo) {
+        $fim = (Get-Date).AddSeconds(60)
+        do {
+            Start-Sleep -Milliseconds 250
+            $processo.Refresh()
+        } while (-not $processo.HasExited -and (Get-Date) -lt $fim)
+
+        if ($processo.HasExited) {
+            Write-Output "[FALHOU] CofreSenhas.exe encerrou antes da verificacao (codigo $($processo.ExitCode))."
+            $codigo = 1
+        } else {
+            $pids = @(Obter-ArvoreProcessos $processo.Id)
+            if ($pids.Count -le 1) {
+                Write-Output '[PULADO] O executavel onefile nao iniciou o processo da aplicacao; conexoes nao foram verificadas.'
+                $codigo = 9
+            } else {
+                $tcp = @()
+                $udp = @()
+                foreach ($pidTeste in $pids) {
+                    try {
+                        $tcp += @(Get-NetTCPConnection -OwningProcess $pidTeste -ErrorAction Stop)
+                    } catch {
+                        if ($_.FullyQualifiedErrorId -notlike 'CmdletizationQuery_NotFound_OwningProcess,*') { throw }
+                    }
+                    try {
+                        $udp += @(Get-NetUDPEndpoint -OwningProcess $pidTeste -ErrorAction Stop)
+                    } catch {
+                        if ($_.FullyQualifiedErrorId -notlike 'CmdletizationQuery_NotFound_OwningProcess,*') { throw }
+                    }
+                }
+                Write-Output "PIDs de teste: $($pids -join ', ')"
+                if ($tcp.Count -or $udp.Count) {
+                    $tcp | Format-Table OwningProcess, LocalAddress, LocalPort, RemoteAddress, RemotePort, State -AutoSize | Out-String | Write-Output
+                    $udp | Format-Table OwningProcess, LocalAddress, LocalPort -AutoSize | Out-String | Write-Output
+                    Write-Output '[FALHOU] O processo abriu conexoes TCP/UDP.'
+                    $codigo = 1
+                } else {
+                    Write-Output '[OK] Nenhuma conexao TCP/UDP.'
+                    $codigo = 0
+                }
+            }
+        }
+    }
+} catch {
+    Write-Output "[FALHOU] Nao foi possivel testar a rede do processo: $($_.Exception.Message)"
+    $codigo = 1
+} finally {
+    if ($tinhaBackground) { $env:COFRE_GUI_TESTS_BACKGROUND = $backgroundOriginal }
+    else { Remove-Item Env:\COFRE_GUI_TESTS_BACKGROUND -ErrorAction SilentlyContinue }
+    if ($processo) {
+        $pids = @(Obter-ArvoreProcessos $processo.Id)
+        [array]::Reverse($pids)
+        foreach ($pidTeste in $pids) {
+            $alvo = Get-Process -Id $pidTeste -ErrorAction SilentlyContinue
+            if ($alvo -and -not $alvo.HasExited) {
+                [void]$alvo.CloseMainWindow()
+                if (-not $alvo.WaitForExit(10000)) {
+                    Stop-Process -Id $pidTeste -Force -ErrorAction Stop
+                }
+            }
+        }
+    }
+    if (Test-Path -LiteralPath $pasta) {
+        Remove-Item -LiteralPath $pasta -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+exit $codigo

@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem pip-audit: confere as bibliotecas do requirements.txt contra vulnerabilidades conhecidas (precisa de internet).
 rem Offline: por padrao pula, pois uma base local desatualizada daria uma falsa garantia. Para consultar a base atual, defina COFRE_ONLINE_AUDIT=1.

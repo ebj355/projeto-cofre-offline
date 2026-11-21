@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Procura cofre.dat, .key, .bak, .diag e segredos em texto (detect-secrets) antes de enviar ao GitHub.
 rem Codigos de saida: 0 = limpo | 1 = achados ou auditoria incompleta

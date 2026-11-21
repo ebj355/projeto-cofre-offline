@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Fuzzing do leitor de planilhas/CSV (ler_planilha): bytes nulos, campos gigantes, UTF-16 com BOM trocado, UTF-8 inválido,
 CSV truncado, .xlsx corrompido, arquivos aleatórios. Regra: NUNCA pode estourar um erro não tratado (só ValueError/OSError
 com mensagem) nem travar; o que for lido não pode trazer caractere de controle. Uso: python testes/teste_fuzz_importacao.py"""

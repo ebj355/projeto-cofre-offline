@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Gera o INDICE.md de cada pasta de testes: uma linha por arquivo dizendo PARA QUE SERVE
 (primeira linha do texto de abertura de cada .py; descrição escrita à mão para .bat/.ps1/.md) e POR QUE está naquela pasta.
 Arquivo novo SEM descrição aparece como 'FALTA DESCRIÇÃO' e o programa sai com erro: assim nenhum arquivo fica sem explicação.
@@ -7,17 +8,18 @@ import ast, os, sys
 AQUI = os.path.dirname(os.path.abspath(__file__))
 TESTES = os.path.dirname(AQUI)
 PASTAS = {
-    "1_TESTE_motor_do_cofre": ("Testes do NÚCLEO (sem janelas)", "Provam o motor do cofre: criptografia, arquivo, backups, tentativas, importação, falhas de disco. Rodam no Linux e no Windows, rápidos, sem tela. Cada `teste_*.py` é independente."),
-    "2_TESTE_telas_e_botoes": ("Testes da INTERFACE (janelas Tk)", "Abrem as telas de verdade (no Linux com tela virtual `xvfb-run`; no Windows em janelas reais) e clicam/digitam como um usuário. Cada `teste_gui_*.py` é independente."),
-    "3_TESTE_ataques_simulados": ("Testes de SEGURANÇA ofensiva (pentest)", "Tentam ATACAR o cofre (injeção, força bruta, DoS, vazamento de memória, engenharia reversa, rede, instalador) para provar que as defesas funcionam."),
-    "4_TESTE_so_no_windows": ("Testes que SÓ fazem sentido no Windows real", "Conferem o que o Linux só consegue simular: atributos de arquivo, permissões (ACL), DPAPI, SMBIOS, instalador, Windows Sandbox."),
-    "5_TESTE_ferramentas_externas": ("Ferramentas EXTERNAS de análise", "Bandit, pip-audit, Nmap, PSScriptAnalyzer, verificação de segredos, qualidade, SBOM, Hypothesis e integridade do repositório. São independentes do executável compilado e fazem parte do TESTAR TUDO (etapa 6/6), menos o pytest, que repete as baterias 1 e 2."),
-    "6_TESTE_ferramentas_dos_testes": ("Ferramentas COMPARTILHADAS pelos testes", "Não são testes do cofre: são os executores (`rodar_*`), os ajudantes (`_resultado`, `_util_mem`), a limpeza, a cobertura e os relatórios. Também os documentos do plano de testes."),
-    "7_TESTE_de_compilacao": ("Testes do EXECUTÁVEL COMPILADO (pós-compilação)", "Verificam o executável gerado: proteções PE, varredura do Defender e conexões de rede do processo. Compile o programa antes; esta pasta pode ser incluída opcionalmente no Testar Tudo com POS-COMPILACAO."),
+    "1_TESTE_motor_do_cofre": ("Testes da Arca — NÚCLEO (sem janelas)", "Provam o motor do cofre: criptografia, arquivo, backups, tentativas, importação, falhas de disco. Rodam no Linux e no Windows, rápidos, sem tela. Cada `teste_*.py` é independente."),
+    "2_TESTE_telas_e_botoes": ("Testes da Arca — INTERFACE (janelas Tk)", "Abrem as telas de verdade (no Linux com tela virtual `xvfb-run`; no Windows em janelas reais) e clicam/digitam como um usuário. Cada `teste_gui_*.py` é independente."),
+    "3_TESTE_ataques_simulados": ("Testes da Arca — SEGURANÇA (pentest)", "Tentam ATACAR o cofre (injeção, força bruta, DoS, vazamento de memória, engenharia reversa, rede, instalador) para provar que as defesas funcionam."),
+    "4_TESTE_so_no_windows": ("Testes da Arca — Windows real", "Conferem o que o Linux só consegue simular: atributos de arquivo, permissões (ACL), DPAPI, SMBIOS, instalador, Windows Sandbox."),
+    "5_TESTE_ferramentas_externas": ("Análise externa da Arca", "Bandit, pip-audit, Nmap, PSScriptAnalyzer, verificação de segredos, qualidade, SBOM, Hypothesis e integridade do repositório. São independentes do executável compilado e fazem parte do TESTAR TUDO (etapa 6/7), menos o pytest, que repete as baterias 1 e 2."),
+    "6_TESTE_ferramentas_dos_testes": ("Ferramentas de teste da Arca", "Não são testes do cofre: são os executores (`rodar_*`), os ajudantes (`_resultado`, `_util_mem`), a limpeza, a cobertura e os relatórios. Também os documentos do plano de testes."),
+    "7_TESTE_de_compilacao": ("Testes da Arca — executável compilado", "Verificam o executável gerado: proteções PE, varredura do Defender e conexões de rede do processo. Compile o programa antes; esta pasta é incluída automaticamente no Testar Tudo."),
 }
 MANUAL = {   # arquivos que não são .py (ou que não têm texto de abertura): para que serve + por que está aqui
-    "6_TESTE_ferramentas_dos_testes/rodar_todos_windows.bat": "Roda as 6 baterias no Windows; a pasta 7 é opcional e pode ser incluída com POS-COMPILACAO, depois de compilar o executável. Junta os resultados em testes/resultados/ e gera RESULTADO COMPLETO.txt.",
-    "6_TESTE_ferramentas_dos_testes/consolidar_resultados.py": "Gera resumo_testes.md, resumo_testes.json, resultados.sarif e RESULTADO COMPLETO.txt, que reúne o conteúdo de todos os arquivos individuais resultado_*.txt.",
+    "6_TESTE_ferramentas_dos_testes/rodar_todos_windows.bat": "Roda as 7 baterias no Windows, incluindo a verificação pós-compilação. Pode incluir a letra do pendrive. Limpa resultados antigos e gera resultado completo/RESULTADO COMPLETO.txt.",
+    "6_TESTE_ferramentas_dos_testes/consolidar_resultados.py": "Gera resumo_testes.md, resumo_testes.json e resultados.sarif em resultados/, além de resultado completo/RESULTADO COMPLETO.txt com todos os resultados individuais.",
+    "6_TESTE_ferramentas_dos_testes/reunir_erros_compilacao.py": "Limpa e reúne os arquivos de erro da bateria em logs_de_compilacao/erros de compilação/TODOS_OS_ERROS.txt.",
     "6_TESTE_ferramentas_dos_testes/cobertura_codigo_windows.bat": "Atalho de dois cliques para medir a cobertura de código no Windows (chama cobertura_codigo.py). Fora do Testar_Tudo de propósito: é lento.",
     "2_TESTE_telas_e_botoes/RODAR ESTA PASTA - testes das telas e botoes.bat": "Atalho de dois cliques da bateria de INTERFACE no Windows (chama teste_gui_windows.ps1).",
     "2_TESTE_telas_e_botoes/teste_gui_windows.ps1": "Prepara um ambiente Python temporário e roda a bateria de interface (rodar_todos.py --so gui) no Windows, gravando o resultado.",
@@ -46,11 +48,12 @@ MANUAL = {   # arquivos que não são .py (ou que não têm texto de abertura): 
     "5_TESTE_ferramentas_externas/baixar_psscriptanalyzer.ps1": "Baixa o módulo PSScriptAnalyzer para pacotes\\powershell-modules (precisa de internet).",
     "5_TESTE_ferramentas_externas/LEIA-ME.txt": "Como usar esta pasta, o que cada .bat faz e os limites das ferramentas.",
     "5_TESTE_ferramentas_externas/preparar_ambiente_offline.bat": "Cria ou atualiza o ambiente virtual local das ferramentas usando somente os wheels de pacotes\\ e requirements-test-lock.txt.",
-    "7_TESTE_de_compilacao/RODAR ESTA PASTA - testes de compilacao.bat": "Roda as verificações pós-compilação: pefile, Defender e rede do processo. Grava o resumo e os relatórios individuais em testes/resultados/. Compile primeiro; se o executável ou o processo não estiverem disponíveis, registra PULADO.",
+    "7_TESTE_de_compilacao/RODAR ESTA PASTA - testes de compilacao.bat": "Roda as verificações pós-compilação: pefile, Defender e rede do processo. Grava o resumo e os relatórios individuais em testes/resultados/. Compile primeiro; se o executável, processo, Defender ou a política de segurança impedirem a verificação, registra PULADO sem contornar o bloqueio.",
     "7_TESTE_de_compilacao/06_PEFILE_EXE.bat": "Confere as proteções ASLR, DEP, High-Entropy ASLR e CFG do CofreSenhas.exe compilado.",
-    "7_TESTE_de_compilacao/07_DEFENDER_EXE.bat": "Varre apenas o executável compilado com o Windows Defender, sem enviar dados do cofre a scanners externos.",
+    "7_TESTE_de_compilacao/07_DEFENDER_EXE.bat": "Varre apenas o executável compilado com o Windows Defender, sem enviar dados do cofre a scanners externos; registra PULADO se o Defender estiver desativado ou uma política de segurança impedir a verificacao.",
     "7_TESTE_de_compilacao/11_REDE_DO_PROCESSO.bat": "Com o CofreSenhas.exe aberto, lista as conexões TCP/UDP do processo; o esperado é nenhuma.",
-    "7_TESTE_de_compilacao/_achar_exe.bat": "Localiza o CofreSenhas.exe por COFRE_EXE, argumento ou caminhos padrão do projeto.",
+    "7_TESTE_de_compilacao/testar_rede_processo.ps1": "Abre uma instância temporária do executável, confere conexões TCP/UDP e encerra apenas os processos dessa instância.",
+    "7_TESTE_de_compilacao/_achar_exe.bat": "Localiza CofreSenhas.exe por COFRE_EXE, argumento, raiz do drive do pendrive ou caminhos padrão do projeto.",
     "7_TESTE_de_compilacao/verificar_pe.py": "Verifica as flags de segurança PE do executável compilado com pefile.",
 }
 POR_QUE = {"1_TESTE_motor_do_cofre": "motor do cofre, sem tela", "2_TESTE_telas_e_botoes": "precisa de janela", "3_TESTE_ataques_simulados": "ataque/segurança", "4_TESTE_so_no_windows": "precisa do Windows real", "5_TESTE_ferramentas_externas": "usa programas instalados no Windows", "6_TESTE_ferramentas_dos_testes": "serve a todas as baterias", "7_TESTE_de_compilacao": "precisa do executável compilado"}

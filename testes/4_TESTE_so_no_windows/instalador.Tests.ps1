@@ -1,4 +1,5 @@
-﻿# Testes unitários (Pester) das funções auxiliares do instalar_cofre.ps1: hash, arquitetura, sistema de arquivos,
+﻿# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
+# Testes unitários (Pester) das funções auxiliares do instalar_cofre.ps1: hash, arquitetura, sistema de arquivos,
 # espaço em disco, certificado, limpeza de caminhos e log. Roda com Pester 3, 4 ou 5 (só usa Describe/It/BeforeAll e 'throw').
 # Como rodar:  powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path .\instalador.Tests.ps1"
 # (o A - testar o instalador.bat já roda isto sozinho se o Pester existir no Windows)
@@ -10,11 +11,9 @@ Describe 'instalar_cofre.ps1: funções auxiliares' {
         . $script:instalador      # só define as funções: o arquivo não instala nada quando é carregado assim
     }
 
-    It 'Confirmar-PalavraApagar aceita maiúsculas e minúsculas, mas exige a palavra exata' {
-        foreach ($valor in 'APAGAR', 'apagar', 'ApAgAr') {
-            if (-not (Confirmar-PalavraApagar $valor)) { throw "devia aceitar: '$valor'" }
-        }
-        foreach ($valor in '', 'APAGA', 'APAGAR ') {
+    It 'Confirmar-PalavraApagar exige APAGAR em maiusculas exatas' {
+        if (-not (Confirmar-PalavraApagar 'APAGAR')) { throw "devia aceitar APAGAR" }
+        foreach ($valor in '', 'apagar', 'ApAgAr', 'APAGA', 'APAGAR ') {
             if (Confirmar-PalavraApagar $valor) { throw "devia recusar: '$valor'" }
         }
     }
@@ -30,6 +29,21 @@ Describe 'instalar_cofre.ps1: funções auxiliares' {
             if (Test-PrefixoSha256 $h $ruim) { throw "devia recusar: '$ruim'" }
         }
         if (Test-PrefixoSha256 '' 'a1b2c3d4e5f60718') { throw 'hash vazio não pode aceitar nada' } # pragma: allowlist secret
+    }
+    It 'Get-HashFonteConjunto vincula deterministicamente os dois arquivos-fonte' {
+        $principal = 'A' * 64 # pragma: allowlist secret
+        $icones = 'B' * 64 # pragma: allowlist secret
+        $combinado = Get-HashFonteConjunto $principal $icones
+        if ($combinado -notmatch '^[0-9A-F]{64}$') { throw 'hash combinado inválido' }
+        if ($combinado -ne (Get-HashFonteConjunto $principal $icones)) { throw 'hash combinado não é determinístico' }
+        $principalMinusculo = $principal.ToLowerInvariant()
+        $iconesMinusculo = $icones.ToLowerInvariant()
+        if ($combinado -ne (Get-HashFonteConjunto $principalMinusculo $iconesMinusculo)) { throw 'hash combinado deve ignorar caixa hexadecimal' }
+        if ($combinado -eq (Get-HashFonteConjunto ('C' * 64) $icones)) { throw 'alterar o arquivo principal não alterou o hash' }
+        if ($combinado -eq (Get-HashFonteConjunto $principal ('C' * 64))) { throw 'alterar o segundo arquivo não alterou o hash' }
+        $invalido = $false
+        try { Get-HashFonteConjunto 'hash-invalido' $icones } catch { $invalido = $true }
+        if (-not $invalido) { throw 'hash de fonte inválido devia ser recusado' }
     }
     It 'Test-ArquiteturaArm reconhece ARM64 e não confunde com x64' {
         if (-not (Test-ArquiteturaArm 'Arm64')) { throw 'Arm64' }
@@ -90,24 +104,34 @@ Describe 'instalar_cofre.ps1: funções auxiliares' {
             New-Item -ItemType Directory -Path $pasta -Force | Out-Null
             if (Get-InstalacaoLegada $raiz) { throw 'uma pasta vazia não deve ser identificada como instalação antiga' }
             Set-Content -LiteralPath (Join-Path $pasta 'CofreSenhas.exe') -Value 'programa'
+            Set-Content -LiteralPath (Join-Path $pasta 'icones_marcas.py') -Value 'fonte auxiliar'
             Set-Content -LiteralPath (Join-Path $pasta 'cofre.dat') -Value 'dados cifrados'
             Set-Content -LiteralPath (Join-Path $pasta 'acesso.key') -Value 'chave'
             $legada = Get-InstalacaoLegada $raiz
             if (-not $legada -or $legada.Path -ne $pasta) { throw 'a pasta antiga não foi encontrada' }
             if ($legada.Programas -notcontains 'CofreSenhas.exe') { throw 'o executável antigo não foi classificado' }
+            if ($legada.Programas -notcontains 'icones_marcas.py') { throw 'o fonte auxiliar antigo não foi classificado' }
             if ($legada.Cofres -notcontains 'cofre.dat' -or $legada.Chaves -notcontains 'acesso.key') { throw 'os dados ou a chave não foram identificados' }
         } finally { Remove-Item -LiteralPath $raiz -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    It 'Get-OpcaoInstalacaoLegada instala na raiz por padrão e mantém escolhas explícitas' {
+        if ((Get-OpcaoInstalacaoLegada '') -ne '2') { throw 'ENTER deve instalar na raiz e manter a pasta antiga intacta' }
+        if ((Get-OpcaoInstalacaoLegada ' 1 ') -ne '1') { throw 'a opção explícita 1 deve atualizar a instalação antiga' }
+        if ((Get-OpcaoInstalacaoLegada '3') -ne '3') { throw 'a opção explícita 3 deve ser preservada' }
     }
     It 'Remove-ProgramaLegado apaga só o programa antigo e preserva cofre, backup e chave' {
         $pasta = Join-Path ([IO.Path]::GetTempPath()) ("cofre_remocao_teste_" + [guid]::NewGuid().ToString('N'))
         try {
             New-Item -ItemType Directory -Path $pasta -Force | Out-Null
-            foreach ($nome in 'CofreSenhas.exe', 'Abrir_Cofre.bat', 'cofre.dat', 'cofre.dat.bak1', 'acesso.key') {
+            foreach ($nome in 'CofreSenhas.exe', 'Abrir_Cofre.bat', 'cofre_senhas.py', 'icones_marcas.py', 'cofre.dat', 'cofre.dat.bak1', 'acesso.key') {
                 Set-Content -LiteralPath (Join-Path $pasta $nome) -Value 'teste'
             }
             $resultado = Remove-ProgramaLegado $pasta
             if ($resultado.Falhas.Count -gt 0) { throw "falha ao remover programa: $($resultado.Falhas -join ', ')" }
             if (Test-Path -LiteralPath (Join-Path $pasta 'CofreSenhas.exe')) { throw 'o executável antigo permaneceu' }
+            foreach ($nome in 'cofre_senhas.py', 'icones_marcas.py') {
+                if (Test-Path -LiteralPath (Join-Path $pasta $nome)) { throw "$nome não deveria permanecer" }
+            }
             foreach ($nome in 'cofre.dat', 'cofre.dat.bak1', 'acesso.key') {
                 if (-not (Test-Path -LiteralPath (Join-Path $pasta $nome))) { throw "$nome não deveria ser apagado" }
             }
@@ -115,5 +139,24 @@ Describe 'instalar_cofre.ps1: funções auxiliares' {
     }
     It 'carregar o instalador com ponto não instala nada (guarda de execução)' {
         if (-not (Get-Command Instalar-Cofre -ErrorAction SilentlyContinue)) { throw 'Instalar-Cofre devia estar definida' }
+    }
+    It 'compilação prepara os dois fontes verificados e inclui Pillow no bundle' {
+        $conteudo = Get-Content -LiteralPath $script:instalador -Raw
+        foreach ($trecho in "Join-Path `$src 'icones_marcas.py'", 'Copy-Item -LiteralPath $moduloIcones.FullName -Destination $iconesCopia',
+                           'Get-FileHash -LiteralPath $iconesCopia', '--include-package=PIL') {
+            if ($conteudo -notmatch [regex]::Escape($trecho)) { throw "faltou no instalador: $trecho" }
+        }
+        if ($conteudo -notmatch '(?m)^pillow==13\.0\.0 .*--hash=sha256:') {
+            throw 'Pillow precisa estar fixado e validado por hashes no build'
+        }
+    }
+    It 'compilação usa o analisador PE local do Nuitka sem liberar downloads automáticos' {
+        $conteudo = Get-Content -LiteralPath $script:instalador -Raw
+        if ($conteudo -notmatch "(?m)^\s*'--experimental=force-dependencies-pefile',\s*$") {
+            throw 'o build deve forçar o analisador PE local para evitar o prompt de download do Dependency Walker'
+        }
+        if ($conteudo -match "(?m)^\s*['""]--assume-yes-for-downloads") {
+            throw 'não autorize downloads automáticos globais do Nuitka'
+        }
     }
 }

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Cofre GRANDE: 5.000 itens (textos de tamanhos variados, com acentos e emoji): cria, salva, fecha e reabre com tudo idêntico; o arquivo cresce em proporção (não explode),
 salvar e abrir ficam em tempo razoável, e cada salvamento seguinte (que renova as cópias de segurança) continua íntegro. Mede o pico de memória do processo."""
 import json, os, random, sys, time

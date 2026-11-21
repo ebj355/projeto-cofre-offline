@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """LIMITE DE TAMANHO DE SENHA (negação de serviço) e ALERTA DE SISTEMA DE ARQUIVOS.
 - avaliar_forca/avaliar_senha com texto gigante: rápido e recusado com mensagem clara;
 - criar/trocar com senha acima do limite: recusa; abrir com senha acima do limite: ChaveMalFormada, SEM gastar tentativa

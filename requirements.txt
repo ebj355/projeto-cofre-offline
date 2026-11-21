@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 # Versões FIXAS, as mesmas testadas com este cofre. O instalador instala exatamente estas, com hash
 # (pip --require-hashes), e inclui também as dependências indiretas abaixo.
 cryptography==50.0.2
@@ -6,6 +7,7 @@ argon2-cffi-bindings==26.1.0
 openpyxl==3.1.5
 defusedxml==0.7.1
 fido2==2.2.1
+pillow==13.0.0
 # dependências indiretas
 cffi==2.1.1
 pycparser==3.12

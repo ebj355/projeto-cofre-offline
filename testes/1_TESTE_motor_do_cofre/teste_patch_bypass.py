@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Simula um ATACANTE que remendou o programa (patch de saltos/comparações): mesmo com todas as comparações do
 Python forçadas a 'verdadeiro' e a conferência de senha da sessão sempre aprovando, uma senha ERRADA continua sem
 abrir o cofre, porque quem decide é a etiqueta de autenticação do AEAD (AES-GCM / ChaCha20-Poly1305): a chave dos dados

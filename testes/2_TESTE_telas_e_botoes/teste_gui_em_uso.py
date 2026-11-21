@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """COFRE ABERTO EM OUTRA JANELA: a segunda janela (App(..., em_uso=True)) vai direto para o MODO CONSULTA, sem perguntar,
 com faixa de aviso própria, ações que alteram dados só explicam e nada é gravado. Também confere a faixa de REVERSÃO."""
 import os, sys, tempfile, shutil

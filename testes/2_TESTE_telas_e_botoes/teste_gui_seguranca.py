@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface: checagem de vazamentos (rede simulada) e janela do bloqueio automático configurável."""
 import os as _os, sys as _sys, tempfile as _tf
 _RAIZ = _os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface (Tk): ícone de Caps Lock dentro do campo de senha e mensagens do FIDO com o próximo passo.
 Roda no Windows ou no Linux (xvfb-run -a)."""
 import os, sys, tempfile

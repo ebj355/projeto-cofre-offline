@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Passeio básico (teste rápido de fumaça): tela de desbloqueio, tela principal, Novo item, teclado virtual, Ctrl+C bloqueado, bloquear e limpar a área de transferência."""
 import os as _os, sys as _sys, tempfile as _tf, subprocess as _sp
 _RAIZ = _os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))
@@ -11,7 +12,7 @@ import tkinter as tk
 import cofre_senhas as c
 W = _tf.mkdtemp(prefix="cofre_gui_"); P = os.path.join(W, "gui.dat")
 if os.path.exists(P): os.remove(P)
-c.Cofre.criar(P, "cavalo azul come pizza na chuva", 3)
+c.Cofre.criar(P, "cavalo azul come pizza na chuva", 3, nivel="alto")
 root = tk.Tk()
 app = c.App(root, P)
 passos = []

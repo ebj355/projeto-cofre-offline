@@ -1,6 +1,13 @@
-# 🔐 Cofre de Senhas (offline)
+<!-- ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt -->
+# 🔐 Arca — Cofre de Segurança (offline)
 
-**Gerenciador de senhas 100% local para Windows.** Um único programa, sem nuvem, sem conta e sem conexões automáticas, que guarda as suas senhas num arquivo criptografado (`cofre.dat`) e roda direto de um pendrive ou de uma pasta protegida do computador. A verificação online de senhas vazadas é opcional e só acontece quando solicitada.
+![Arca — Cofre de Segurança, produto da Arca Sistemas](<imagens visuais para campanha/arca_capa_1600x300.png>)
+
+<p align="center">
+  <img src="imagens%20visuais%20para%20campanha/arca_perfil_230x320.png" alt="Arca — cofre offline" width="160">
+</p>
+
+**Produto da Arca Sistemas.** A Arca é um cofre de segurança e gerenciador de senhas **100% local para Windows**. Um único programa, sem nuvem, sem conta e sem conexões automáticas, guarda as senhas num arquivo criptografado (`cofre.dat`) e roda direto de um pendrive ou de uma pasta protegida do computador. A verificação online de senhas vazadas é opcional e só acontece quando solicitada.
 
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011%20(64%20bits)-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11%20%E2%80%93%203.13-3776AB?logo=python&logoColor=white)
@@ -71,13 +78,13 @@
 
 ## 2. Visão geral e o que o projeto contempla
 
-O **Cofre de Senhas** foi feito para quem quer guardar logins, senhas, PINs, chaves de API, códigos de recuperação e dados bancários **sem entregar nada para um serviço na nuvem**.
+A **Arca**, produto da **Arca Sistemas**, foi feita para quem quer guardar logins, senhas, PINs, chaves de API, códigos de recuperação e dados bancários **sem entregar nada para um serviço na nuvem**.
 
 | Característica | Como é |
 |---|---|
 | **Local** | Tudo fica num arquivo `cofre.dat`, ao lado do programa. Não há servidor, conta nem sincronização. |
 | **Portátil** | Funciona num pendrive (recomendado, com BitLocker To Go) ou numa pasta do computador protegida por permissões do Windows. |
-| **Um arquivo só** | O programa inteiro é o `cofre_senhas.py`, de propósito: fica mais fácil de auditar e de conferir pelo SHA-256. |
+| **Fontes conferíveis** | O motor fica em `cofre_senhas.py` e os dados de marcas/autocompletar em `icones_marcas.py`; o instalador confere os dois arquivos e seu hash combinado. |
 | **Compilado por você** | O instalador compila o `CofreSenhas.exe` no seu próprio computador, a partir de bibliotecas com versão e hash fixos. Você não baixa um `.exe` pronto de ninguém. |
 | **Em português** | Interface escura no estilo Windows 11, com mensagens que explicam o que fazer, não só o que deu errado. |
 | **Sem rastros no sistema** | Sem registro, serviço, tarefa agendada, atalho, menu de contexto ou pedido de administrador. "Desinstalar" é apagar a pasta. |
@@ -122,10 +129,10 @@ rodar_todos_windows.bat
   ├─ 5 pentest
   ├─ 6 ferramentas externas
   ├─ resultados em testes\resultados\
-  └─ POS-COMPILACAO ──► etapa opcional 7 (depois de compilar)
+  └─ 7 testes de compilação (depois de compilar)
 ```
 
-O executor `rodar_todos_windows.bat` fica em `testes\6_TESTE_ferramentas_dos_testes\`; os seis números acima indicam a ordem das etapas, não o número da pasta. O fluxo de testes não compila o aplicativo: a etapa 7 só verifica um executável já compilado e pode ser incluída com `POS-COMPILACAO`.
+O executor `rodar_todos_windows.bat` fica em `testes\6_TESTE_ferramentas_dos_testes\`; os números acima indicam a ordem das etapas. O fluxo não compila o aplicativo: a etapa 7 verifica um executável já compilado e roda automaticamente, registrando `[PULADO]` quando não houver pré-requisitos.
 
 ---
 
@@ -133,7 +140,7 @@ O executor `rodar_todos_windows.bat` fica em `testes\6_TESTE_ferramentas_dos_tes
 
 **É para você se:**
 
-- quer um cofre de senhas **offline**, sob seu controle total, sem depender de empresa nenhuma;
+- quer um cofre de senhas **offline**, sob seu controle total, sem depender de serviços na nuvem;
 - usa um pendrive e aceita ativar o **BitLocker To Go** nele;
 - está disposto a guardar uma chave de acesso e um backup em locais separados;
 - gosta de poder **ler e conferir** o que o programa faz.
@@ -272,6 +279,7 @@ Cada abertura é registrada **dentro do próprio cofre, criptografada**, então 
 ### 4.9 Interface
 
 - Tema escuro no estilo Windows 11, com todos os ícones desenhados pelo próprio programa (sem depender de fontes ou arquivos externos) e contraste mínimo WCAG AA nos textos secundários.
+- Campo Serviço com ícones locais de marcas e sugestões offline; aceita nomes livres e não faz consultas de rede.
 - **Passeio guiado** na primeira entrada (escurece a janela e destaca cada área) e **Guia de uso e atalhos** no botão `?`.
 - Busca instantânea (`Ctrl+F`), lista que desenha só as linhas visíveis (6.000 contas rolam sem engasgar), painel de detalhes e quadro de status da proteção.
 - **Ranking de proteção** (escudo na barra lateral): nota de 0 a 100 (Básica, Boa, Forte, Máxima) com botão **Ativar** no que falta, e tela **Segurança adicional** com a visão geral.
@@ -583,7 +591,7 @@ Transparência faz parte da segurança. O quadro abaixo resume o [`documentacao/
 ### 10.1 Baixar o projeto
 
 ```powershell
-git clone https://github.com/ebj355/projeto-cofre-offline.git
+git clone <URL_DO_REPOSITORIO>
 cd projeto-cofre-offline
 ```
 
@@ -591,7 +599,7 @@ Ou use **Code → Download ZIP** no GitHub e extraia numa pasta.
 
 ### 10.2 Rodar o instalador
 
-Dê dois cliques em **`1 - INSTALAR O COFRE - compila e instala.bat`**. Ele confere os arquivos, informa se vai trabalhar em modo ONLINE ou OFFLINE, mostra o SHA-256 do `cofre_senhas.py`, grava um log da execução em `logs_de_compilacao\` e chama o `instalar_cofre.ps1`. Aceita a letra do pendrive como argumento (`... H`).
+Dê dois cliques em **`1 - INSTALAR O COFRE - compila e instala.bat`**. Ele confere os arquivos, informa se vai trabalhar em modo ONLINE ou OFFLINE, mostra os SHA-256 de `cofre_senhas.py` e `icones_marcas.py` e o hash combinado, grava um log da execução em `logs_de_compilacao\` e chama o `instalar_cofre.ps1`. Aceita a letra do pendrive como argumento (`... H`).
 
 Se o Windows bloquear scripts, o `.bat` já usa `-ExecutionPolicy Bypass` **só para aquela execução**, sem mudar a política do computador. Também dá para rodar direto:
 
@@ -611,11 +619,11 @@ O instalador **pergunta primeiro** qual é o seu uso:
 Depois, são 5 etapas explicadas na tela, com barra de progresso e "Etapa N de 5":
 
 0. **Destino:** pergunta a letra do pendrive (sugere H:) e recusa o disco do Windows. Se já existe cofre no destino, pergunta se mantém (padrão) ou apaga tudo (exige digitar `APAGAR`; só alcança `cofre.dat*` e o registro, nunca o `.exe`).
-1. **Conferência do programa:** usa **somente** o `cofre_senhas.py` ao lado do instalador, mostra o SHA-256 e **exige que você digite os 16 primeiros caracteres**. É a única etapa que nunca aceita ENTER: é a defesa central contra um arquivo trocado. O hash é recalculado três vezes (após a cópia, antes dos testes e imediatamente antes de compilar) e a cópia vira somente leitura.
+1. **Conferência do programa:** usa `cofre_senhas.py` e `icones_marcas.py` ao lado do instalador, mostra os SHA-256 individuais e um hash combinado, e **exige que você digite os 16 primeiros caracteres do combinado**. É a única etapa que nunca aceita ENTER: é a defesa central contra arquivos trocados. Os dois hashes são recalculados após a cópia, antes dos testes e imediatamente antes de compilar; as cópias ficam somente leitura.
 2. **Python:** verifica e instala se faltar (winget ou instalador oficial assinado), sempre x64; em Windows 11 ARM64 roda por emulação.
 3. **Bibliotecas:** instala em **versões fixas e com hash** (`pip --require-hashes`), num ambiente virtual novo e isolado (`_cb\venv`). Variáveis `PYTHON*`, `PIP_*`, `NUITKA_*` e `CC` do seu ambiente são limpas, o `pip` roda com `--isolated` e a compilação usa `python -I`. Qualquer arquivo diferente do esperado é recusado.
 4. **Teste de criptografia:** cria, abre e destrói um cofre de teste.
-5. **Compilação:** gera um único `CofreSenhas.exe` nativo com o Nuitka e o compilador Zig. A primeira compilação leva de 5 a 20 minutos; as seguintes são bem mais rápidas, e uma falha **não recomeça do zero**.
+5. **Compilação:** gera um único `CofreSenhas.exe` nativo com o Nuitka e o compilador Zig. O Nuitka usa seu analisador PE embutido para mapear DLLs, sem baixar o Dependency Walker nem aguardar confirmação interativa. A primeira compilação leva de 5 a 20 minutos; as seguintes são bem mais rápidas, e uma falha **não recomeça do zero**.
 
 No fim, o instalador mostra o **SHA-256 do `.exe`** e uma tabela de tempo por etapa. **Anote o hash em papel**: é a única cópia confiável dele (o programa não grava mais esse valor em nenhum arquivo ao lado do `.exe`, porque um arquivo solto poderia ser trocado junto com ele).
 
@@ -646,7 +654,7 @@ Na primeira vez que abrir o `.exe`, o Windows pode avisar "Editor desconhecido".
 
 ### 10.7 Onde ficam os dados e quais arquivos aparecem
 
-Numa instalação portátil nova, a raiz do pendrive mostra só o **`CofreSenhas.exe`**. Se o instalador encontrar uma versão antiga em `H:\CofreSenhas`, ele oferece atualizá-la no mesmo local para manter o cofre existente. O restante fica oculto e protegido:
+Numa instalação portátil, o **`CofreSenhas.exe`** fica na raiz do pendrive. Se o instalador encontrar uma versão antiga em `H:\CofreSenhas`, o padrão (ENTER) instala o programa na raiz e mantém a pasta antiga intacta; os dados antigos não são movidos. Digite **1** para atualizar dentro da pasta antiga e continuar usando aquele cofre. O restante fica oculto e protegido:
 
 | Arquivo / pasta | Para que serve |
 |---|---|
@@ -665,7 +673,7 @@ Numa instalação portátil nova, a raiz do pendrive mostra só o **`CofreSenhas
 
 - O cofre é **portátil**: copiar o programa e o `cofre.dat` para outro PC funciona. A segurança vem da senha e da chave, não do computador (a menos que você ative *Computadores autorizados*).
 - Se o cofre estiver no disco do Windows, a tela de desbloqueio avisa. Salvar backup, modelo de planilha ou a chave de acesso no disco do Windows pede confirmação.
-- **Atualizar:** rode o instalador de novo; se encontrar uma instalação antiga em `H:\CofreSenhas`, ele oferece atualizá-la no mesmo local (padrão, preservando cofre, backups e chaves), instalar na raiz mantendo a pasta antiga intacta, ou apagar somente os arquivos antigos do programa após digitar `APAGAR`. Se já houver um executável no destino, também confirma antes de substituí-lo. **Desinstalar:** no modo portátil, apague os arquivos do cofre na raiz do pendrive; no modo computador, apague a pasta escolhida (não há registro, serviço nem atalho).
+- **Atualizar:** rode o instalador de novo; se encontrar uma instalação antiga em `H:\CofreSenhas`, o padrão (ENTER) instala o programa na raiz e mantém a pasta antiga intacta. Os cofres, backups e chaves antigos não são movidos; digite **1** para atualizar naquela pasta e continuar usando os dados existentes. A opção **3** apaga somente os arquivos antigos do programa após digitar `APAGAR`. Se já houver um executável no destino, também confirma antes de substituí-lo. **Desinstalar:** no modo portátil, apague os arquivos do cofre na raiz do pendrive; no modo computador, apague a pasta escolhida (não há registro, serviço nem atalho).
 
 ---
 
@@ -716,7 +724,7 @@ Versões exatas (todas fixas, com hash na instalação):
 
 | Biblioteca | Versão | Para quê |
 |---|---|---|
-| `cryptography` | 50.0.1 | AES-GCM, ChaCha20-Poly1305, HKDF, X25519 |
+| `cryptography` | 50.0.2 | AES-GCM, ChaCha20-Poly1305, HKDF, X25519 |
 | `argon2-cffi` / `argon2-cffi-bindings` | 25.1.0 / 26.1.0 | Argon2id |
 | `fido2` | 2.2.1 | Chave de segurança FIDO2 (hmac-secret/PRF) |
 | `openpyxl` / `et-xmlfile` | 3.1.5 / 2.0.0 | Leitura e geração de planilhas |
@@ -734,7 +742,7 @@ O programa **não usa** `eval`, `exec`, `pickle` nem `shell=True`, não guarda s
 
 O projeto tem uma bateria grande de testes, organizada por assunto. Cada teste trabalha numa pasta temporária (**nunca toca no seu `cofre.dat`**), termina com `TODOS OK` e devolve código de saída 0 (sucesso) ou 1 (falha), o que permite usar em integração contínua.
 
-### 14.1 As seis etapas obrigatórias e a etapa opcional 7
+### 14.1 As sete etapas
 
 Os números **1 a 6** abaixo são a ordem de execução do BAT, não o prefixo das pastas. Por exemplo, a etapa 2 (instalador) e a etapa 3 (Windows nativo) usam arquivos da pasta `4_TESTE_so_no_windows/`; a pasta `6_TESTE_ferramentas_dos_testes/` guarda o executor e scripts auxiliares/de relatório, não uma bateria. Os resultados gerados ficam em `testes/resultados/`.
 
@@ -746,8 +754,8 @@ Os números **1 a 6** abaixo são a ordem de execução do BAT, não o prefixo d
 | `testes/4_TESTE_so_no_windows/` | O que só vale no **Windows real**: sintaxe e funções do instalador (Pester), atributos de arquivo, ACL, SMBIOS × PowerShell, DPAPI, computador autorizado de ponta a ponta, blindagens/DLLs, WebAuthn e Windows Sandbox limpo. |
 | `testes/5_TESTE_ferramentas_externas/` | Ferramentas independentes do executável compilado: Bandit, pip-audit, Nmap local, PSScriptAnalyzer, busca de segredos, qualidade extra, SBOM, Hypothesis e verificação de integridade do repositório. O pytest é opcional no menu e repete as baterias 1 e 2. |
 | `testes/6_TESTE_ferramentas_dos_testes/` | **Não são testes:** executores, ajudantes, limpeza, geradores de relatórios, cobertura e ponte para o `pytest`. |
-| `testes/7_TESTE_de_compilacao/` | **Opcional, depois de compilar:** confere proteções PE com pefile, varre o executável com o Windows Defender e verifica as conexões do processo aberto. Os resultados ficam em `testes/resultados/`. |
-| `testes/resultados/` | Tudo que os testes geram (resultados individuais, `RESULTADO COMPLETO.txt` com todos eles reunidos, `resultado_rodar_todos_windows.txt`, `resumo_testes.md/json`, `resultados.sarif` e `log_depuracao.txt`). Os arquivos ficam diretamente nesta pasta, sem subpasta por rodada (não vai para o Git). |
+| `testes/7_TESTE_de_compilacao/` | **Depois de compilar:** confere proteções PE com pefile, varre o executável com o Windows Defender e verifica as conexões do processo aberto. Sem executável, registra `[PULADO]`. |
+| `testes/resultados/` | Relatórios individuais, resumos, SARIF e log. Os consolidados ficam separados em `testes/resultados/resultado completo/` (`RESULTADO COMPLETO.txt` e `resultado_rodar_todos_windows.txt`). A bateria nova limpa a anterior; não vai para o Git. |
 
 ### 14.2 Riscos cobertos
 
@@ -765,7 +773,7 @@ O [`PLANO_DE_TESTES.md`](testes/PLANO_DE_TESTES.md) organiza os testes por risco
 
 ### 14.3 Como rodar
 
-**No Windows (mais fácil):** primeiro rode **`3 - BAIXAR PACOTES - so para instalar sem internet.bat`** com internet para preparar os wheels das ferramentas; depois dê dois cliques em **`2 - TESTAR TUDO - roda todos os testes.bat`**. Ele executa as seis baterias obrigatórias: núcleo (incluindo a descoberta do teste Hypothesis), instalador, Windows nativo, interface, pentest e ferramentas externas 01, 02, 04, 05 e 08–10, 12–13. O pytest 03 fica fora porque repete as baterias 1 e 2. A pasta 7 é opcional: compile primeiro o `CofreSenhas.exe` e passe `POS-COMPILACAO` ao atalho para incluir a verificação PE, o Windows Defender e a rede do processo (este último exige o executável aberto). Sem os pré-requisitos, o relatório registra `[PULADO]`. Para executar somente essa pasta, rode `testes\7_TESTE_de_compilacao\RODAR ESTA PASTA - testes de compilacao.bat`. Exemplo combinado: `2 - TESTAR TUDO - roda todos os testes.bat H OFFLINE POS-COMPILACAO`. A etapa 6 consulta a base atual do `pip-audit` pela internet; `OFFLINE` pula essa consulta. Os resultados ficam diretamente em `testes\resultados\`, sem subpastas por rodada: `RESULTADO COMPLETO.txt` reúne o conteúdo de todos os arquivos individuais da rodada; `resultado_rodar_todos_windows.txt` reúne as etapas por bateria. Cada pasta de testes também tem o seu `.bat` ("RODAR ESTA PASTA - …") para rodar só aquela bateria.
+**No Windows (mais fácil):** primeiro rode **`3 - BAIXAR PACOTES - so para instalar sem internet.bat`** com internet para preparar os wheels das ferramentas; depois dê dois cliques em **`2 - TESTAR TUDO - roda todos os testes.bat`**. Ele executa as etapas 1 a 7: núcleo (incluindo Hypothesis), instalador, Windows nativo, interface, pentest, ferramentas externas e verificações pós-compilação. O pytest 03 fica fora porque repete as baterias 1 e 2. Compile o `CofreSenhas.exe` antes da etapa 7; sem executável ou processo aberto, o relatório registra `[PULADO]`. Para executar somente essa pasta, rode `testes\7_TESTE_de_compilacao\RODAR ESTA PASTA - testes de compilacao.bat`. Exemplo combinado: `2 - TESTAR TUDO - roda todos os testes.bat H OFFLINE POS-COMPILACAO` (o argumento POS-COMPILACAO é compatível, mas não é necessário). A etapa 6 consulta a base atual do `pip-audit` pela internet; `OFFLINE` pula essa consulta. Os resultados individuais ficam em `testes\resultados\`; os dois relatórios consolidados ficam em `testes\resultados\resultado completo\`: `RESULTADO COMPLETO.txt` reúne todos os arquivos individuais e `resultado_rodar_todos_windows.txt` reúne as etapas por bateria.
 
 **Pela linha de comando:**
 
@@ -782,12 +790,12 @@ Para a ponte opcional do pytest, use `testes\5_TESTE_ferramentas_externas\03_PYT
 ### 14.4 Relatórios, depuração e boas maneiras
 
 - **`log_depuracao.txt`**: saída **completa** (com tracebacks), horário, duração e comando de cada teste. É o arquivo para abrir quando algo falha.
-- **`RESULTADO COMPLETO.txt`**: conteúdo de todos os arquivos individuais `resultado_*.txt` da rodada, cada um com o nome do arquivo e separadores. Os arquivos individuais continuam disponíveis; a bateria completa do Windows gera novamente o TXT a cada execução.
+- **`testes\resultados\resultado completo\RESULTADO COMPLETO.txt`**: conteúdo de todos os arquivos individuais `resultado_*.txt` da rodada, cada um com o nome do arquivo e separadores. Os arquivos individuais continuam disponíveis; a bateria completa do Windows gera novamente o TXT a cada execução.
 - **`resumo_testes.md` / `.json` / `resultados.sarif`**: tabela legível, JSON comparável entre rodadas e SARIF só com as falhas.
 - **Bateria nova substitui a antiga:** `limpar_resultados.py` apaga os resultados anteriores antes de começar, para nunca misturar "ontem" com "hoje". No fim, `limpar_artefatos_testes.py` apaga pastas temporárias órfãs.
-- **Respeito ao seu PC:** os testes rodam em prioridade baixa, esperam haver RAM livre e fazem pausa entre si.
+- **Respeito ao seu PC:** por padrão, os testes rodam em prioridade baixa, esperam haver RAM livre e fazem pausa entre si. Para uma rodada autorizada em prioridade alta, defina `COFRE_TEST_HIGH_PRIORITY=1`; as janelas GUI continuam no segundo plano.
 - **Manifestos de teste:** `requirements-test-direct.in` guarda as dependências diretas com versões exatas (`==`); `requirements-test-lock.txt` é o lock gerado, com dependências transitivas e hashes, usado por `pip --require-hashes`. São duas etapas intencionais do mesmo fluxo, não cópias redundantes. Depois de alterar o arquivo de dependências diretas, regenere o lock com o comando em `testes\5_TESTE_ferramentas_externas\LEIA-ME.txt` e atualize `pacotes\` com `3 - BAIXAR PACOTES`.
-- **Ambiente e caches:** `testes\ambiente_virtual_ferramentas (NAO MEXER)` é um ambiente virtual persistente, ignorado pelo Git; não renomeie, mova ou apague: os atalhos dependem desse caminho. Caches temporários de Python, Hypothesis (incluindo os dados globais), Ruff, mypy, pytest e arquivos temporários dos testes ficam em `testes\CACHE\<execução>` e são removidos ao terminar; `CACHE` também desaparece quando fica vazia. Os testes não deixam `.hypothesis` nem `.ruff_cache` na raiz. Relatórios em `testes\resultados\` são mantidos.
+- **Ambiente e caches:** `testes\ambiente_virtual_ferramentas (NAO MEXER)` é um ambiente virtual persistente, ignorado pelo Git; não renomeie, mova ou apague: os atalhos dependem desse caminho. As baterias usam caches temporários em `testes\CACHE\<execução>` e os removem ao terminar; execuções diretas do programa ou Ruff também direcionam seus caches para subpastas de `testes\CACHE\`. Assim, não são criados `.hypothesis` nem `.ruff_cache` na raiz. Relatórios em `testes\resultados\` são mantidos.
 - **Ferramentas de teste:** o lock fixa versões exatas. Dependências de runtime e ferramentas são instaladas em ambiente virtual local a partir de `pacotes\`, sem acesso à rede. O pentest instala somente as bibliotecas essenciais do programa; ferramentas opcionais ausentes são puladas, sem impedir os demais testes. Pester também é carregado do pacote local. O Nmap vem como instalador local, mas requer instalação manual e pode solicitar privilégios/Npcap; sem ele, o teste registra `PULADO`. Relatórios ficam diretamente em `testes\resultados\`. Nmap verifica apenas `127.0.0.1`.
 - **Testes do executável:** pefile e Defender só podem analisar um `CofreSenhas.exe` compilado; o teste de rede exige que esse executável esteja aberto. Baixar dependências não cria nem abre o programa; cada relatório individual explica o pré-requisito ausente.
 - **Hypothesis:** `teste_propriedades_hypothesis.py` verifica ida e volta de cofres com dados gerados e entradas CSV hostis. O executor tenta instalá-lo do wheelhouse do núcleo quando disponível; se faltar, mostra `PULADO` com código 9, sem contar como aprovado nem como falha. Uma falha real do teste retorna código diferente e reprova a bateria. O atalho 12 permite rodá-lo isoladamente.
@@ -821,16 +829,18 @@ projeto-cofre-offline/
 │
 ├── README.md                                     # guia principal: uso, dependências, testes e mapa do projeto
 ├── 1 - INSTALAR O COFRE - compila e instala.bat  # instalador: dois cliques
-├── 2 - TESTAR TUDO - roda todos os testes.bat    # roda 6 baterias; POS-COMPILACAO inclui a etapa 7
+├── 2 - TESTAR TUDO - roda todos os testes.bat    # roda as etapas 1 a 7
 ├── 3 - BAIXAR PACOTES - so para instalar sem internet.bat # wheelhouse do cofre e das ferramentas de teste
 ├── baixar_pacotes_offline.ps1 # prepara Python, dependencias de teste, Pester e Nmap
 ├── ENVIAR PRO GITHUB.bat  # atalho de conveniência: git add + commit + push
 │
-├── cofre_senhas.py        # o programa inteiro (um arquivo só, fácil de auditar)
+├── cofre_senhas.py        # núcleo criptográfico e interface principal
+├── icones_marcas.py       # marcas, ícones locais e autocompletar offline
 ├── instalar_cofre.ps1     # o instalador que o "1 - INSTALAR..." chama por trás
 ├── requirements.txt         # runtime + compilação
 ├── requirements-test-direct.in    # entradas diretas fixadas; fonte para gerar o lock de testes
 ├── requirements-test-lock.txt  # lock de teste completo, com dependências transitivas e hashes
+├── ruff.toml              # mantém o cache Ruff em testes/CACHE
 ├── .gitignore
 ├── LICENSE                # licença de uso pessoal e estudo
 ├── SECURITY.md            # escopo de proteção e contato para relatos privados
@@ -865,7 +875,7 @@ projeto-cofre-offline/
 
 Este README é o único guia de entrada na raiz e explica os atalhos, arquivos e pastas para quem não é programador. Os manuais especializados em `documentacao/` e os guias em `testes/` continuam disponíveis para consulta detalhada. Cada pasta de testes tem um `INDICE.md` que explica **cada arquivo**; depois de criar, renomear ou apagar algo em `testes/`, atualize os índices com `python testes\6_TESTE_ferramentas_dos_testes\gerar_indices.py`.
 
-O programa é **um único arquivo** de propósito. Internamente é organizado em seções: núcleo criptográfico, avaliação de força, impressão, proteções do Windows, classe `Cofre`, importação, FIDO2, tema e ícones, componentes de interface e classe `App`.
+O núcleo criptográfico e a interface principal ficam em `cofre_senhas.py`, organizado em seções. `icones_marcas.py` concentra as marcas, os ícones gerados localmente e as sugestões offline do campo Serviço; não baixa logos nem consulta a rede.
 
 ```text
 cofre_senhas.py
@@ -877,6 +887,7 @@ cofre_senhas.py
 └── interface
     ├── tema e componentes
     └── class App               ← telas e ações; coordena a interface com Cofre
+icones_marcas.py                ← MARCAS, ALIASES, ícones Pillow e autocompletar offline
 ```
 
 As pastas numeradas de teste descrevem **assuntos**; a numeração do executor descreve **ordem de execução**. Por isso, a etapa 6 é a bateria de ferramentas externas, mas o executor fica na pasta `6_TESTE_ferramentas_dos_testes/`. A etapa 7 fica separada porque exige um executável já compilado.
@@ -922,7 +933,7 @@ Mesmo assim:
 | Sintoma | O que significa e o que fazer |
 |---|---|
 | *"A execução de scripts foi desabilitada neste sistema"* | Use o `1 - INSTALAR O COFRE...bat` (ele já usa `-ExecutionPolicy Bypass` só naquela execução). Se uma política de grupo (GPO) impedir até isso, instale em outro computador. |
-| O instalador recusa o hash dos 16 caracteres | Nunca avance. Confira se o `cofre_senhas.py` é o que você baixou e se digitou o hash que **o próprio instalador** mostrou. Arquivo diferente = abortar. |
+| O instalador recusa o hash dos 16 caracteres | Nunca avance. Confira se `cofre_senhas.py` e `icones_marcas.py` são os que você baixou e se digitou o hash combinado informado por quem forneceu o projeto. Arquivos diferentes = abortar. |
 | A compilação falhou ou foi interrompida | É só **rodar de novo**: o que já foi baixado e compilado fica no cache e é aproveitado. Veja `logs_de_compilacao\` e o `instalacao_detalhada.log` do destino. |
 | A tela parece parada na compilação | A etapa "Onefile Payload" costuma ficar muda alguns minutos. O instalador mostra `[vivo]` a cada 15 s; só considere travado se avisar em vermelho (10 min sem atividade). |
 | "Pouco espaço" na instalação | São necessários mais de 3 GB livres no destino. Apague a pasta `_cb_cache` se precisar liberar espaço. |
@@ -978,7 +989,7 @@ Pode guardar as senhas de várias pessoas (campo *Pessoa*), mas todas abrem com 
 O programa e as proteções são para Windows. Os testes do motor também rodam em Linux, mas isso é para desenvolvimento, não para uso.
 
 **Preciso confiar no `.exe` de alguém?**
-Não: você compila o seu, a partir do `cofre_senhas.py` que pode ler, com bibliotecas de versão e hash fixos.
+Não: você compila o seu, a partir dos fontes `cofre_senhas.py` e `icones_marcas.py`, que pode ler, com bibliotecas de versão e hash fixos.
 
 ---
 
@@ -1011,7 +1022,7 @@ Não: você compila o seu, a partir do `cofre_senhas.py` que pode ler, com bibli
 
 **Adotado de propósito:**
 
-- **Um arquivo só** (`cofre_senhas.py`): fácil de auditar e de conferir por hash.
+- **Um executável só para uso**; os fontes auditáveis são `cofre_senhas.py` e `icones_marcas.py`, conferidos individualmente e por hash combinado.
 - **Compilar na sua máquina**, com versões e hashes fixos, em vez de distribuir um `.exe`.
 - **Compilação e temporários no pendrive**, nunca no disco do Windows (preferência por segurança em vez de velocidade).
 - **Nada fora do `.exe`:** sem `.bat` nem `.sha256` ao lado dele, porque um arquivo solto poderia ser trocado junto.
@@ -1034,8 +1045,8 @@ Não: você compila o seu, a partir do `cofre_senhas.py` que pode ler, com bibli
 
 ## 23. Status e honestidade do projeto
 
-- Este é um **projeto pessoal**. Não passou por auditoria de segurança independente.
-- A última bateria completa registrada foi em 2026-11-20, no Windows 11 Pro 10.0.26300, Python 3.13.9 AMD64: 2.321 verificações `[OK]`, zero falhas e três testes condicionais pulados (pefile/Defender sem `.exe` compilado; conexões do processo sem o executável aberto). PSScriptAnalyzer e qualidade extra terminaram com `[ALERTA]`; por isso esse resultado não é um Go de release até os achados serem revisados. Alterações posteriores tiveram validações focadas (incluindo Pester e Hypothesis), mas a bateria completa não foi repetida depois delas. A matriz detalhada está em [`testes/COMO_RODAR_OS_TESTES.md`](testes/COMO_RODAR_OS_TESTES.md#status-do-windows-e-versões).
+- A **Arca é um produto da Arca Sistemas**. Não passou por auditoria de segurança independente.
+- A última bateria completa registrada foi em 2026-11-20, no Windows 11 Pro 10.0.26300, Python 3.13.9 AMD64: o consolidado registrou 2.344 verificações `[OK]`, 9 relatórios com falha/interrupção e zero testes marcados como `[PULADO]`. As quatro sondas `python -X dev` terminaram com violação de acesso `-1073741819` mesmo em comandos mínimos, sem carregar o Cofre; o defeito não foi localizado no programa, mas a causa exata entre o interpretador e o Windows não foi comprovada. PSScriptAnalyzer e qualidade extra também tiveram alertas. Esse resultado é No-Go. Alterações posteriores tiveram validações focadas (Pester 14/14, engenharia reversa e integridade dos pacotes), mas a bateria completa não foi repetida depois delas e a versão final ainda precisa ser validada com Python 3.13.17. A matriz detalhada está em [`testes/COMO_RODAR_OS_TESTES.md`](testes/COMO_RODAR_OS_TESTES.md#status-do-windows-e-versões).
 - Não há evidência de execução no Windows Sandbox. Também seguem sem validação: instalação/compilação ponta a ponta no Windows 11 x64, build nativo ARM64 (não suportado), assinatura digital opcional do `.exe` e uso com uma **chave FIDO2/PRF física real**.
 - A cobertura de código medida no Linux (motor + pentest, sem interface) foi de 32,1%; as faixas sem teste estão listadas por `cobertura_codigo_windows.bat`.
 - Versões antigas do programa **não abrem** cofres com o fator *computador*; backups feitos antes de ativá-lo continuam abrindo em qualquer computador. Cofres de formatos anteriores (`COFRE01`–`COFRE04`) são convertidos automaticamente para o atual (`COFRE05`).
@@ -1051,14 +1062,14 @@ Não: você compila o seu, a partir do `cofre_senhas.py` que pode ler, com bibli
 
 **Licença: Uso Pessoal e Estudo** (texto completo no arquivo [`LICENSE`](LICENSE)). O código é **visível**, mas **não é software livre nem open source**.
 
-| Você pode | Você NÃO pode sem autorização por escrito do autor |
+| Você pode | Você NÃO pode sem autorização por escrito da Arca Sistemas |
 |---|---|
 | Ler, estudar e auditar o código | Vender, alugar ou cobrar pelo software ou por versões dele |
 | Compilar e usar para uso **pessoal e não comercial** | Usar em empresa, órgão ou atividade que gere receita |
 | Fazer backup e modificar **para você mesmo** | Redistribuir ou publicar o código, o `.exe` ou versões modificadas |
 | Ver e fazer fork dentro do GitHub (termos da plataforma) | Remover a autoria ou dizer que a obra é sua |
 
-Para **uso comercial, revenda ou redistribuição**, peça autorização ao autor pelo perfil [@ebj355](https://github.com/ebj355). A autorização pode ser condicionada a pagamento.
+Para **uso comercial, revenda ou redistribuição**, peça autorização à **Arca Sistemas** pelo canal oficial informado pela empresa. A autorização pode ser condicionada a pagamento.
 
 ### 24.2 Sem garantia
 
@@ -1082,6 +1093,6 @@ O cofre usa bibliotecas de terceiros (lista exata em `requirements.txt`: `crypto
 
 ### 24.6 Autor e contato
 
-**Autor e manutenção:** [@ebj355](https://github.com/ebj355)
+**Titular e manutenção:** **Arca Sistemas**
 
-**Reportar um problema de segurança:** prefira avisar o autor em particular (pelo perfil do GitHub) antes de abrir uma issue pública com detalhes de uma vulnerabilidade.
+**Reportar um problema de segurança:** prefira avisar a Arca Sistemas em particular pelo canal oficial antes de abrir uma issue pública com detalhes de uma vulnerabilidade.

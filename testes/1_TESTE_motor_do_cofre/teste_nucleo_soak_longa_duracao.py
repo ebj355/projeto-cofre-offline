@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """SOAK TEST (longa duração) DO NÚCLEO: 1.000 ciclos seguidos de abrir -> alterar -> salvar -> fechar.
 
 Os outros testes repetem 20-30 ciclos; aqui o objetivo é achar o que só aparece com uso MUITO prolongado:

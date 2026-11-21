@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Limpeza ao bloquear: depois de bloquear não sobra lista, barra lateral, hash do detalhe com segredo nem campos revelados na memória."""
 import os as _os, sys as _sys, tempfile as _tf, subprocess as _sp
 _RAIZ = _os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Autochecagem do SHA-256 do programa ("Verificar integridade"): o hash calculado pelo cofre bate com o de uma conta
 independente (hashlib), muda se UM byte do arquivo mudar, tem 64 hex, e o programa não deixa arquivo .sha256 ao lado.
 Simula o .exe compilado (COMPILADO=True, argv[0]=arquivo) sem precisar do Nuitka. Roda no Linux e no Windows."""

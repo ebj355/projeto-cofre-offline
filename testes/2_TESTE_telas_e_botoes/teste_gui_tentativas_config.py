@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Tentativas erradas: as setas das caixas numéricas funcionam (clique real sobe/desce), a tela de criar NÃO mostra mais
 a opção (ela fica dentro do cofre, ⋯ > Tentativas erradas, e pede a senha mestra), a mudança é gravada no cofre e vale
 na autodestruição; a tela inicial não tem mais os textos cinza sem sentido. Roda no Windows ou no Linux (xvfb-run -a)."""

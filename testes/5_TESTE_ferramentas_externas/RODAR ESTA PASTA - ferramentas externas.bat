@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Bateria 5 (ferramentas externas) SEM menu e SEM pausas: ferramentas automaticas (01, 02, 04, 05 e 08 a 10, 12 e 13).
 rem E o que o rodar_todos_windows.bat chama. O pytest (03) fica so no menu, porque repete as baterias 1 e 2.
@@ -5,6 +6,11 @@ rem Ferramenta nao instalada = [PULADO]. Achados = [ALERTA] (revisao humana). Hy
 rem Resultado: testes\resultados\resultado_ferramentas_externas_windows.txt  (relatorios completos tambem em testes\resultados\)
 chcp 65001 >nul
 setlocal EnableExtensions
+if not defined COFRE_TEST_MINIMIZADO (
+  set "COFRE_TEST_MINIMIZADO=1"
+  start "" /min cmd.exe /d /c ""%~f0" %*"
+  exit /b
+)
 set "AQUI=%~dp0"
 set "COFRE_AUTO=1"
 set "FALHAS_TESTES=0"

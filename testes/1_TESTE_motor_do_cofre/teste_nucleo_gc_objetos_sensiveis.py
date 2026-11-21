@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """OBJETOS SENSÍVEIS E O COLETOR DE LIXO (gc) DO PYTHON.
 
 `teste_vazamento_memoria.py` e `teste_memoria.py` procuram sobras de senha na RAM por varredura de bytes. Este olha por

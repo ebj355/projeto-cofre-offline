@@ -1,4 +1,5 @@
-﻿# ============================================================================
+﻿# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
+# ============================================================================
 #  Desfaz os ajustes do aplicar_seguranca.ps1 (volta ao padrão de fábrica do Windows)
 #  - Liga de novo a reprodução automática de pendrives/CDs (autoplay)
 #  - Liga de novo o histórico da área de transferência (Win+V)

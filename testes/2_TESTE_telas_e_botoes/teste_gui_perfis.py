@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Teste de interface: ordem A→Z/Z→A, mover contas entre perfis (arrastar/menu), avaliação em tempo real,
 tela montada de uma vez e ausência do botão Gerador ao lado de 'Novo item'. Roda no Linux com xvfb-run."""
 import os, sys, tempfile

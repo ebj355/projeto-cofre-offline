@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Prepara dependencias de instalacao e de teste para uso offline. Precisa de internet somente nesta etapa.
 cd /d "%~dp0"

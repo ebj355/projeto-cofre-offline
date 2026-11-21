@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """FONTES NOMEADAS: preparar_fontes pode ser chamada de novo (mesma janela ou outra janela) sem erro. Antes, a segunda
 chamada falhava com "named font ... does not exist" no Python 3.14 do Windows (descartar o objeto Font antigo apagava a
 fonte nomeada no Tk e a configuração seguinte quebrava)."""

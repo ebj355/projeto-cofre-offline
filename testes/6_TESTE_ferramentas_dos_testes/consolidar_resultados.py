@@ -1,13 +1,15 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Junta os resultados individuais (testes/resultados/resultado_*.txt) em quatro relatórios, para ler tudo de uma vez:
   - resumo_testes.md     : tabela legível (um teste por linha, com contagem de [OK]/[FALHOU] e as linhas que falharam);
   - resumo_testes.json   : o mesmo em formato de máquina (para comparar uma rodada com a outra);
   - resultados.sarif     : formato SARIF 2.1.0 (só as falhas), aceito por ferramentas de revisão de código;
-  - RESULTADO COMPLETO.txt: conteúdo de todos os arquivos individuais resultado_*.txt.
+  - resultado completo/RESULTADO COMPLETO.txt: conteúdo de todos os arquivos individuais resultado_*.txt.
 Uso: python testes/6_TESTE_ferramentas_dos_testes/consolidar_resultados.py        Sai com código 1 se algum teste falhou ou não puder gerar o TXT completo.
 Não altera resultados individuais. Os resumos auxiliares são opcionais; falha ao gravar o TXT completo é informada."""
 import datetime, glob, json, os, re, sys
 
 PASTA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "resultados")
+PASTA_COMPLETO = os.path.join(PASTA, "resultado completo")
 TESTES = os.path.dirname(PASTA)
 RUIM = re.compile(r"\[FALHOU\]|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]")
 INCOMPLETO = re.compile(r"\bKeyboardInterrupt\b|\bTimeoutExpired\b", re.I)
@@ -44,7 +46,8 @@ def analisa(caminho):
 
 def gravar_resultado_completo(arqs, quando, total_ok, total_pulados, total_falhas):
     """Concatena os relatórios individuais em um TXT, sem carregar tudo na memória."""
-    destino = os.path.join(PASTA, "RESULTADO COMPLETO.txt")
+    os.makedirs(PASTA_COMPLETO, exist_ok=True)
+    destino = os.path.join(PASTA_COMPLETO, "RESULTADO COMPLETO.txt")
     with open(destino, "w", encoding="utf-8", errors="replace", newline="\n") as saida:
         saida.write("RESULTADO COMPLETO - Cofre de Senhas\n")
         saida.write("Gerado em: %s\n" % quando)
@@ -99,7 +102,7 @@ def main():
     total_pulados = sum(i["pulados"] for i in itens)
     md = ["# Resumo dos testes", "", "Gerado em %s | %d resultado(s) | %d verificações [OK] | %d resultado(s) com falha ou interrupção" % (
         quando, len(itens), total_ok, len(ruins)) + " | %d teste(s) pulado(s)" % total_pulados, "",
-        "Todas as baterias são gravadas diretamente em `testes/resultados/`, sem subpastas por rodada.", "",
+        "Relatórios individuais ficam em `testes/resultados/`; consolidados ficam em `testes/resultados/resultado completo/`.", "",
         "| Pasta | Testes encontrados | Resultado |", "|---|---:|---|"]
     for pasta in pastas:
         if pasta["pasta"] == "6_TESTE_ferramentas_dos_testes":
@@ -123,7 +126,7 @@ def main():
         md += ["", "## O que falhou"]
         for i in ruins:
             md += ["", "### " + i["nome"]] + ["- `%s`" % l.replace("`", "'") for l in i["linhas_ruins"]]
-    md += ["", "TXT com os resultados individuais: `testes/resultados/RESULTADO COMPLETO.txt`.",
+    md += ["", "TXT com os resultados individuais: `testes/resultados/resultado completo/RESULTADO COMPLETO.txt`.",
            "Detalhes completos (saída inteira, tracebacks): `testes/resultados/log_depuracao.txt`."]
     sarif = {"version": "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
              "runs": [{"tool": {"driver": {"name": "testes-cofre-de-senhas", "rules": [{"id": "TESTE-FALHOU"}]}},
@@ -147,7 +150,7 @@ def main():
         gravar_resultado_completo(arqs, quando, total_ok, total_pulados, len(ruins))
         completo_ok = True
     except OSError as ex:
-        print("ERRO: não foi possível gerar RESULTADO COMPLETO.txt: %s" % ex, file=sys.stderr)
+        print("ERRO: não foi possível gerar \"resultado completo/RESULTADO COMPLETO.txt\": %s" % ex, file=sys.stderr)
     return 1 if ruins or not completo_ok else 0
 
 

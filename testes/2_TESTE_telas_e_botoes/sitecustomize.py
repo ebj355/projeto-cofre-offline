@@ -1,5 +1,13 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Keeps automated Tk windows behind the user's active app on Windows."""
 import os
+import sys
+
+_raiz_projeto = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_cache_teste = os.environ.get("COFRE_TEST_CACHE_DIR") or os.path.join(_raiz_projeto, "testes", "CACHE")
+os.environ.setdefault("PYTHONPYCACHEPREFIX", os.path.join(_cache_teste, "pycache"))
+os.environ.setdefault("RUFF_CACHE_DIR", os.path.join(_cache_teste, "ruff"))
+sys.pycache_prefix = os.environ["PYTHONPYCACHEPREFIX"]
 
 
 if os.name == "nt" and os.environ.get("COFRE_GUI_TESTS_BACKGROUND") == "1":

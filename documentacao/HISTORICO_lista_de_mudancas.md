@@ -1,4 +1,7 @@
+<!-- ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt -->
 # Lista de mudanças (2026-11-16)
+
+> A **Arca**, produto da **Arca Sistemas**, é a marca atual do cofre. Os registros abaixo preservam os nomes técnicos e o contexto de quando cada mudança foi feita.
 
 ## 1. Programa (`cofre_senhas.py`)
 **Mudou / melhorou**
@@ -104,4 +107,4 @@ Núcleo, pentest e interface rodados: tudo passou, exceto itens que dependem do 
 - **Dependências de teste:** `requirements-test-direct.in` é a fonte de dependências diretas fixadas; `requirements-test-lock.txt` é o lock transitivo com hashes. O teste de integridade verifica a consistência dos dois.
 - **Caches:** caches transitórios de Python, Hypothesis, Ruff, mypy, pytest e arquivos temporários ficam em `testes\CACHE\<execução>` e são removidos ao fim; `CACHE` desaparece quando fica vazia. `testes\ambiente_virtual_ferramentas (NAO MEXER)` é persistente, separado dos caches e ignorado pelo Git.
 - **Automação e segurança:** workflow Windows em `.github\workflows\` permanece na raiz, e foi criado `SECURITY.md` com escopo de proteção e canal privado para relatos.
-- **Validação registrada:** bateria completa em Windows 11 Pro 10.0.26300 / Python 3.13.9 AMD64: 2.321 verificações OK, zero falhas, três pulos condicionais e alertas de PSScriptAnalyzer/qualidade extra. Validações focadas posteriores passaram Pester 12/12 e Hypothesis; a bateria completa não foi repetida após as últimas mudanças.
+- **Validação registrada:** bateria completa em Windows 11 Pro 10.0.26300 / Python 3.13.9 AMD64: 2.344 verificações OK e 9 relatórios com falha/interrupção, além de PSScriptAnalyzer e qualidade extra com alerta. Quatro sondas `-X dev` também falharam com `-1073741819` mesmo sem abrir o Cofre. Validações focadas posteriores passaram Pester 14/14 e engenharia reversa; a bateria completa não foi repetida após as últimas mudanças e não foi validada com Python 3.13.17.

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Velocidade de abertura: importação + tela de desbloqueio em menos de 2,5 s (sem contar o Argon2 de criar o cofre),
 e as bibliotecas pesadas (Excel/openpyxl, FIDO) só carregam quando são usadas (lazy)."""
 import os, sys, time, tempfile

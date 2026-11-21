@@ -1,9 +1,10 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 setlocal
 cd /d "%~dp0"
-title Cofre de Senhas - compilar e instalar
+title Arca - Cofre de Seguranca - compilar e instalar
 echo.
-echo  === COFRE DE SENHAS: iniciar a compilacao ===
+echo  === ARCA: iniciar a compilacao do cofre de seguranca ===
 echo  Pasta: %CD%
 echo.
 rem --- 1) conferencias antes de comecar (nada e instalado aqui) ---

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Teste SEVERO das modificações recentes: (1) impressão restrita (varredura estática do código + fuzz de títulos);
 (2) fator 'computador autorizado' sob adulteração (inverte bytes do arquivo, trunca, troca seções) — só pode dar erro
 conhecido, nunca abrir com dado errado nem travar; (3) tentativas e autodestruição com o fator; (4) segredo local

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Auxiliar dos testes (não é um teste): faz o teste gravar o SEU PRÓPRIO arquivo de resultado em
 testes/resultados/resultado_<nome-do-teste>.txt, além de mostrar tudo na tela como sempre.
 
@@ -238,7 +239,7 @@ def baixa_prioridade():
 
 # arquivos GERADOS por uma bateria (cada bateria nova apaga os da anterior, para nunca misturar "ontem" com "hoje")
 _GERADOS = ("resultado_*.txt", "RESULTADO COMPLETO.txt", "resumo_testes.md", "resumo_testes.json",
-            "resultados.sarif", "log_depuracao*.txt",
+            "resultados.sarif", "sbom.cdx.json", "log_depuracao*.txt",
             "limpeza_artefatos.txt", "cobertura_codigo.*", "cobertura_html.zip", ".coverage*", ".coveragerc", "*.tmp")
 
 
@@ -253,7 +254,10 @@ def limpar_resultados_antigos():
         caminho = os.path.join(pasta, nome)
         try:
             if os.path.isdir(caminho):
-                if nome == "cobertura_html" or nome.startswith("rodada_") or nome == "ferramentas_externas":
+                if nome == "resultado completo":
+                    shutil.rmtree(caminho)
+                    feitos.append("apagada pasta " + nome)
+                elif nome == "cobertura_html" or nome == "ferramentas_externas" or nome.startswith("rodada_"):
                     shutil.rmtree(caminho, True)
                     feitos.append("apagada pasta " + nome)
                 continue

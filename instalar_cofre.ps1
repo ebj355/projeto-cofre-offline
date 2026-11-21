@@ -1,12 +1,13 @@
-﻿# ============================================================================
-#  INSTALADOR AUTOMÁTICO DO COFRE DE SENHAS
+﻿# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
+# ============================================================================
+#  INSTALADOR AUTOMÁTICO DO ARCA — COFRE DE SEGURANÇA
 #  Faz tudo sozinho:
-#   1. confere o cofre_senhas.py que está AO LADO deste instalador (SHA-256 digitado por você)
+#   1. confere cofre_senhas.py e icones_marcas.py ao lado deste instalador (SHA-256 combinado digitado por você)
 #   2. instala o Python 3.13 se não houver (winget ou python.org, com assinatura e SHA-256 conferidos)
 #   3. instala as bibliotecas em versões FIXAS e com hash (pip --require-hashes)
 #   4. compila o CofreSenhas.exe (código nativo) DENTRO DO PENDRIVE, a partir de uma pasta limpa
 #   5. deixa o .exe no destino escolhido e mostra o SHA-256; ao detectar a instalação antiga em
-#      <pendrive>:\CofreSenhas, oferece atualizá-la no mesmo local sem apagar os dados
+#      <pendrive>:\CofreSenhas, instala por padrão na raiz e mantém a pasta antiga intacta
 #  O instalador PERGUNTA onde instalar: (1) pendrive/disco externo, recomendado, ou (2) uma pasta no computador.
 #  Em qualquer dos dois a compilação roda DENTRO do destino escolhido (e não em %LOCALAPPDATA%): nada do cofre,
 #  nem restos de compilação, vai parar em outro lugar. No pendrive ela é mais lenta (veja os tempos).
@@ -23,7 +24,7 @@
 #  Carregar este arquivo com ". .\instalar_cofre.ps1" só define as funções; não instala nada.
 # ----------------------------------------------------------------------------
 function Confirmar-PalavraApagar([string]$valor) {
-    return $valor -ieq 'APAGAR'
+    return $valor -ceq 'APAGAR'
 }
 
 function Test-PrefixoSha256([string]$hashCompleto, [string]$digitado) {
@@ -31,6 +32,18 @@ function Test-PrefixoSha256([string]$hashCompleto, [string]$digitado) {
     $d = "$digitado".Trim()
     if ($d.Length -lt 16 -or $d -notmatch '^[0-9A-Fa-f]+$') { return $false }
     return ("$hashCompleto").StartsWith($d, [System.StringComparison]::OrdinalIgnoreCase)
+}
+function Get-HashFonteConjunto([string]$hashPrincipal, [string]$hashIcones) {
+    $principal = "$hashPrincipal".ToUpperInvariant()
+    $icones = "$hashIcones".ToUpperInvariant()
+    if ($principal -notmatch '^[0-9A-F]{64}$' -or $icones -notmatch '^[0-9A-F]{64}$') {
+        throw 'Os hashes dos arquivos-fonte devem ter 64 caracteres hexadecimais.'
+    }
+    $texto = "cofre_senhas.py=$principal`nicones_marcas.py=$icones`n"
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        return [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($texto))).Replace('-', '')
+    } finally { $sha.Dispose() }
 }
 function Test-ArquiteturaArm([string]$arq) { return ("$arq" -match 'arm64') }
 function Get-AvisoSistemaArquivos([string]$fs) {
@@ -125,7 +138,7 @@ function Get-InstalacaoLegada([string]$destino) {
     $itemPasta = Get-Item -LiteralPath $pasta -Force -ErrorAction Stop
     $itens = @(Get-ChildItem -LiteralPath $pasta -Force -File -ErrorAction Stop)
     $nomesPrograma = @('CofreSenhas.exe', 'CofreSenhas-arm64.exe', 'Abrir_Cofre.bat',
-                       'CofreSenhas.sha256', 'CofreSenhas-arm64.sha256', 'cofre_senhas.py')
+                       'CofreSenhas.sha256', 'CofreSenhas-arm64.sha256', 'cofre_senhas.py', 'icones_marcas.py')
     $programas = @($itens | Where-Object { $_.Name -in $nomesPrograma } | ForEach-Object { $_.Name })
     $cofres = @($itens | Where-Object { $_.Name -like 'cofre.dat*' } | ForEach-Object { $_.Name })
     $chaves = @($itens | Where-Object { $_.Extension -ieq '.key' } | ForEach-Object { $_.Name })
@@ -138,9 +151,14 @@ function Get-InstalacaoLegada([string]$destino) {
         ReparsePoint = [bool]($itemPasta.Attributes -band [IO.FileAttributes]::ReparsePoint)
     }
 }
+function Get-OpcaoInstalacaoLegada([string]$resposta) {
+    $opcao = "$resposta".Trim()
+    if (-not $opcao) { return '2' }
+    return $opcao
+}
 function Remove-ProgramaLegado([string]$pasta) {
     $nomes = @('CofreSenhas.exe', 'CofreSenhas-arm64.exe', 'Abrir_Cofre.bat',
-               'CofreSenhas.sha256', 'CofreSenhas-arm64.sha256', 'cofre_senhas.py')
+               'CofreSenhas.sha256', 'CofreSenhas-arm64.sha256', 'cofre_senhas.py', 'icones_marcas.py')
     $removidos = @()
     $falhas = @()
     foreach ($nome in $nomes) {
@@ -211,7 +229,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
         }
     } catch {}
     Clear-Host
-    Write-Host "INSTALADOR DO COFRE DE SENHAS" -ForegroundColor Cyan
+    Write-Host "INSTALADOR DO ARCA — COFRE DE SEGURANÇA" -ForegroundColor Cyan
     Write-Host "Não feche esta janela. A 1ª compilação leva de 5 a 20 minutos; as seguintes são bem mais rápidas." -ForegroundColor Cyan
     Write-Host "Se algo falhar, é só rodar de novo: o que já foi baixado e compilado fica guardado e é aproveitado." -ForegroundColor Cyan
     Write-Host "A cada 15 segundos a compilação mostra que está viva (tempo, uso do processador)." -ForegroundColor Cyan
@@ -340,7 +358,13 @@ function Instalar-Cofre([string]$LetraPedida = '') {
             try {
                 $meuSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
                 $saidaAcl = & icacls.exe $resp /inheritance:r /grant:r "*${meuSid}:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" 2>&1 | Out-String
-                if ($LASTEXITCODE -eq 0) { Ok "pasta trancada: só a sua conta do Windows (e o sistema) acessa $resp" }
+                $codigoAcl = $LASTEXITCODE
+                if ($codigoAcl -eq 0) {
+                    $saidaRemocao = & icacls.exe $resp /remove:g "*S-1-1-0" "*S-1-5-11" "*S-1-5-32-545" 2>&1 | Out-String
+                    $codigoAcl = $LASTEXITCODE
+                    if ($codigoAcl -ne 0) { $saidaAcl += $saidaRemocao }
+                }
+                if ($codigoAcl -eq 0) { Ok "pasta trancada: só a sua conta do Windows (e o sistema) acessa $resp" }
                 else { Info "aviso: não consegui restringir as permissões da pasta (disco sem NTFS?): $($saidaAcl.Trim())" }
             } catch { Info "aviso: não consegui restringir as permissões da pasta: $($_.Exception.Message)" }
             $pastaPc = $resp
@@ -383,6 +407,21 @@ function Instalar-Cofre([string]$LetraPedida = '') {
         Write-Host ""
     }
     $destino = if ($modoPc) { $pastaPc } else { "$($letra):\" }
+    if ($avisoFs -and -not $modoPc) {
+        $marcadorNtfs = Join-Path $destino 'exigir_ntfs.txt'
+        $respostaNtfs = Read-Host "   Deseja ativar a opção de exigir NTFS e recusar FAT32/exFAT? Digite SIM para ativar [ENTER = não]"
+        if ($respostaNtfs -eq 'SIM') {
+            try {
+                Set-Content -LiteralPath $marcadorNtfs -Value 'Exige NTFS/ReFS: escolhido pelo dono na instalação.' -Encoding UTF8
+                Ok "opção escolhida: esta cópia recusa FAT32/exFAT (exigir_ntfs.txt)"
+            } catch {
+                Info "não consegui ativar a opção NTFS: $($_.Exception.Message)"
+            }
+        } else {
+            Remove-Item -LiteralPath $marcadorNtfs -Force -ErrorAction SilentlyContinue
+            Info "opção não ativada: esta cópia continua como só-alerta em FAT32/exFAT"
+        }
+    }
     $confirmouVersaoAnterior = $false
     $instalacaoLegada = Get-InstalacaoLegada $destino
     if ($instalacaoLegada) {
@@ -395,8 +434,9 @@ function Instalar-Cofre([string]$LetraPedida = '') {
                 Write-Host "   Há $($instalacaoLegada.Cofres.Count) arquivo(s) do cofre e $($instalacaoLegada.Chaves.Count) chave(s)." -ForegroundColor Yellow
                 Write-Host "   Atualizar não apaga o cofre, os backups nem as chaves; a próxima tela oferece separadamente a opção APAGAR." -ForegroundColor Green
             }
-            Write-Host "     1 = ATUALIZAR nessa pasta (ENTER = 1): substitui o programa antigo e mantém os dados"
-            Write-Host "     2 = Instalar em $destino e deixar a pasta antiga intacta"
+            Write-Host "     1 = ATUALIZAR nessa pasta: substitui o programa antigo e mantém os dados (digite 1)"
+            Write-Host "     2 = Instalar em $destino e deixar a pasta antiga intacta (ENTER = 2)"
+            Write-Host "         O cofre e as chaves da pasta antiga não serão movidos para o novo destino."
             if ($instalacaoLegada.Programas.Count -gt 0) {
                 Write-Host "     3 = Apagar só os arquivos antigos do programa; manter cofre, backups e chaves"
             }
@@ -404,8 +444,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
                 $opcaoLegada = '1'
                 Info "[MODO TESTE] atualizando no local antigo; dados preservados."
             } else {
-                $opcaoLegada = (Read-Host "   Escolha 1, 2 ou 3").Trim()
-                if (-not $opcaoLegada) { $opcaoLegada = '1' }
+                $opcaoLegada = Get-OpcaoInstalacaoLegada (Read-Host "   Escolha 1, 2 ou 3 [ENTER = 2]")
             }
             if ($opcaoLegada -eq '1') {
                 $destino = $instalacaoLegada.Path
@@ -449,7 +488,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     $base = "$raizObra\_cb"
     $velha = Join-Path $destino '_compilacao'
     if (Test-Path $velha) { Remove-Item $velha -Recurse -Force -ErrorAction SilentlyContinue }
-    # A pasta _cb (ambiente virtual, zig.exe, módulos, cópia do fonte) é apagada por inteiro e refeita a cada vez:
+    # A pasta _cb (ambiente virtual, zig.exe, módulos e cópias dos fontes) é apagada por inteiro e refeita a cada vez:
     # um .exe, zig.exe ou módulo Python plantado ali nunca é executado nem embutido no programa.
     # O que fica entre execuções está em _cb_cache e só tem o que é conferido por hash (downloads do pip),
     # o cache do compilador (endereçado pelo conteúdo) e o resultado parcial da compilação.
@@ -582,7 +621,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     }
 
     # ------------------------------------------------------------------
-    Etapa "1/5  Conferindo o arquivo cofre_senhas.py"
+    Etapa "1/5  Conferindo os arquivos-fonte"
     # Só o arquivo AO LADO do instalador: nada de procurar em Downloads/Documentos, onde qualquer programa
     # do seu usuário poderia plantar um "cofre" falso para ser compilado.
     $pasta = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
@@ -591,28 +630,39 @@ function Instalar-Cofre([string]$LetraPedida = '') {
         Erro "Não achei o cofre_senhas.py na MESMA pasta do instalador ($pasta). Coloque os dois juntos e rode de novo."
         return
     }
+    $moduloIcones = Get-Item -LiteralPath (Join-Path $pasta 'icones_marcas.py') -ErrorAction SilentlyContinue
+    if (-not $moduloIcones) {
+        Erro "Não achei o icones_marcas.py na MESMA pasta do instalador ($pasta). Coloque os dois arquivos juntos e rode de novo."
+        return
+    }
     function Versao-Do-Cofre($arq) {
         $m = Select-String -LiteralPath $arq.FullName -Pattern 'VERSAO_PROGRAMA = "([0-9.]+)"' -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($m) { try { return [version]$m.Matches[0].Groups[1].Value } catch {} }
         return [version]'0.0'
     }
-    $hashFonteTxt = (Get-FileHash -LiteralPath $fonte.FullName -Algorithm SHA256).Hash
+    $hashPrincipal = (Get-FileHash -LiteralPath $fonte.FullName -Algorithm SHA256).Hash
+    $hashIcones = (Get-FileHash -LiteralPath $moduloIcones.FullName -Algorithm SHA256).Hash
+    $hashFonteTxt = Get-HashFonteConjunto $hashPrincipal $hashIcones
     Write-Host ""
     Sep
     Write-Host "   Arquivo que será compilado:" -ForegroundColor White
     Write-Host "     $($fonte.FullName)" -ForegroundColor Gray
     Write-Host "     Versão: $(Versao-Do-Cofre $fonte)" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "   SHA-256 deste arquivo:" -ForegroundColor White
+    Write-Host "   SHA-256 de cofre_senhas.py:" -ForegroundColor White
+    Write-Host "     $hashPrincipal" -ForegroundColor Yellow
+    Write-Host "   SHA-256 de icones_marcas.py:" -ForegroundColor White
+    Write-Host "     $hashIcones" -ForegroundColor Yellow
+    Write-Host "   SHA-256 combinado dos dois arquivos (este é o hash a conferir):" -ForegroundColor White
     Write-Host "     $hashFonteTxt" -ForegroundColor Yellow
     Sep
     Write-Host ""
     Write-Host "   Por que confirmar isso:" -ForegroundColor White
-    Write-Host "     Esse SHA-256 identifica exatamente o código que vai virar o seu cofre." -ForegroundColor Gray
+    Write-Host "     Esse SHA-256 combinado identifica exatamente os dois arquivos que vão virar o seu cofre." -ForegroundColor Gray
     Write-Host "     Compare com o que foi informado a você (por quem entregou o arquivo)." -ForegroundColor Gray
     Write-Host ""
     Write-Host "   DICA:" -ForegroundColor White
-    Write-Host "     Copie o número da MENSAGEM de quem entregou e COLE aqui (botão direito do mouse)." -ForegroundColor Gray
+    Write-Host "     Copie o hash combinado da MENSAGEM de quem entregou e COLE aqui (botão direito do mouse)." -ForegroundColor Gray
     Write-Host "     Não copie da tela acima: colar o número calculado pelo próprio arquivo não prova nada." -ForegroundColor Gray
     Write-Host ""
     if ($testeSandbox) {
@@ -623,41 +673,50 @@ function Instalar-Cofre([string]$LetraPedida = '') {
         Sep
     } else {
         Sep
-        $resp = "$(Read-Host '   Cole (ou digite) os 16 primeiros caracteres do SHA-256 informado  (obrigatório; N = cancelar)')".Trim()
+        $resp = "$(Read-Host '   Cole (ou digite) os 16 primeiros caracteres do SHA-256 combinado informado  (obrigatório; N = cancelar)')".Trim()
         Sep
         if ($resp -match '^[nN]?$') { Erro "Cancelado: a conferência do SHA-256 é obrigatória."; return }
     }
     if (-not (Test-PrefixoSha256 $hashFonteTxt $resp)) {
-        Erro "O SHA-256 digitado NÃO confere com o arquivo (ou tem menos de 16 caracteres). Pode ser outro arquivo. Nada foi compilado."
+        Erro "O SHA-256 combinado digitado NÃO confere com os arquivos (ou tem menos de 16 caracteres). Pode ser outro projeto. Nada foi compilado."
         return
     }
     Ok "SHA-256 conferido com o que você informou"
     $conteudo = Get-Content -LiteralPath $fonte.FullName -Raw -Encoding UTF8
-    if ($conteudo -notmatch 'class Cofre' -or $conteudo -notmatch 'MAGIC = b"COFRE0[4-9]' -or $conteudo -notmatch 'VERSAO_PROGRAMA = "') {
-        Erro "O arquivo $($fonte.FullName) não é a versão atual do cofre. Baixe novamente o cofre_senhas.py."
+    $conteudoIcones = Get-Content -LiteralPath $moduloIcones.FullName -Raw -Encoding UTF8
+    if ($conteudo -notmatch 'class Cofre' -or $conteudo -notmatch 'MAGIC = b"COFRE0[4-9]' -or
+        $conteudo -notmatch 'VERSAO_PROGRAMA = "' -or $conteudoIcones -notmatch 'class AutocompletarMarcas' -or
+        $conteudoIcones -notmatch 'MARCAS_EXTRA') {
+        Erro "Os arquivos-fonte não correspondem à versão atual do cofre. Baixe novamente o projeto completo."
         return
     }
-    # Pasta de compilação SÓ com o fonte: o compilador embute o que estiver ao lado dele (um argon2.py plantado
-    # ali iria para dentro do .exe).
+    # Pasta de compilação só com os dois fontes verificados; módulos adicionais não verificados não são embutidos.
     $src = Join-Path $base 'src'
     New-Item -ItemType Directory -Path $src -Force | Out-Null
     $fonteCopia = Join-Path $src 'cofre_senhas.py'
+    $iconesCopia = Join-Path $src 'icones_marcas.py'
     Copy-Item -LiteralPath $fonte.FullName -Destination $fonteCopia -Force
+    Copy-Item -LiteralPath $moduloIcones.FullName -Destination $iconesCopia -Force
     function Conferir-Copia {
-        $h = (Get-FileHash -LiteralPath $fonteCopia -Algorithm SHA256).Hash
-        if ($h -ne $hashFonteTxt) {
-            Erro "O arquivo copiado para $src MUDOU depois da conferência do SHA-256 (alguém ou algum programa o alterou). Nada foi compilado."
+        $hPrincipal = (Get-FileHash -LiteralPath $fonteCopia -Algorithm SHA256).Hash
+        $hIcones = (Get-FileHash -LiteralPath $iconesCopia -Algorithm SHA256).Hash
+        if ($hPrincipal -ne $hashPrincipal -or $hIcones -ne $hashIcones -or
+            (Get-HashFonteConjunto $hPrincipal $hIcones) -ne $hashFonteTxt) {
+            Erro "Um dos arquivos-fonte copiados para $src MUDOU depois da conferência do hash combinado. Nada foi compilado."
             return $false
         }
         return $true
     }
     if (-not (Conferir-Copia)) { return }
-    # somente leitura logo após a conferência (dificulta troca entre a conferência e a compilação); o hash é refeito antes do compilador
-    try { Set-ItemProperty -LiteralPath $fonteCopia -Name IsReadOnly -Value $true -ErrorAction Stop } catch { Info "aviso: não consegui marcar a cópia como somente leitura (a conferência do hash continua valendo)." }
+    # Somente leitura após a conferência; ambos os hashes são refeitos antes do compilador.
+    foreach ($copiaFonte in @($fonteCopia, $iconesCopia)) {
+        try { Set-ItemProperty -LiteralPath $copiaFonte -Name IsReadOnly -Value $true -ErrorAction Stop }
+        catch { Info "aviso: não consegui marcar $copiaFonte como somente leitura (a conferência do hash continua valendo)." }
+    }
     Ok "usando $($fonte.FullName) (versão $(Versao-Do-Cofre $fonte), modificado em $($fonte.LastWriteTime.ToString('dd/MM/yyyy HH:mm')))"
     $exe = Join-Path $obra 'CofreSenhas.exe'
     $final = Join-Path $destino 'CofreSenhas.exe'
-    Marca '1/5 Conferência do cofre_senhas.py'
+    Marca '1/5 Conferência dos arquivos-fonte'
 
     # ------------------------------------------------------------------
     Etapa "2/5  Verificando o Python"
@@ -796,6 +855,7 @@ argon2-cffi-bindings==26.1.0 --hash=sha256:2c36ff87b5dfaa477d0bd51e9d7f6abdae7c8
 openpyxl==3.1.5 --hash=sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2
 defusedxml==0.7.1 --hash=sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
 fido2==2.2.1 --hash=sha256:ed397da981b9ab133da6ead7309e41f924b566b749956129efe286fae097749f
+pillow==13.0.0 --hash=sha256:d7710eb676e9bb68965cb045be0d333b4c0d7f9dfbaa7fbf121385b1588683d3 --hash=sha256:ff3fe9eb621fbb9db4c4be33ab946f6bac5f98ab50ca8d3260503653656c961b --hash=sha256:9dda0788a9932776a75d8bcc020076edc308ce2508b51f6739a45e3158b3fc42
 ordered-set==4.1.0 --hash=sha256:046e1132c71fcf3330438a539928932caf51ddbc582496833e23de611de14562
 zstandard==0.25.0 --hash=sha256:daab68faadb847063d0c56f361a289c4f268706b598afbf9ad113cbe5c38b6b2 --hash=sha256:ffef5a74088f1e09947aecf91011136665152e0b4b359c42be3373897fb39b01 --hash=sha256:1f830a0dac88719af0ae43b8b2d6aef487d437036468ef3c2ea59c51f9d55fd5 --hash=sha256:22a06c5df3751bb7dc67406f5374734ccee8ed37fc5981bf1ad7041831fa1137 --hash=sha256:181eb40e0b6a29b3cd2849f825e0fa34397f649170673d385f3598ae17cca2e9 --hash=sha256:85304a43f4d513f5464ceb938aa02c1e78c2943b29f44a750b48b25ac999a049
 cffi==2.1.1 --hash=sha256:42f6930c31dc7f50732c9ae793c2786c7b6b044195967bbdde40bb9be81c4cc0 --hash=sha256:f53e442b08449d42821fa4a4fba000095af9f62742a500f978a9f557ec44339a --hash=sha256:1aa5645c30469b09530c4ebca77ebf8f17618293c58f8549cb1a543a50236e7d --hash=sha256:c7659f22557c5a0bc4855cd635f55edec690cc008a40768527762cb9fb263455 --hash=sha256:7bde5e4cc5c10140859842b9d383af292b22639a4dffb725314baf45968cef80 --hash=sha256:63bbfd5ded17c4840ac07cd8f1c21ba9d9708141f840b324f422f41b207e3973
@@ -926,7 +986,7 @@ print(a)
     Info "O aviso do Nuitka sobre '{PROGRAM_BASE}' é esperado (é o que mantém tudo no pendrive)."
     # Ícone do programa (gerado aqui, sem baixar nada) + dados do arquivo (nome, versão): o .exe não sai com o ícone do Python
     $ico = Join-Path $base 'cofre.ico'
-    [IO.File]::WriteAllBytes($ico, [Convert]::FromBase64String('AAABAAMAEBAAAAEAIABoBAAANgAAACAgAAABACAAqBAAAJ4EAAAwMAAAAQAgAKglAABGFQAAKAAAABAAAAAgAAAAAQAgAAAAAABABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOpRWkDqUVpA6lFaQOpRWkDqUVpA6lFaQOpRWkDqUVpA6lFaQOpRWkAAAAAAAAAAAAAAAAAAAAAA6lFaMOpRWt/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa3+pRWjAAAAAAAAAAAOpRWt/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVrfAAAAAOpRWkDqUVr/6lFa/+pRWv/vfIP/9Kis//SorP/0qKz/9Kis//SorP/0qKz/73yD/+pRWv/qUVr/6lFa/+pRWkDqUVpA6lFa/+pRWv/qUVr/9Kis/////////////vT1//709f////////////SorP/qUVr/6lFa/+pRWv/qUVpA6lFaQOpRWv/qUVr/6lFa//SorP////////////azt//2s7f////////////0qKz/6lFa/+pRWv/qUVr/6lFaQOpRWkDqUVr/6lFa/+pRWv/0qKz////////////rXGT/61xk////////////9Kis/+pRWv/qUVr/6lFa/+pRWkDqUVpA6lFa/+pRWv/qUVr/9Kis////////////+97g//ve4P////////////SorP/qUVr/6lFa/+pRWv/qUVpA6lFaQOpRWv/qUVr/6lFa//SorP/73uD/73yD/+98g//vfIP/73yD//ve4P/0qKz/6lFa/+pRWv/qUVr/6lFaQOpRWkDqUVr/6lFa/+pRWv/xh47//////+5yef/qUVr/6lFa/+5yef//////8YeO/+pRWv/qUVr/6lFa/+pRWkDqUVpA6lFa/+pRWv/qUVr/6lFa//rU1v/+9PX/9Kis//SorP/+9PX/+tTW/+pRWv/qUVr/6lFa/+pRWv/qUVpA6lFaQOpRWv/qUVr/6lFa/+pRWv/rXGT/9Kis//rU1v/61Nb/9Kis/+tcZP/qUVr/6lFa/+pRWv/qUVr/6lFaQOpRWkDqUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWkAAAAAA6lFa3+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWt8AAAAAAAAAAOpRWjDqUVrf6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWt/qUVowAAAAAAAAAAAAAAAAAAAAAOpRWkDqUVpA6lFaQOpRWkDqUVpA6lFaQOpRWkDqUVpA6lFaQOpRWkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKAAAACAAAABAAAAAAQAgAAAAAACAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADqUVog6lFacOpRWq/qUVq/6lFav+pRWr/qUVq/6lFav+pRWr/qUVq/6lFav+pRWr/qUVq/6lFav+pRWr/qUVq/6lFav+pRWr/qUVq/6lFar+pRWnDqUVogAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADqUVoQ6lFaj+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVqP6lFaEAAAAAAAAAAAAAAAAAAAAAAAAAAA6lFaEOpRWs/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVrP6lFaEAAAAAAAAAAAAAAAAAAAAADqUVqP6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVqPAAAAAAAAAAAAAAAA6lFaIOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVogAAAAAAAAAADqUVpw6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWnAAAAAAAAAAAOpRWq/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr////////////////////////////////////////////////////////////////////////////qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFarwAAAAAAAAAA6lFav+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv///////////////////////////////////////////////////////////////////////////+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVq/AAAAAAAAAADqUVq/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa//////////////////////////////////rU1v/61Nb/////////////////////////////////6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWr8AAAAAAAAAAOpRWr/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/////////////////////////////////9Kis//SorP/////////////////////////////////qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFavwAAAAAAAAAA6lFav+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv////////////////////////////e+wf/qUVr/6lFa//e+wf///////////////////////////+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVq/AAAAAAAAAADqUVq/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa////////////////////////////7Wdv/+pRWv/qUVr/7Wdv////////////////////////////6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWr8AAAAAAAAAAOpRWr/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr////////////////////////////vfIP/6lFa/+pRWv/vfIP////////////////////////////qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFavwAAAAAAAAAA6lFav+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv////////////////////////////zp6v/ykpj/8pKY//zp6v///////////////////////////+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVq/AAAAAAAAAADqUVq/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa////////////////////////////////////////////////////////////////////////////6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWr8AAAAAAAAAAOpRWr/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr////////////86er/+tTW//rU1v/61Nb/+tTW//rU1v/61Nb/+tTW//rU1v/86er////////////qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFavwAAAAAAAAAA6lFav+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv////////////e+wf/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa//e+wf///////////+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVq/AAAAAAAAAADqUVq/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa//ve4P///////Onq/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr//Onq///////73uD/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWr8AAAAAAAAAAOpRWr/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/852i////////////977B/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa//e+wf////////////Odov/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFavwAAAAAAAAAA6lFav+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/+97g////////////+MnL/+1nb//qUVr/6lFa/+1nb//4ycv////////////73uD/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVq/AAAAAAAAAADqUVq/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/ucnn//vT1/////////////////////////////////////////////vT1/+5yef/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWr8AAAAAAAAAAOpRWr/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/tZ2//+tTW//////////////////////////////////rU1v/tZ2//6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFavwAAAAAAAAAA6lFav+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/7nJ5//SorP/61Nb/+tTW//SorP/ucnn/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVq/AAAAAAAAAADqUVqv6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWq8AAAAAAAAAAOpRWnDqUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFacAAAAAAAAAAA6lFaIOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVogAAAAAAAAAAAAAAAA6lFaj+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFajwAAAAAAAAAAAAAAAAAAAADqUVoQ6lFaz+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWs/qUVoQAAAAAAAAAAAAAAAAAAAAAAAAAADqUVoQ6lFaj+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVqP6lFaEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA6lFaIOpRWnDqUVqv6lFav+pRWr/qUVq/6lFav+pRWr/qUVq/6lFav+pRWr/qUVq/6lFav+pRWr/qUVq/6lFav+pRWr/qUVq/6lFav+pRWq/qUVpw6lFaIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgAAAAwAAAAYAAAAAEAIAAAAAAAgCUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOpRWlDqUVqf6lFa3+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa3+pRWp/qUVpQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADqUVpA6lFaz+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFaz+pRWkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOpRWmDqUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVpgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA6lFaYOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFaYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADqUVpA6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADqUVrP6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWs8AAAAAAAAAAAAAAAAAAAAAAAAAAOpRWlDqUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVpQAAAAAAAAAAAAAAAAAAAAAOpRWp/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVqfAAAAAAAAAAAAAAAAAAAAAOpRWt/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/73yD//SorP/0qKz/9Kis//SorP/0qKz/9Kis//SorP/0qKz/9Kis//SorP/0qKz/9Kis//SorP/0qKz/9Kis//SorP/0qKz/9Kis//SorP/0qKz/73yD/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVrfAAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis////////////////////////////////////////////////////////////////////////////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis////////////////////////////////////////////////////////////////////////////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis////////////////////////////////////////////////////////////////////////////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis//////////////////////////////////////////////////e+wf/3vsH/////////////////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis/////////////////////////////////////////////////+98g//vfIP/////////////////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis////////////////////////////////////////////+tTW/+1nb//tZ2//+tTW////////////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis///////////////////////////////////////4ycv/6lFa/+pRWv/qUVr/6lFa//jJy///////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis///////////////////////////////////////vfIP/6lFa/+pRWv/qUVr/6lFa/+98g///////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis///////////////////////////////////////ucnn/6lFa/+pRWv/qUVr/6lFa/+5yef//////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis///////////////////////////////////////znaL/6lFa/+pRWv/qUVr/6lFa//Odov//////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis///////////////////////////////////////+9PX/8pKY/+pRWv/qUVr/8pKY//709f//////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis////////////////////////////////////////////////////////////////////////////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis////////////////////////////////////////////////////////////////////////////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis////////////////////////////////////////////////////////////////////////////////////////////////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis/////////////////+98g//qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/vfIP/////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/9Kis//////////////////SorP/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/0qKz/////////////////9Kis/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/73yD//////////////////ve4P/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/73uD/////////////////73yD/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa//709f/////////////////vfIP/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+98g//////////////////+9PX/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa//SorP/////////////////+9PX/7nJ5/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/7nJ5//709f/////////////////0qKz/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+tcZP/+9PX//////////////////vT1//GHjv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/xh47//vT1//////////////////709f/rXGT/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/xh47////////////////////////////73uD/9Kis//GHjv/xh47/9Kis//ve4P////////////////////////////GHjv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/8pKY////////////////////////////////////////////////////////////////////////////8pKY/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa//GHjv/+9PX///////////////////////////////////////////////////////709f/xh47/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/rXGT/9Kis//709f/////////////////////////////////+9PX/9Kis/+tcZP/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/ucnn/852i//SorP/0qKz/852i/+5yef/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/AAAAAAAAAAAAAAAAAAAAAOpRWt/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVrfAAAAAAAAAAAAAAAAAAAAAOpRWp/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVqfAAAAAAAAAAAAAAAAAAAAAOpRWlDqUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVpQAAAAAAAAAAAAAAAAAAAAAAAAAADqUVrP6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWs8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADqUVpA6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA6lFaYOpRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFaYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOpRWmDqUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVpgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADqUVpA6lFaz+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFaz+pRWkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOpRWlDqUVqf6lFa3+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa/+pRWv/qUVr/6lFa3+pRWp/qUVpQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='))
+    [IO.File]::WriteAllBytes($ico, [Convert]::FromBase64String('AAABAAEAQEAAAAEAIAB7AwAAFgAAAIlQTkcNChoKAAAADUlIRFIAAABAAAAAQAgGAAAAqmlx3gAAA0JJREFUeNrtm71uFDEQx08RiQCFgBBKg4QihESRgpYEUI6vfHQgUVGRlDQUlFBQI1okGlpKGl6AJ0geIAV1nmLR7ySjYfB6x3vsrb3ek0Z32vPaM3/PjP/+mkwMn6XlCxvLq+vPzl+79SEHQVd0nsz7Wbl8/dWlje2TK7f3qxwF3bEh2vBzF69O127u/MrVcC3Ygk3mXh+K4VoavWHIxjeCgIsM3Xgn3nAYUsxbcsJcrr978KT68m6nOv56rzr7vtWroAO6oFPrULAOdVvTp9WPTw96N7pO0A0drUPkH5JjNf7023ayxjtBRysIM7IEa2pjPK735uihubEuhLbRQYeiFQRsn0AdmwpqtyfmbtzZSyapoQs66XBoeg/bGwEguWjjU83uGoSmxGgCQFaKq+mef/H8cS+JkTZpW3uCDIemzjIBICsk3kKI9yHaSHSUHTY3ALIxmVhA3z3/+fn+P73RpdAWbbr2ZdvoKHX+rwD4EiOK9JEQadOBoBPeQgDwoW9hkB/fTmcKy2GV3zzjvxhGJ72wNwAsih6+fBRFmynLO5a6kwaAeJSxGiu820RokgUA96yjzhhG9n7/ejoTftcBRR2hMOsUAJRrA4CMTWkI9W3e3f0rNKSr8x9lfMDVgdApAFoJCwC+eQMJThouAUb0c8pqclXH75MDQLtyiI1BWjS5ChEt6k4aANzZNyHhtzWry3p8EzFdT1IAyKEOl3Vu7wyyTFEdk3OGUocMKU1vk0mCetaoY1sbD5NzSVAzSV1W6yHJUjLDICxOlvUlPenimgmGQoS6ZN20lRwAMlZ9yUr2vG+Y41loTiGTq+T+yQAgjQplfp0oQwmubkSgreQA0PGPMXzrYS4GAN6Vdfl0yQ6AmBDICgBrCLRJglmEgDUJ+oZNyxpA8kkwZhiMBSCLYTCWCIUAyJIIxVLhOgCSosKxAMRMhkIekMxkqM2CiHU6bMkB2U2HYxZEQgBkvSBiXRJz6/pyX2EQS2KDWhSdB4BBLIu3XRUeN0YWtDWWHQBdSO8ALHJbPKnN0SK3x4s8IFH8EZniD0kVf0xu8Acliz8qW/xh6eKPy48XJsYrM+OlqfHa3Hhxcrw6O16eLvb6/G+BUVXP7f2fhQAAAABJRU5ErkJggg=='))
     $verTxt = "$(Versao-Do-Cofre $fonte)"
     if ($verTxt -notmatch '^\d+(\.\d+){0,3}$') { $verTxt = '1.0.0.0' }
     # núcleos x memória: cada compilação em paralelo usa ~1 GB
@@ -939,15 +999,16 @@ print(a)
     function Q([string]$s) { return '"' + $s + '"' }
     $args_nk = @(
         '-I', '-u', '-m', 'nuitka', '--onefile', '--zig', '--windows-console-mode=disable', '--enable-plugin=tk-inter',
-        '--include-package=openpyxl', '--include-package=defusedxml',
+        '--experimental=force-dependencies-pefile',
+        '--include-package=openpyxl', '--include-package=defusedxml', '--include-package=PIL',
         '--include-module=fido2.client.windows', '--include-module=fido2.client.win_api', '--include-package-data=fido2',
         '--onefile-no-compression', '--lto=no', '--python-flag=no_docstrings', "--jobs=$jobs",
-        '--onefile-tempdir-spec={PROGRAM_BASE}_em_uso_{PID}_{TIME}',
+        '--onefile-tempdir-spec={TEMP}\CofreSenhas_em_uso_{PID}_{TIME}',
         '--noinclude-data-files=tcl/tzdata', '--noinclude-data-files=tcl/msgs', '--noinclude-data-files=tk/msgs',
         ('--output-dir=' + (Q $obra)), '--output-filename=CofreSenhas.exe',
         ('--windows-icon-from-ico=' + (Q $ico)),
-        '--product-name="Cofre de Senhas"', "--file-version=$verTxt", "--product-version=$verTxt",
-        '--file-description="Cofre de Senhas local"', '--company-name="Uso pessoal"',
+        '--product-name="Arca"', "--file-version=$verTxt", "--product-version=$verTxt",
+        '--file-description="Arca — Cofre de Segurança"', '--company-name="Arca Sistemas"',
         (Q $fonteCopia)
     )
     # Compilação incremental: se o Nuitka, o Zig, o Python ou as opções são os mesmos da vez anterior, o que já foi
@@ -1110,9 +1171,14 @@ print(a)
         Info "Se o cofre estiver aberto, feche-o e rode de novo. O programa compilado ficou em $exe."
         return
     }
-    # o pendrive guarda só o programa compilado: remove qualquer código-fonte solto de instalações antigas
-    $fonteSolta = Join-Path $destino 'cofre_senhas.py'
-    if (Test-Path -LiteralPath $fonteSolta) { Remove-Item -LiteralPath $fonteSolta -Force -ErrorAction SilentlyContinue; Info "removido o código-fonte antigo de $destino (o pendrive guarda só o programa compilado)" }
+    # O destino guarda só o programa compilado: remove fontes soltos de instalações antigas.
+    foreach ($nomeFonteSolto in @('cofre_senhas.py', 'icones_marcas.py')) {
+        $fonteSolta = Join-Path $destino $nomeFonteSolto
+        if (Test-Path -LiteralPath $fonteSolta) {
+            Remove-Item -LiteralPath $fonteSolta -Force -ErrorAction SilentlyContinue
+            Info "removido o código-fonte antigo $nomeFonteSolto de $destino (o destino guarda só o programa compilado)"
+        }
+    }
     # Assinatura digital (OPCIONAL, desligada por padrão). Só roda se a variável de ambiente COFRE_ASSINAR_SHA1 tiver a
     # impressão digital (40 caracteres hex) de um certificado de assinatura de código do SEU repositório de certificados.
     # COFRE_ASSINAR_TS (opcional) = endereço https do servidor de carimbo de tempo (sem ele, nada é enviado pela internet).
@@ -1174,6 +1240,7 @@ print(a)
     Write-Host "$nomeFinal criado em: $destino" -ForegroundColor Green
     Write-Host "Nada mais fica ao lado dele (sem .bat, sem .sha256): tudo o que é do programa está dentro deste" -ForegroundColor Green
     Write-Host "único arquivo compilado -- não há nada de fora para ser mexido ou copiado." -ForegroundColor Green
+    Write-Host "Ao executar, o Nuitka usa uma pasta temporária do Windows, fora da pasta do EXE; normalmente ela é removida ao fechar." -ForegroundColor Gray
     Write-Host ""
     Write-Host "CÓDIGO SHA256 DO PROGRAMA (anote em PAPEL -- é a ÚNICA cópia confiável deste número):" -ForegroundColor Yellow
     Write-Host ("  " + ($hash -replace '(.{8})', '$1 ').Trim()) -ForegroundColor Yellow

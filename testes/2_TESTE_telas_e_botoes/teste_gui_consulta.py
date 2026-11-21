@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface do MODO CONSULTA: pendrive protegido contra gravação. Entra pela tela de senha (a escrita é bloqueada), aceita
 a oferta do modo consulta, confere o aviso na tela principal e que as ações que alteram dados só explicam e voltam."""
 import os, sys, errno, builtins, tempfile

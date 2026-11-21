@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Qualidade extra do cofre_senhas.py: Ruff (lint/seguranca), mypy (tipos), Radon (complexidade) e Vulture (codigo morto).
 rem Codigos de saida: 0 = Ruff sem achados | 1 = Ruff com achados (mypy/Radon/Vulture so informam) | 9 = ferramentas nao instaladas (pulado)

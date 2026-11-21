@@ -1,3 +1,4 @@
+<!-- ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1600 900">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -59,4 +60,13 @@
     <text x="66" y="359" fill="#8fc8a8" font-size="12">A segurança depende da configuração e do uso.</text>
   </g>
   <text x="112" y="842" fill="#666f82" font-family="Segoe UI, Arial" font-size="14" letter-spacing="1.2">MOCKUP CONCEITUAL · NÃO MOSTRA UMA CONFIGURAÇÃO ATIVA DE UM COFRE REAL</text>
+  <g id="marca-arca-projeto" transform="translate(1280 800)" font-family="Segoe UI, Arial, sans-serif">
+    <rect x="0" y="0" width="34" height="34" rx="8" fill="#102748" stroke="#E9AE39" stroke-width="2"/>
+    <rect x="5" y="5" width="24" height="24" rx="5" fill="none" stroke="#E9AE39" stroke-width="1.5"/>
+    <circle cx="17" cy="16" r="7" fill="none" stroke="#E9AE39" stroke-width="1.6"/>
+    <circle cx="17" cy="15" r="1.8" fill="#E9AE39"/>
+    <path d="M16.2 16.5h1.6v5h-1.6z" fill="#E9AE39"/>
+    <text x="43" y="15" fill="#edf0f5" font-size="13" font-weight="700">ARCA</text>
+    <text x="43" y="29" fill="#E9AE39" font-size="10" font-weight="650">ARCA SISTEMAS</text>
+  </g>
 </svg>

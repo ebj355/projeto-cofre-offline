@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """DUAS JANELAS NO MESMO COFRE + DIAGNÓSTICO CIFRADO + SELO DA PLANILHA SEM A ABA DE SELO.
 1) Duas instâncias abrem o mesmo .dat; a primeira salva; a segunda NÃO pode sobrescrever em silêncio (ConflitoGravacao) e o
    arquivo continua com o que a primeira gravou; o conflito é registrado no diagnóstico cifrado (.diag), legível só com a

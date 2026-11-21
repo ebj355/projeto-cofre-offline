@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Red team local: um atacante com a PASTA do cofre (cofre.dat, .bak, .key) e as ferramentas de engenharia reversa
 (strings, entropia, hex, editor, depurador de arquivo) tenta abrir/quebrar o cofre SEM a senha. Cada ataque que o
 atacante consegue fazer aqui é medido (não só 'falhou'): custo por tentativa, o que vaza, o que não vaza."""

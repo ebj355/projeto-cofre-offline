@@ -1,6 +1,7 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Windows Defender (MpCmdRun): varre SO o CofreSenhas.exe para ver se vira falso positivo. Nunca envie cofre.dat/.key a nenhum scanner.
-rem Codigos de saida: 0 = limpo | 1 = ameaca ou erro na varredura | 9 = exe ou Defender ausente (pulado)
+rem Codigos de saida: 0 = limpo | 1 = ameaca ou erro na varredura | 9 = exe ou Defender indisponivel (pulado)
 setlocal
 cd /d "%~dp0..\.."
 title Cofre - Windows Defender: varredura do exe
@@ -19,6 +20,13 @@ if not defined COFRE_EXE (
 )
 if not defined MP (
   >"%LOG%" echo [PULADO] MpCmdRun.exe nao encontrado - Defender ausente ou substituido por outro antivirus.
+  if not defined COFRE_AUTO type "%LOG%"
+  if not defined COFRE_AUTO pause
+  exit /b 9
+)
+powershell.exe -NoProfile -Command "try { $s=Get-MpComputerStatus -ErrorAction Stop; if ($s.AMServiceEnabled -and $s.AntivirusEnabled) { exit 0 } else { exit 9 } } catch { exit 9 }" >nul 2>nul
+if errorlevel 1 (
+  >"%LOG%" echo [PULADO] Microsoft Defender instalado, mas desativado ou indisponivel; a varredura nao foi executada.
   if not defined COFRE_AUTO type "%LOG%"
   if not defined COFRE_AUTO pause
   exit /b 9

@@ -1,5 +1,6 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Testes de FLUIDEZ e GLITCHES visuais (Linux/xvfb): janelas que deviam fechar antes de mexer no campo por baixo,
-textos com destaque/tamanho dinâmico, redimensionamento em rajada de um diálogo rolável, e arraste do cartão do
+textos com destaque/tamanho dinâmico, ajuste do diálogo sem rolagem, e arraste do cartão do
 passeio guiado. Cada teste aqui é a REGRESSÃO de um glitch relatado de verdade pelo usuário (2026-11-13), não um
 teste genérico -- segue o princípio "o teste é a prova documentada do defeito", e cada um fica claro e isolado
 (uma causa, um teste) para não virar um "pesticida" que para de pegar nada com o tempo. Descoberto por autodiscovery
@@ -36,7 +37,7 @@ def fechar_janela(d):
     de novo, pela lista própria de comandos do widget) -- o segundo apagão falha com 'can't delete Tcl command',
     e como esse erro vinha DEPOIS do destroy já ter raspado a árvore de widgets filhos, a janela ficava sem ser
     destruída de verdade (zumbi) sempre que algum widget dela tinha um after() pendente (medidor de força, debounce
-    do corpo rolável...). destroy() sozinho (sem cancelar nada antes) já limpa os after() de cada widget filho na
+    do diálogo...). destroy() sozinho (sem cancelar nada antes) já limpa os after() de cada widget filho na
     hora certa, sem esse conflito -- confirmado sem nenhuma exceção em root.report_callback_exception mesmo
     esperando vários segundos depois."""
     try: d.destroy()
@@ -118,38 +119,37 @@ ok(d_cod.winfo_exists(), "código: bloco ERRADO não fecha o diálogo (continua 
 fechar_janela(d_cod); root.update()
 
 # ---------------------------------------------------------------------------------------------------------------
-# 3) _corpo_rolavel: uma rajada de <Configure> (como a reconstrução do painel de força a cada tecla do teclado
-#    virtual) deve gerar POUCAS reconfigurações reais do Canvas, não uma por evento -- bug relatado: "ao abrir o
-#    teclado virtual e clicar nele... o aplicativo ao fundo fica dando erros e problemas gráficos de animação
-#    glitch". Espiona Canvas.configure enquanto dispara manualmente vários <Configure> em sequência rápida no
-#    frame interno do corpo rolável do diálogo "Novo item" (mesmo mecanismo usado por todo diálogo rolável).
+# 3) Diálogos sem rolagem quando o conteúdo cabe: em telas menores, o corpo pode rolar com o rodapé fixo.
 # ---------------------------------------------------------------------------------------------------------------
 app.dialogo_registro(None); root.update()
 d_item = tops(root)[-1]
-telas = [w for w in todos(d_item) if w.winfo_class() == "Canvas"]
-ok(len(telas) >= 1, "diálogo 'Novo item' tem o Canvas do corpo rolável")
-tela = telas[0]
-fr_interno = next(iter(tela.winfo_children()), None)
-ok(fr_interno is not None, "Canvas do corpo rolável tem o frame de conteúdo dentro")
-contagem = {"n": 0}
-configure_original = tk.Canvas.configure
-def configure_espiao(self, *a, **k):
-    if self is tela and ("width" in k or "height" in k):
-        contagem["n"] += 1
-    return configure_original(self, *a, **k)
-tk.Canvas.configure = configure_espiao
-try:
-    contagem["n"] = 0
-    for _ in range(12):                        # simula 12 "teclas" em rajada (bem mais rápido que o debounce de 30 ms)
-        fr_interno.event_generate("<Configure>")
-    root.update()
-    ok(contagem["n"] <= 2, f"12 eventos <Configure> em rajada viraram só {contagem['n']} reconfiguração(ões) do Canvas (debounce)")
-finally:
-    tk.Canvas.configure = configure_original
+barras = [w for w in todos(d_item) if w.winfo_class() in ("Scrollbar", "TScrollbar") and w.winfo_ismapped()]
+areas = [w for w in todos(d_item) if w.winfo_class() == "Canvas" and w.cget("yscrollcommand")]
+rolaveis = [w for w in areas if w.yview()[1] < 0.999]
+ok(not barras and not rolaveis, "diálogo 'Novo item' não rola quando o conteúdo cabe")
+ok(d_item.winfo_height() <= d_item.winfo_screenheight(), "diálogo cabe na altura disponível da tela")
 fechar_janela(d_item); root.update()
 
 # ---------------------------------------------------------------------------------------------------------------
-# 4) Passeio guiado: o cartão pode ser arrastado pelo título (pedido do usuário: "o guia que da passo a passo não
+# 4) Barra lateral: itens fora da página continuam acessíveis pela seleção e paginação, sem rolagem.
+# ---------------------------------------------------------------------------------------------------------------
+d_paginas = tk.Toplevel(root)
+d_paginas.geometry("260x220")
+lateral = c.BarraLateral(d_paginas, max_linhas=2)
+lateral.pack(fill="both", expand=True)
+lateral.definir([{"iid": f"grupo-{i}", "texto": f"Grupo {i}", "n": i} for i in range(5)])
+root.update()
+ok(len(lateral.get_children()) == 5 and len(lateral._itens) == 2,
+   "barra lateral conserva todas as entradas e mostra apenas a página atual")
+lateral.selection_set("grupo-4"); root.update()
+ok(lateral.selection() == ("grupo-4",) and "grupo-4" in lateral._itens,
+   "selecionar item oculto leva à página que o contém")
+ok(not any(w.winfo_class() in ("Scrollbar", "TScrollbar") for w in todos(lateral)),
+   "barra lateral sem barras de rolagem")
+fechar_janela(d_paginas); root.update()
+
+# ---------------------------------------------------------------------------------------------------------------
+# 5) Passeio guiado: o cartão pode ser arrastado pelo título (pedido do usuário: "o guia que da passo a passo não
 #    permite ser movido para outro canto da tela").
 # ---------------------------------------------------------------------------------------------------------------
 app.passeio_principal(); root.update()
@@ -190,6 +190,19 @@ ok(abs(w1 - base_w) <= 5, f"sem widgets acumulando depois dos ciclos ({base_w} -
 
 ok(not erros, f"nenhum erro exibido ao usuário durante a bateria {erros[:2]}")
 ok(not excecoes, f"nenhuma exceção não tratada {excecoes[:2]}")
+
+# ---- fechar pelo protocolo da janela sem erro ao cancelar after() criados por widgets filhos
+root.after(0, app.sair)
+try:
+    root.update()
+except tk.TclError:
+    pass
+try:
+    fechou = not root.winfo_exists()
+except tk.TclError:
+    fechou = True
+ok(fechou and not excecoes, "fechar o cofre sem erro ao cancelar timers dos campos")
+
 print("PASSOU" if all(f) else "FALHOU", sum(f), "/", len(f))
 fechar_janela(root)
 sys.exit(0 if all(f) else 1)

@@ -1,7 +1,10 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface (Tk): gerador com rodapé fixo e detalhes escondidos, 'Usar em um novo item', caixas de extras no Novo item,
 grupos DENTRO de cada perfil, painel de proteção recolhido, convite do guia na 1ª entrada e troca de tela sem apagar a
 janela. Roda no Windows ou no Linux (xvfb-run -a)."""
 import os, sys, tempfile
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
 import tkinter as tk
 from tkinter import messagebox
@@ -66,7 +69,7 @@ for t in ("Copiar", "Atualizar senha"):
     b = botao(d, t); ok(b is not None and b.winfo_rooty() + b.winfo_height() <= d.winfo_rooty() + d.winfo_height() + 2, f"botão '{t}' está dentro da janela (rodapé fixo)")
 ok(not any("Composição" in t or "TEMPO PARA" in t.upper() for t in textos(d)), "textos de análise escondidos até o clique")
 ok(not any("bits" in t for t in textos(d)), "'bits' (técnico) não fica à vista")
-b = botao(d, "Ver detalhes"); b.invoke(); root.update()
+b = botao(d, "Ver detalhes da senha"); b.invoke(); root.update()
 ok(any("Composição" in t for t in textos(d)), "'Ver detalhes' mostra a composição")
 botao(d, "Esconder detalhes").invoke(); root.update()
 ok(not any("Composição" in t for t in textos(d)), "'Esconder detalhes' esconde de novo")
@@ -83,22 +86,50 @@ ok(nd.title() == "Novo item", "abre 'Novo item'")
 cand = [w for w in todos(nd) if w.winfo_class() in ("TEntry", "Entry") and len(w.get()) >= 8]
 ok(len(cand) == 1, "a senha gerada já vem preenchida no Novo item")
 
-# ---- Novo item: caixas de extras e grupo
-def marca(d_, rot):
-    for w in todos(d_):
-        if w.winfo_class() == "TCheckbutton" and str(w.cget("text")) == rot: w.invoke(); d_.update(); return True
+# ---- Novo item: credenciais sob demanda e grupo
+def adicionar_credencial(d_, nome):
+    seletor = next((w for w in todos(d_) if w.winfo_class() == "TCombobox"
+                    and nome in list(w.cget("values"))), None)
+    if seletor is None:
+        return False
+    seletor.set(nome)
+    next(w for w in todos(d_) if w.winfo_class() == "TButton"
+         and str(w.cget("text")) == "+ Adicionar").invoke()
+    d_.update()
+    return True
+
 vis = lambda: [t.upper() for t in textos(nd)]
 ok(not any(t in ("PIN", "SENHA EXTRA", "CÓDIGOS DE RECUPERAÇÃO") for t in vis()), "PIN, senha extra e códigos de recuperação escondidos por padrão")
-ok(marca(nd, "Senha extra") and "SENHA EXTRA" in vis(), "marcar 'Senha extra' mostra o campo")
-ok(marca(nd, "PIN") and "PIN" in vis(), "marcar 'PIN' mostra o campo")
-ok(marca(nd, "Código de recuperação") and "CÓDIGOS DE RECUPERAÇÃO" in vis(), "marcar 'Código de recuperação' mostra a caixa de códigos")
+ok(adicionar_credencial(nd, "Senha extra") and "SENHA EXTRA" in vis(),
+   "adicionar 'Senha extra' mostra o campo")
+ok(adicionar_credencial(nd, "PIN numérico") and "PIN" in vis(), "adicionar 'PIN' mostra o campo")
+ok(adicionar_credencial(nd, "Códigos de recuperação") and "CÓDIGOS DE RECUPERAÇÃO" in vis(),
+   "adicionar códigos de recuperação mostra a caixa")
 ok(all(w.cget("show") == "•" for w in todos(nd) if w.winfo_class() == "TEntry" and str(w.cget("show"))) and
-   any(w.winfo_class() == "TEntry" and str(w.cget("show")) == "•" for w in todos(nd)), "marcar caixas NÃO revela nenhuma senha (continuam em bolinhas)")
-marca(nd, "PIN"); ok("PIN" not in vis(), "desmarcar esconde")
+   any(w.winfo_class() == "TEntry" and str(w.cget("show")) == "•" for w in todos(nd)),
+   "adicionar credenciais NÃO revela nenhuma senha (continuam em bolinhas)")
+pin_label = next(w for w in todos(nd) if w.winfo_class() == "TLabel" and str(w.cget("text")) == "PIN")
+next(w for w in pin_label.master.winfo_children() if w.winfo_class() == "TButton").invoke()
+root.update()
+ok("PIN" not in vis(), "remover uma credencial oculta seu campo")
 cg = [w for w in todos(nd) if w.winfo_class() == "TCombobox" and w.winfo_ismapped()]
 ok(len(cg) >= 1 and "＋ Criar novo grupo…" in list(cg[0].cget("values")), "grupo visível, com a opção '＋ Criar novo grupo…'")
 cg[0].set("＋ Criar novo grupo…"); cg[0].event_generate("<<ComboboxSelected>>"); root.update()
 ok(cg[0].get() == "", "criar novo grupo limpa o campo para o usuário escrever o nome que quiser")
+status_bt = next(w for w in todos(nd) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Em uso")
+status_bt.invoke(); root.update()
+ok(str(status_bt.cget("text")) == "Inativa", "estado Em uso/Inativa pode ser alternado")
+servico = next(w for w in todos(nd) if w.winfo_class() == "TEntry" and w.winfo_ismapped())
+servico.insert(0, "Item desativado de teste")
+next(w for w in todos(nd) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Salvar").invoke()
+root.update()
+salvo = next((r for r in app.cofre.registros if r.get("servico") == "Item desativado de teste"), None)
+ok(salvo is not None and salvo.get("ativo") is False, "estado desativado é persistido ao salvar")
+if salvo is not None:
+    app.tree.selection_set(salvo["id"]); app._montar_detalhe(); root.update()
+ok(any("Inativa" in t for t in textos(app.detalhe)), "estado inativo fica visível nos detalhes do item")
+legado = dict(salvo or {}); legado.pop("ativo", None)
+ok(c._item_ativo(legado), "itens antigos sem estado salvo continuam ativos")
 fecha(root)
 
 # ---- grupos DENTRO do perfil

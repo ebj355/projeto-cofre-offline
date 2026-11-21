@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """COBERTURA DE CÓDIGO (coverage.py): quais linhas e ramificações de cofre_senhas.py os testes realmente executam.
 
 Para quê: achar blocos de tratamento de erro importantes (falha de descriptografia, timeout de E/S em pendrive, queda no meio

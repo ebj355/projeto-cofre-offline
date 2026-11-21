@@ -1,6 +1,6 @@
-# Ferramentas EXTERNAS de análise
+# Análise externa da Arca
 
-**Para que serve esta pasta:** Bandit, pip-audit, Nmap, PSScriptAnalyzer, verificação de segredos, qualidade, SBOM, Hypothesis e integridade do repositório. São independentes do executável compilado e fazem parte do TESTAR TUDO (etapa 6/6), menos o pytest, que repete as baterias 1 e 2.
+**Para que serve esta pasta:** Bandit, pip-audit, Nmap, PSScriptAnalyzer, verificação de segredos, qualidade, SBOM, Hypothesis e integridade do repositório. São independentes do executável compilado e fazem parte do TESTAR TUDO (etapa 6/7), menos o pytest, que repete as baterias 1 e 2.
 
 _Gerado por `testes/6_TESTE_ferramentas_dos_testes/gerar_indices.py` (não edite à mão: rode o script)._
 

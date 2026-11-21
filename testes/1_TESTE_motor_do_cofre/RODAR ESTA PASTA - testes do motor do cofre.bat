@@ -1,6 +1,12 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 chcp 65001 >nul
 setlocal
+if not defined COFRE_TEST_MINIMIZADO (
+  set "COFRE_TEST_MINIMIZADO=1"
+  start "" /min cmd.exe /d /c ""%~f0" %*"
+  exit /b
+)
 rem Teste do NUCLEO (os teste_*.py desta pasta) no Windows real, com o Python do Windows em vez do Linux.
 rem Util para rodar SO essa parte, sem os testes especificos do instalador (esses ficam em
 rem testes\4_TESTE_so_no_windows\A - testar o instalador.bat) nem a bateria de interface (testes\2_TESTE_telas_e_botoes\RODAR ESTA PASTA - testes das telas e botoes.bat).
@@ -22,7 +28,7 @@ where py >nul 2>nul || (echo  Python nao encontrado. Instale o Python 3.13 e rod
 if not exist "%RAIZ%\pacotes\*.whl" (echo  Dependencias offline nao encontradas em pacotes\. Rode primeiro 3 - BAIXAR PACOTES. & pause & exit /b 9)
 if exist "%VENV%" rmdir /s /q "%VENV%"
 py -3.13 -m venv "%VENV%" || (echo  Falhou criar o ambiente Python 3.13. & pause & exit /b 9)
-"%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml
+"%VENV%\Scripts\python.exe" -m pip install --no-index --find-links "%RAIZ%\pacotes" --disable-pip-version-check -q argon2-cffi cryptography fido2 openpyxl defusedxml pillow
 if errorlevel 1 (echo  Falhou instalar as bibliotecas. & pause & exit /b 9)
 rem Hypothesis e opcional: se o wheelhouse tiver o pacote, roda o teste por propriedades; sem ele, o executor registra PULADO (codigo 9).
 if exist "%RAIZ%\pacotes\hypothesis-*.whl" (

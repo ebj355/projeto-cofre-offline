@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Executa TODOS os testes do cofre e mostra um resumo.
 
 Uso (na pasta do projeto):
@@ -8,7 +9,7 @@ Uso (na pasta do projeto):
 
 No Linux sem tela, a interface roda dentro do `xvfb-run` (precisa estar instalado).
 No Windows, as janelas dos testes de interface são não ativáveis e ficam atrás do aplicativo em uso.
-Sai com código 0 só se tudo passou. Um teste conta como FALHA se imprimir "[FALHOU]", "FALHAS: [...]" com
+Sai com código 0 só se tudo passou. Um teste conta como FALHA se imprimir "[FALHOU]" ou "FALHOU", "FALHAS: [...]" com
 conteúdo, "FAIL" ou "[X]", se terminar com código diferente de 0 ou se passar do tempo limite."""
 import argparse
 import datetime
@@ -22,6 +23,7 @@ import time
 
 AQUI = os.path.dirname(os.path.abspath(__file__))        # testes/6_TESTE_ferramentas_dos_testes
 RAIZ_TESTES = os.path.dirname(AQUI)                       # testes/ (onde ficam nucleo/ e gui/)
+RAIZ_PROJETO = os.path.dirname(RAIZ_TESTES)
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _resultado  # log de depuração (testes/resultados/log_depuracao.txt)
@@ -31,7 +33,7 @@ for fluxo in (sys.stdout, sys.stderr):
     if hasattr(fluxo, "reconfigure"):
         fluxo.reconfigure(errors="replace")
 
-ruim = re.compile(r"\[FALHOU\]|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]|\bKeyboardInterrupt\b")
+ruim = re.compile(r"\[FALHOU\]|\bFALHOU\b|\[X\]|\bFAIL\b|FALHAS( v\d+)?: \[[^\]]|\bKeyboardInterrupt\b")
 bom = re.compile(r"TODOS( OS TESTES)? (PASSARAM|OK)|FALHAS( v\d+)?: \[\]|\[OK\]|FIM-OK")
 
 
@@ -50,14 +52,19 @@ def roda(nome, cmd, cwd, limite):
     try:
         # UTF-8 nos filhos e na leitura: o console do Windows usa cp850/cp1252 e quebraria os acentos e símbolos
         amb = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1")
+        caminhos_python = [RAIZ_PROJETO, amb.get("PYTHONPATH", "")]
         if (os.name == "nt" and nome.startswith("gui/")
                 and os.environ.get("COFRE_GUI_TESTS_FOREGROUND") != "1"):
             pasta_gui = os.path.join(RAIZ_TESTES, "2_TESTE_telas_e_botoes")
-            caminhos = [pasta_gui, amb.get("PYTHONPATH", "")]
-            amb["PYTHONPATH"] = os.pathsep.join(p for p in caminhos if p)
+            caminhos_python.insert(0, pasta_gui)
             amb["COFRE_GUI_TESTS_BACKGROUND"] = "1"
+        amb["PYTHONPATH"] = os.pathsep.join(p for p in caminhos_python if p)
         _resultado.esperar_memoria(1000, 180)           # não começa nada pesado com o PC sem RAM livre
-        extra = {"creationflags": 0x00004000} if os.name == "nt" else {"preexec_fn": lambda: os.nice(10)}   # prioridade baixa
+        if os.name == "nt":
+            prioridade = 0x00000080 if amb.get("COFRE_TEST_HIGH_PRIORITY") == "1" else 0x00004000
+            extra = {"creationflags": prioridade}
+        else:
+            extra = {"preexec_fn": lambda: os.nice(10)}
         proc = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
                                 errors="replace", env=amb, **extra)
         try:

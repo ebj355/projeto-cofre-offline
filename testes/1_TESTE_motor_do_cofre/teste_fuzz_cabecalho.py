@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """FUZZING DO CABEÇALHO v5 E DA SEÇÃO FIDO: troca CADA byte do cabeçalho e da seção FIDO (vários valores) e confere que
 o programa NUNCA gasta tentativa, NUNCA destrói e NUNCA abre com dados errados: o resultado é sempre ArquivoCorrompido ou
 ArquivoInvalido, e o arquivo no disco fica idêntico byte a byte. (Só o byte do contador fica de fora: ele não é autenticado.)"""

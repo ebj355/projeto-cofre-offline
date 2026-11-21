@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Garante que os números citados no README batem com as constantes do código (documentação que diverge = achado)."""
 import os, re, sys
 raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

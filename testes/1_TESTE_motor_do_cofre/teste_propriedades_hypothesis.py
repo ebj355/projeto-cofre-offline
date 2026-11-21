@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Testes por PROPRIEDADES (Hypothesis): gera entradas aleatorias e confere que criar->salvar->fechar->abrir devolve exatamente os mesmos itens e que a leitura de CSV hostil nunca estoura erro nao tratado.
 Uso: python testes/1_TESTE_motor_do_cofre/teste_propriedades_hypothesis.py  |  Saida: 0 = passou | 1 = falhou | 9 = hypothesis nao instalado. COFRE_HYPOTHESIS_EXEMPLOS (padrao 12) muda a quantidade; cada exemplo gasta ~1 s de Argon2 (nivel alto)."""
 import importlib

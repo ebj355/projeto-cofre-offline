@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface: formulário SIMPLES de novo item (nome, grupo, pessoa, usuário, senha), sem botão 'Mais opções'. Para leigos e
 idosos: poucos campos, poucos cliques. Roda no Linux com xvfb-run."""
 import os, sys, tempfile
@@ -25,9 +26,23 @@ def novo():
     return next(w for w in root.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == "Novo item")
 d = novo()
 ok(d.winfo_viewable(), "Novo item abre visível")
+icones_cabecalho = [w for w in todos(d) if w.winfo_class() == "Canvas" and w.winfo_ismapped()
+                    and len(w.find_all()) >= 2]
+ok(bool(icones_cabecalho), "Novo item mostra o ícone no cabeçalho")
+rotulo_ident = next(w for w in todos(d) if w.winfo_class() == "TLabel"
+                    and str(w.cget("text")) == "IDENTIFICAÇÃO E ORGANIZAÇÃO")
+ok(str(rotulo_ident.cget("style")) == "C.Campo.TLabel",
+   "rótulos de identificação usam o fundo do cartão, sem faixa escura")
+rotulo_senha = next(w for w in todos(d) if w.winfo_class() == "TLabel"
+                     and str(w.cget("text")) == "SENHA")
+ok(str(rotulo_senha.cget("style")) == "S2.Campo.TLabel",
+   "rótulos das credenciais usam o fundo do painel")
+status = next(w for w in todos(d) if w.winfo_class() == "TButton"
+              and str(w.cget("text")) == "Em uso")
+ok(status is not None, "estado da conta fica identificado como 'Em uso'")
 vis = lambda: [str(w.cget("text")) for w in todos(d) if w.winfo_class() in ("TLabel",) and w.winfo_ismapped()]
 v = " | ".join(vis())
-ok("NOME DO SITE OU APP" in v and "USUÁRIO OU E-MAIL" in v and "SENHA" in v, "mostra nome, usuário e senha")
+ok("CONTA / APP" in v and "LOGIN / E-MAIL / USUÁRIO" in v and "SENHA" in v, "mostra nome, usuário e senha")
 ok("GRUPO" in v and "PESSOA" in v, "mostra GRUPO e PESSOA (sem botão de modo)")
 for escondido in ("PIN", "SENHA EXTRA"):
     ok(escondido not in v, f"extras escondidos até marcar a caixa: {escondido}")
@@ -47,10 +62,11 @@ ok(len(regs) == 1 and regs[0]["servico"] == "Banco Azul" and regs[0]["login"] ==
    "salvou nome, usuário e senha")
 ok(not erros, "sem erro ao salvar")
 d = novo()
-for rot in ("PIN",):                               # extras: só aparecem quando a caixa 'este item também tem' é marcada
-    achar(d, rot, "TCheckbutton").invoke(); root.update()
+seletor = next(w for w in todos(d) if w.winfo_class() == "TCombobox" and "PIN numérico" in w.cget("values"))
+seletor.set("PIN numérico")
+achar(d, "+ Adicionar").invoke(); root.update()
 v = " | ".join(vis())
-ok("PIN" in v, "marcar a caixa mostra PIN")
+ok("PIN" in v, "adicionar a credencial mostra PIN")
 ok("NOTAS" in v, "notas continuam visíveis sem caixa adicional")
 d.destroy(); root.update()
 # editar abre completo

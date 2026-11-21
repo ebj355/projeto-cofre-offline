@@ -1,4 +1,4 @@
-# Testes que SÓ fazem sentido no Windows real
+# Testes da Arca — Windows real
 
 **Para que serve esta pasta:** Conferem o que o Linux só consegue simular: atributos de arquivo, permissões (ACL), DPAPI, SMBIOS, instalador, Windows Sandbox.
 

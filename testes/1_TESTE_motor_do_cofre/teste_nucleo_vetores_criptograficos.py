@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Vetores e integridade dos primitivos criptográficos, no nível das PEÇAS (não do arquivo inteiro - isso já é
 feito por `teste_ataques.py`). Em vez de confiar de olhos fechados que "a biblioteca `cryptography` é boa, logo
 está tudo certo", este teste confere a FIAÇÃO que o próprio `cofre_senhas.py` faz entre as peças:

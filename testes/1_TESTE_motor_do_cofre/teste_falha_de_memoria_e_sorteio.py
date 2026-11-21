@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Falha de memória no meio do Argon2 não tranca nem estraga o cofre (todos os modos) e o sorteio de palavras da frase-senha é uniforme."""
 import os, sys, tempfile, math, collections
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))

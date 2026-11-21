@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Prepara cache isolado para uma execução e remove-o ao encerrar."""
 import atexit
 import os

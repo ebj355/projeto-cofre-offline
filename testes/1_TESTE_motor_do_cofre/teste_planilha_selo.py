@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Planilha modelo SELADA: o cofre confere, ao importar, que o modelo nasceu dele e que a estrutura não foi alterada.
 Cobre: selo válido, linhas preenchidas depois (continua válido), estrutura adulterada (recusa), selo falso/forjado
 (recusa), selo de outro cofre (aviso, sem recusa), modelo sem selo (comportamento antigo) e conteúdo malicioso em

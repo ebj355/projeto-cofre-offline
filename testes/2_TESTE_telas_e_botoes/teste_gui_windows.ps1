@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 # Bateria de testes de INTERFACE (GUI) no Windows REAL. As janelas de teste ficam atrás do aplicativo em uso
 # e não roubam o foco; não precisa clicar em nada, é tudo automático.
 # Não cria cofre de verdade na pasta do usuário (cada teste usa sua própria pasta temporária, apagada ao final).
@@ -57,6 +58,10 @@ if ($py -and (Test-Path $fonte) -and (Test-Path $rodar)) {
     if (-not (Test-Path $req)) { L "[info] requirements.txt não está em ${pai}: copie-o para lá para a bateria rodar" }
     if (Test-Path $req) {
         $pins = Get-Content $req | Where-Object { $_ -match '^(cryptography|argon2-cffi|argon2-cffi-bindings|openpyxl|defusedxml|fido2|cffi|pycparser|et-xmlfile)==' }
+        $reqTest = Join-Path $pai 'requirements-test-direct.in'
+        if (Test-Path $reqTest) {
+            $pins += Get-Content $reqTest | Where-Object { $_ -match '^Pillow==' }
+        }
         $reqT = Join-Path $aqui 'req_gui_tmp.txt'
         Set-Content -Path $reqT -Value $pins -Encoding ASCII
         L 'Criando ambiente temporário e instalando as bibliotecas do wheelhouse local...'

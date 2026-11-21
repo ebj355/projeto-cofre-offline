@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """CAMPOS DE TEXTO: ao destruir uma tela ou janela de diálogo, o texto digitado nos campos (senhas, chaves) é apagado
 antes; campos ligados a uma variável (textvariable) ficam como estão."""
 import os, sys

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """BLOQUEIO POR INATIVIDADE: com o relógio curto, o cofre se tranca sozinho, apaga as chaves da memória (o objeto Cofre fica
 zerado), derruba as janelas abertas e volta para a tela de desbloqueio; mexer no programa RENOVA o relógio (não bloqueia
 em uso); e o relógio é refeito a cada bloqueio/desbloqueio sem empilhar temporizadores. Linux (xvfb-run) e Windows."""

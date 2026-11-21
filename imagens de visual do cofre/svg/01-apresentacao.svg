@@ -1,3 +1,4 @@
+<!-- ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1600 900">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -21,7 +22,7 @@
     <rect x="112" y="106" width="58" height="58" rx="18" fill="url(#glow)"/>
     <path d="M141 132v-8a11 11 0 0 1 22 0v8m-27 0h32v24h-32z" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="157" cy="143" r="2.5" fill="#fff"/>
-    <text x="188" y="147" fill="#e8eaf0" font-size="25" font-weight="650">COFRE DE SENHAS</text>
+    <text x="188" y="147" fill="#e8eaf0" font-size="25" font-weight="650">ARCA</text>
 
     <rect x="112" y="244" width="300" height="38" rx="19" fill="#211f42" stroke="#38346f"/>
     <circle cx="136" cy="263" r="5" fill="#3dd68c"/>
@@ -71,4 +72,13 @@
     <text x="101" y="526" fill="#8fc8a8" font-family="Segoe UI, Arial" font-size="13">Demonstração visual · dados fictícios</text>
   </g>
   <text x="112" y="836" fill="#666f82" font-family="Segoe UI, Arial" font-size="14" letter-spacing="1.2">MOCKUP CONCEITUAL · NÃO É CAPTURA DO APLICATIVO · SEM DADOS REAIS</text>
+  <g id="marca-arca-projeto" transform="translate(1280 800)" font-family="Segoe UI, Arial, sans-serif">
+    <rect x="0" y="0" width="34" height="34" rx="8" fill="#102748" stroke="#E9AE39" stroke-width="2"/>
+    <rect x="5" y="5" width="24" height="24" rx="5" fill="none" stroke="#E9AE39" stroke-width="1.5"/>
+    <circle cx="17" cy="16" r="7" fill="none" stroke="#E9AE39" stroke-width="1.6"/>
+    <circle cx="17" cy="15" r="1.8" fill="#E9AE39"/>
+    <path d="M16.2 16.5h1.6v5h-1.6z" fill="#E9AE39"/>
+    <text x="43" y="15" fill="#edf0f5" font-size="13" font-weight="700">ARCA</text>
+    <text x="43" y="29" fill="#E9AE39" font-size="10" font-weight="650">ARCA SISTEMAS</text>
+  </g>
 </svg>

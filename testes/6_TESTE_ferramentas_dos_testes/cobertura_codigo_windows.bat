@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Cobertura de codigo (coverage.py) no Windows: mede quais linhas/ramificacoes de cofre_senhas.py os testes executam.
 rem NAO faz parte do Testar_Tudo (e lenta e e uma ferramenta de analise, nao um teste). Dois cliques para rodar.

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Qualidade estatística da aleatoriedade GERADA PELO PRÓPRIO PROGRAMA (não é uma suíte NIST SP800-22 completa -
 isso exigiria megabytes de amostra; aqui o objetivo é ser um "canário": pegar uma regressão catastrófica, como
 alguém trocar por engano `secrets.token_bytes`/Argon2id por um gerador fraco (ex.: `random`, ou um sal/nonce fixo),

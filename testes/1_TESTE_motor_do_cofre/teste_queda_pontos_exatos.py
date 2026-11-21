@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """QUEDA DE ENERGIA EM PONTOS EXATOS: em vez de matar o programa em instantes aleatórios, derruba o processo (os._exit, sem
 nenhuma limpeza) EXATAMENTE em cada passo da gravação: depois de escrever o .tmp (antes do fsync), depois do fsync, antes e
 depois de CADA renomeação (rotação das cópias .bak e troca final). Em todos os pontos o cofre principal e cada cópia que

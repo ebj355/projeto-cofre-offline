@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Confere o .gitignore com arquivos de teste reais e a coerencia dos pins/hashes do build.
 rem Codigos: 0 = consistente | 1 = falha ou auditoria incompleta

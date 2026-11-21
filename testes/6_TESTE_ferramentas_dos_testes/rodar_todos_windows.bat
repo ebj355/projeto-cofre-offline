@@ -1,5 +1,6 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
-rem Roda as SEIS baterias obrigatorias de teste do Windows real, UMA VEZ cada, uma depois da outra, chamando o .bat
+rem Roda as SETE baterias de teste do Windows real, UMA VEZ cada, uma depois da outra, chamando o .bat
 rem de CADA UMA (nucleo, instalador, nativo, interface, pentest, ferramentas externas). Cada bateria grava o seu PROPRIO resultado,
 rem exatamente como se tivesse sido chamada sozinha - nada aqui muda o comportamento dela.
 rem
@@ -7,8 +8,8 @@ rem Uso: rodar_todos_windows.bat                 (nativo testa o disco do sistem
 rem      rodar_todos_windows.bat H               (nativo testa tambem o pendrive H:)
 rem      rodar_todos_windows.bat OFFLINE         (pula consultas online do pip-audit)
 rem      rodar_todos_windows.bat H OFFLINE       (pendrive H: e sem consultas online)
-rem      rodar_todos_windows.bat POS-COMPILACAO  (inclui a pasta 7; compile o executavel primeiro)
-rem      rodar_todos_windows.bat H OFFLINE POS-COMPILACAO
+rem      rodar_todos_windows.bat POS-COMPILACAO  (compatibilidade; a pasta 7 tambem roda sem esta opcao)
+rem      rodar_todos_windows.bat H OFFLINE POS-COMPILACAO (procura H:\CofreSenhas.exe)
 rem
 rem Importante (por que todo "call" abaixo tem "< nul" no final):
 rem  - cada ...\teste_*.bat termina com um "pause" (espera uma tecla) para quem roda ele sozinho (clicando duas
@@ -26,7 +27,24 @@ rem    dai ele somava a propria pasta duas vezes (ex.: testes\4_TESTE_so_no_wind
 rem    python.exe. Com caminho completo isso nao acontece.
 chcp 65001 >nul
 setlocal EnableExtensions
+if not defined COFRE_TEST_MINIMIZADO (
+  set "COFRE_TEST_MINIMIZADO=1"
+  start "" /min cmd.exe /d /c ""%~f0" %*"
+  exit /b
+)
 cd /d "%~dp0"
+set "PASTA_LOGS_COMPILACAO=%~dp0..\..\logs_de_compilacao"
+set "PASTA_ERROS_COMPILACAO=%PASTA_LOGS_COMPILACAO%\erros de compilação"
+if exist "%PASTA_LOGS_COMPILACAO%" rmdir /s /q "%PASTA_LOGS_COMPILACAO%" >nul 2>nul
+if exist "%PASTA_LOGS_COMPILACAO%" (
+  echo ERRO: nao foi possivel limpar logs_de_compilacao da rodada anterior.
+  exit /b 1
+)
+mkdir "%PASTA_ERROS_COMPILACAO%" >nul 2>nul
+if not exist "%PASTA_ERROS_COMPILACAO%" (
+  echo ERRO: nao foi possivel criar logs_de_compilacao\erros de compilação.
+  exit /b 1
+)
 for %%I in ("%~dp0..\CACHE\_cache_bateria_%RANDOM%_%RANDOM%") do set "COFRE_TEST_CACHE_DIR=%%~fI"
 if exist "%COFRE_TEST_CACHE_DIR%" (
   echo ERRO: o caminho de cache temporario ja existe; nao vou apagar conteudo preexistente.
@@ -54,12 +72,18 @@ rem O log de depuracao (testes\resultados\log_depuracao.txt) e recriado do zero;
 if not exist "%~dp0..\resultados" mkdir "%~dp0..\resultados"
 set "DRIVE="
 set "AUDIT_MODO="
-set "RODAR_POS_COMPILACAO=0"
+set "RODAR_POS_COMPILACAO=1"
 if not "%~1"=="" for %%A in (%*) do call :argumento %%~A
+if defined DRIVE set "COFRE_USB_DRIVE=%DRIVE:~0,1%:"
 set "COFRE_ONLINE_AUDIT="
 set "COFRE_OFFLINE=1"
-py -3.13 "%~dp0limpar_resultados.py" 2>nul
 set "FALHAS=0"
+py -3.13 "%~dp0limpar_resultados.py"
+if errorlevel 1 (
+  echo ERRO: nao foi possivel remover os resultados antigos; a bateria nao sera iniciada para evitar misturar relatorios.
+  set /a FALHAS+=1
+  goto :fim
+)
 set "RODADAS=1"
 for /L %%R in (1,1,%RODADAS%) do (
   echo.
@@ -73,10 +97,10 @@ echo  Cofre de Senhas - bateria COMPLETA no Windows real
 echo  1/6 nucleo                2/6 instalador (SO/atributos do instalador)
 echo  3/6 nativo (atributos/ACL/DPAPI)   4/6 interface (automatico)
 echo  5/6 pentest (injecao, forca bruta, DoS, vazamento de memoria, etc.)
-echo  6/6 ferramentas externas (Bandit, pip-audit, Nmap e ferramentas 05, 08-10, 12-13)
+echo  6/7 ferramentas externas (Bandit, pip-audit, Nmap e ferramentas 05, 08-10, 12-13)
 echo  Roda UMA vez cada bateria sem baixar dependencias.
 echo  O pip-audit consulta dados atuais da internet na etapa 6; use OFFLINE para pular.
-if "%RODAR_POS_COMPILACAO%"=="1" echo  IMPORTANTE: etapa 7 opcional; compile o executavel antes de incluir.
+echo  Etapa 7: compile o executavel antes para que as verificacoes nao fiquem [PULADO].
 echo ============================================================
 echo.
 
@@ -110,7 +134,7 @@ call "%~dp0..\3_TESTE_ataques_simulados\RODAR ESTA PASTA - testes de ataque simu
 if errorlevel 1 set /a FALHAS+=1
 echo.
 
-echo [6/6] ferramentas externas (testes\5_TESTE_ferramentas_externas\RODAR ESTA PASTA - ferramentas externas.bat) ...
+echo [6/7] ferramentas externas (testes\5_TESTE_ferramentas_externas\RODAR ESTA PASTA - ferramentas externas.bat) ...
 if /I "%AUDIT_MODO%"=="OFFLINE" (
   set "COFRE_ONLINE_AUDIT="
   echo  Modo OFFLINE: pip-audit sera registrado como PULADO.
@@ -123,25 +147,29 @@ call "%~dp0..\5_TESTE_ferramentas_externas\RODAR ESTA PASTA - ferramentas extern
 if errorlevel 1 set /a FALHAS+=1
 echo.
 
-if "%RODAR_POS_COMPILACAO%"=="1" (
-  echo [7 opcional] verificacoes do executavel compilado (testes\7_TESTE_de_compilacao) ...
-  echo IMPORTANTE: compile o CofreSenhas.exe antes. Sem ele, as verificacoes dependentes serao marcadas como PULADO.
-  cd /d "%~dp0"
-  set "COFRE_AUTO=1"
-  call "%~dp0..\7_TESTE_de_compilacao\RODAR ESTA PASTA - testes de compilacao.bat" < nul
-  if errorlevel 1 set /a FALHAS+=1
-  echo.
-)
+echo [7/7] verificacoes do executavel compilado (testes\7_TESTE_de_compilacao) ...
+echo IMPORTANTE: compile o CofreSenhas.exe antes. Sem ele, as verificacoes dependentes serao marcadas como PULADO.
+cd /d "%~dp0"
+set "COFRE_AUTO=1"
+call "%~dp0..\7_TESTE_de_compilacao\RODAR ESTA PASTA - testes de compilacao.bat" < nul
+if errorlevel 1 set /a FALHAS+=1
+echo.
 
 rem limpeza de sobras dos testes em %TEMP%; os relatorios consolidados sao gerados apos juntar as baterias.
 py -3.13 "%~dp0limpar_artefatos_testes.py" >nul 2>nul
 
 cd /d "%~dp0"
-rem junta os resultados (que cada teste grava em testes\resultados\) num arquivo SO, tambem em testes\resultados\ -
-rem assim so precisa entrar numa pasta so (resultados\) para ver tudo, inclusive o resumo junto.
+rem junta os resultados individuais numa subpasta separada dentro de testes\resultados\.
 if not exist "%~dp0..\resultados" mkdir "%~dp0..\resultados"
+set "PASTA_COMPLETO=%~dp0..\resultados\resultado completo"
+if not exist "%PASTA_COMPLETO%" mkdir "%PASTA_COMPLETO%" >nul 2>nul
+if not exist "%PASTA_COMPLETO%" (
+  echo ERRO: nao foi possivel criar testes\resultados\resultado completo.
+  set /a FALHAS+=1
+  goto :fim
+)
 if "%DRIVE%"=="" (set "NATIVO_ARQ=%~dp0..\resultados\resultado_nativo_windows.txt") else (set "NATIVO_ARQ=%~dp0..\resultados\resultado_nativo_windows_%DRIVE%.txt")
-set "TUDO=%~dp0..\resultados\resultado_rodar_todos_windows.txt"
+set "TUDO=%PASTA_COMPLETO%\resultado_rodar_todos_windows.txt"
 echo ====== 1/6 nucleo (RODAR ESTA PASTA - testes do motor do cofre.bat) ====== > "%TUDO%"
 type "%~dp0..\resultados\resultado_nucleo_windows.txt" >> "%TUDO%" 2>nul
 echo. >> "%TUDO%"
@@ -157,21 +185,20 @@ echo. >> "%TUDO%"
 echo ====== 5/6 pentest (RODAR ESTA PASTA - testes de ataque simulado.bat) ====== >> "%TUDO%"
 type "%~dp0..\resultados\resultado_pentest_windows.txt" >> "%TUDO%" 2>nul
 echo. >> "%TUDO%"
-echo ====== 6/6 ferramentas externas (RODAR ESTA PASTA - ferramentas externas.bat) ====== >> "%TUDO%"
+echo ====== 6/7 ferramentas externas (RODAR ESTA PASTA - ferramentas externas.bat) ====== >> "%TUDO%"
 type "%~dp0..\resultados\resultado_ferramentas_externas_windows.txt" >> "%TUDO%" 2>nul
-if "%RODAR_POS_COMPILACAO%"=="1" (
-  echo. >> "%TUDO%"
-  echo ====== etapa 7 opcional: testes de compilacao ====== >> "%TUDO%"
-  type "%~dp0..\resultados\resultado_cofre_compilado_windows.txt" >> "%TUDO%" 2>nul
-) else (
-  echo. >> "%TUDO%"
-  echo ====== etapa 7 opcional: nao solicitada ====== >> "%TUDO%"
-  echo [PULADO] Para executar, compile o CofreSenhas.exe e passe POS-COMPILACAO ao Testar Tudo. >> "%TUDO%"
+echo. >> "%TUDO%"
+echo ====== 7/7 testes de compilacao ====== >> "%TUDO%"
+type "%~dp0..\resultados\resultado_cofre_compilado_windows.txt" >> "%TUDO%" 2>nul
+py -3.13 "%~dp0consolidar_resultados.py" >nul
+if errorlevel 1 (
+  echo ERRO: nao foi possivel consolidar os resultados desta bateria.
+  set /a FALHAS+=1
 )
-py -3.13 "%~dp0consolidar_resultados.py" >nul 2>nul
+py -3.13 -X utf8 "%~dp0reunir_erros_compilacao.py"
 if errorlevel 1 set /a FALHAS+=1
-if not exist "%~dp0..\resultados\RESULTADO COMPLETO.txt" (
-  echo ERRO: nao foi possivel gerar testes\resultados\RESULTADO COMPLETO.txt.
+if not exist "%PASTA_COMPLETO%\RESULTADO COMPLETO.txt" (
+  echo ERRO: nao foi possivel gerar testes\resultados\resultado completo\RESULTADO COMPLETO.txt.
   set /a FALHAS+=1
 )
 exit /b 0
@@ -186,17 +213,18 @@ if exist "%COFRE_TEST_CACHE_DIR%" (
   rmdir "%~dp0..\CACHE" >nul 2>nul
 )
 echo ============================================================
-echo  Rodada concluida. Todos os arquivos ficam diretamente em testes\resultados\.
+echo  Rodada concluida. Arquivos individuais em testes\resultados\ e consolidados em "resultado completo"\.
 if "%FALHAS%"=="0" (
-  if "%RODAR_POS_COMPILACAO%"=="1" (echo  As 6 baterias obrigatorias e a etapa opcional 7 terminaram sem falhas.) else (echo  TUDO PASSOU nas 6 baterias obrigatorias; a etapa 7 e opcional.)
+  echo  TUDO PASSOU nas 7 baterias; confira os itens [PULADO] da etapa 7 sem executavel compilado.
 ) else (
   echo  Pelo menos uma etapa terminou com erro: confira o resultado abaixo mesmo assim ^(o numero acima
   echo  nem sempre e exato - o que vale e o conteudo do arquivo^).
 )
 echo.
-echo  Resultado completo (arquivos individuais): testes\resultados\RESULTADO COMPLETO.txt
-echo  Resultado por baterias: testes\resultados\resultado_rodar_todos_windows.txt
+echo  Resultado completo (arquivos individuais): testes\resultados\resultado completo\RESULTADO COMPLETO.txt
+echo  Resultado por baterias: testes\resultados\resultado completo\resultado_rodar_todos_windows.txt
 echo  Resumo: resumo_testes.md  ^|  Log de depuracao: testes\resultados\log_depuracao.txt
+echo  Erros da bateria: logs_de_compilacao\erros de compilação\TODOS_OS_ERROS.txt
 echo ============================================================
 set "COFRE_OFFLINE="
 echo Pressione uma tecla para fechar esta janela.

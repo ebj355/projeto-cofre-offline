@@ -1,4 +1,5 @@
-﻿# ============================================================================
+﻿# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
+# ============================================================================
 #  Aplicar ajustes de segurança (mantém o Avast)
 #  - Cria ponto de restauração antes de mudar qualquer coisa
 #  - Desativa reprodução automática de pendrives

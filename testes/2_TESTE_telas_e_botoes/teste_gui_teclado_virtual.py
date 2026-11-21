@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Teclado virtual: as teclas são criadas UMA vez e só trocam de letra (sem recriar, sem piscar), digitam no campo,
 apagam, alternam maiúsculas, mostram a contagem sem revelar a senha, fecham com Esc e respondem rápido.
 Roda no Windows ou no Linux (xvfb-run -a)."""

@@ -1,4 +1,4 @@
-# Testes da INTERFACE (janelas Tk)
+# Testes da Arca — INTERFACE (janelas Tk)
 
 **Para que serve esta pasta:** Abrem as telas de verdade (no Linux com tela virtual `xvfb-run`; no Windows em janelas reais) e clicam/digitam como um usuário. Cada `teste_gui_*.py` é independente.
 
@@ -8,6 +8,7 @@ _Gerado por `testes/6_TESTE_ferramentas_dos_testes/gerar_indices.py` (não edite
 |---|---|
 | `RODAR ESTA PASTA - testes das telas e botoes.bat` | Atalho de dois cliques da bateria de INTERFACE no Windows (chama teste_gui_windows.ps1). |
 | `sitecustomize.py` | Keeps automated Tk windows behind the user's active app on Windows. |
+| `teste_autocompletar.py` | Verifica o autocomplete de marcas sem rede; use --visual para abrir a janela manual. |
 | `teste_gui_abertura.py` | Velocidade de abertura: importação + tela de desbloqueio em menos de 2,5 s (sem contar o Argon2 de criar o cofre), e as bibliotecas pesadas (Excel/openpyxl, FIDO) só carregam quando são usadas (lazy). |
 | `teste_gui_acessibilidade_teclado.py` | Acessibilidade: navegação completa SEM MOUSE (só teclado). `teste_gui_desempenho_usabilidade.py` já confere contraste, tamanho de fonte e número de cliques; `teste_gui_efeitos.py` já confere Esc fechando diálogos. O que |
 | `teste_gui_ajustes_ui.py` | Interface (Tk): gerador com rodapé fixo e detalhes escondidos, 'Usar em um novo item', caixas de extras no Novo item, grupos DENTRO de cada perfil, painel de proteção recolhido, convite do guia na 1ª entrada e troca de tela sem apagar a |
@@ -24,13 +25,13 @@ _Gerado por `testes/6_TESTE_ferramentas_dos_testes/gerar_indices.py` (não edite
 | `teste_gui_copiar.py` | Botões 'Copiar' do painel do item e do formulário de edição: copiam o valor certo, mostram 'Copiado', limpam a área de transferência e voltam ao normal. |
 | `teste_gui_criar.py` | Tela de CRIAR o cofre (primeiro uso): campos da senha mestra, validações e criação do arquivo. |
 | `teste_gui_dados_bancarios.py` | Interface: dados bancários (número da conta / agência) no formulário de item. Verifica que os campos aparecem ao marcar as caixas, salvam e sobrevivem a fechar/reabrir o cofre (cifrados), |
-| `teste_gui_desempenho_usabilidade.py` | Desempenho e usabilidade da interface (Linux/xvfb). Mede tempos, vazamento de janelas/widgets/timers e memória em ciclos repetidos, rolagem/busca/ordenação com milhares de contas, e confere critérios de usabilidade: foco inicial, |
+| `teste_gui_desempenho_usabilidade.py` | Desempenho e usabilidade da interface (Linux/xvfb). Mede tempos, vazamento de janelas/widgets/timers e memória em ciclos repetidos, paginação/busca/ordenação com milhares de contas, e confere critérios de usabilidade: foco inicial, |
 | `teste_gui_diagnostico.py` | Teste de interface (Tk): menu ⋯ › Diagnóstico mostra os registros cifrados (só com o cofre aberto), pendrive removido durante uma gravação mostra mensagem clara (sem caminho) e não perde nada na memória. Veja testes/COMO_RODAR_OS_TESTES.md. |
 | `teste_gui_efeitos.py` | Animação e efeitos: a troca de tela é única (sem quadro vazio), a janela nunca fica transparente/invisível, o aviso 'Verificando…/Salvando…' aparece só quando demora e some sempre (mesmo com erro), não sobram janelinhas, |
 | `teste_gui_em_uso.py` | COFRE ABERTO EM OUTRA JANELA: a segunda janela (App(..., em_uso=True)) vai direto para o MODO CONSULTA, sem perguntar, com faixa de aviso própria, ações que alteram dados só explicam e nada é gravado. Também confere a faixa de REVERSÃO. |
 | `teste_gui_energia.py` | Suspender o PC / bloquear a sessão (Win+L): apaga as chaves da memória e bloqueia; trocar a senha mestra pela tela e a chave de acesso nova. |
 | `teste_gui_fido.py` | Tela de chaves FIDO2 e filtros da lista: cadastro/remoção de chaves, item antigo ganhando campos novos, filtro por grupo. |
-| `teste_gui_fluidez_animacoes.py` | Testes de FLUIDEZ e GLITCHES visuais (Linux/xvfb): janelas que deviam fechar antes de mexer no campo por baixo, textos com destaque/tamanho dinâmico, redimensionamento em rajada de um diálogo rolável, e arraste do cartão do |
+| `teste_gui_fluidez_animacoes.py` | Testes de FLUIDEZ e GLITCHES visuais (Linux/xvfb): janelas que deviam fechar antes de mexer no campo por baixo, textos com destaque/tamanho dinâmico, ajuste do diálogo sem rolagem, e arraste do cartão do |
 | `teste_gui_fontes.py` | FONTES NOMEADAS: preparar_fontes pode ser chamada de novo (mesma janela ou outra janela) sem erro. Antes, a segunda chamada falhava com "named font ... does not exist" no Python 3.14 do Windows (descartar o objeto Font antigo apagava a |
 | `teste_gui_forca.py` | Força das senhas na interface: senha repetida/fraca nos alertas, 'Verificar senhas', troca por senha forte e a impressão da folha de emergência. |
 | `teste_gui_importacao.py` | Importar planilha pela interface: itens entram no cofre, a planilha é apagada depois, o aviso de itens que precisam de atenção. |
@@ -53,4 +54,6 @@ _Gerado por `testes/6_TESTE_ferramentas_dos_testes/gerar_indices.py` (não edite
 | `teste_gui_teclado_virtual.py` | Teclado virtual: as teclas são criadas UMA vez e só trocam de letra (sem recriar, sem piscar), digitam no campo, apagam, alternam maiúsculas, mostram a contagem sem revelar a senha, fecham com Esc e respondem rápido. |
 | `teste_gui_tentativas.py` | Teste de interface: o selo 'Tentativas restantes' da tela inicial acompanha cada senha errada, o aviso fica acima do botão e o MODO CONSULTA avisa que não conta tentativas. Roda no Linux com xvfb-run. |
 | `teste_gui_tentativas_config.py` | Tentativas erradas: as setas das caixas numéricas funcionam (clique real sobe/desce), a tela de criar NÃO mostra mais a opção (ela fica dentro do cofre, ⋯ > Tentativas erradas, e pede a senha mestra), a mudança é gravada no cofre e vale |
+| `teste_gui_visual_varredura.py` | Varredura VISUAL da interface da Arca (Tk real), em varias escalas do Windows e varios tamanhos de janela. O que procura, em cada tela (criar, desbloqueio, principal e a janela "Novo item"): |
 | `teste_gui_windows.ps1` | Prepara um ambiente Python temporário e roda a bateria de interface (rodar_todos.py --so gui) no Windows, gravando o resultado. |
+| `teste_icones.py` | Verifica ícones de marcas; use --visual para abrir uma grade demonstrativa de 40 marcas. |

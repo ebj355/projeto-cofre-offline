@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 $ErrorActionPreference = 'Stop'
 
 $raiz = $PSScriptRoot

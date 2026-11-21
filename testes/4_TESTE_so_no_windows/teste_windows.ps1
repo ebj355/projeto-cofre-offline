@@ -1,4 +1,5 @@
-﻿# Teste de fumaça (do INSTALADOR/SO, não do núcleo) no Windows REAL. Não cria cofre e não mexe no pendrive. Cria um
+﻿# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
+# Teste de fumaça (do INSTALADOR/SO, não do núcleo) no Windows REAL. Não cria cofre e não mexe no pendrive. Cria um
 # ambiente Python TEMPORÁRIO ao lado deste arquivo (apagado no fim) para instalar as bibliotecas do cofre; não altera
 # o Python do sistema. A bateria do núcleo tem seu próprio teste separado: testes\1_TESTE_motor_do_cofre\RODAR ESTA PASTA - testes do motor do cofre.bat.
 # Escreve o resultado em resultados\resultado_teste_windows.txt (uma pasta acima, junto com o de todos os outros testes).
@@ -74,7 +75,7 @@ if ($py -and (Test-Path $fonte)) {
     $req = Join-Path $pai 'requirements.txt'
     if (-not (Test-Path $req)) { L "[info] requirements.txt não está em ${pai}: copie-o para lá para os testes 4 e 6 rodarem" }
     if (Test-Path $req) {
-        $pins = Get-Content $req | Where-Object { $_ -match '^(cryptography|argon2-cffi|argon2-cffi-bindings|openpyxl|defusedxml|fido2|cffi|pycparser|et-xmlfile)==' }
+        $pins = Get-Content $req | Where-Object { $_ -match '^(cryptography|argon2-cffi|argon2-cffi-bindings|openpyxl|defusedxml|fido2|pillow|cffi|pycparser|et-xmlfile)==' }
         $reqT = Join-Path $aqui 'req_teste_tmp.txt'
         Set-Content -Path $reqT -Value $pins -Encoding ASCII
         L 'Criando ambiente temporário e instalando as bibliotecas do wheelhouse local...'

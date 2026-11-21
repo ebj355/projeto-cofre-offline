@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Verifica as seis paletas fixas, o contraste e a persistência local da escolha."""
 import json
 import os

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Bateria de ataques contra o cofre. Uso: python3.12 ataques.py /caminho/para/pasta_do_cofre"""
 import os, sys, time, shutil, struct, secrets, math
 sys.path.insert(0, sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))

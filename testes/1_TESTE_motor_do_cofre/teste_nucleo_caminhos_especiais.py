@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """CAMINHOS COMPLICADOS: espaços, acentos, símbolos, emoji e caminhos muito longos.
 
 O cofre pode estar em `D:\\Meus Documentos\\Cofre de Senhas (Teste)!\\`, no perfil de alguém chamado 'José Ção', num

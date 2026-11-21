@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Arquivos de apoio do cofre escondidos e protegidos depois da instalação (Oculto+Sistema+Somente leitura).
 Usa um 'Windows de mentira' (atributos guardados num dicionário) para provar a lógica em qualquer sistema:
  - só o que é do cofre é marcado (cofre, cópias, .diag, .lock, logs); o PRÓPRIO PROGRAMA (.exe) NUNCA é escondido

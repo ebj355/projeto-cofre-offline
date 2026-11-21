@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Bateria de interface: cada tela é montada, cada botão do cabeçalho e cada item do menu '⋯' é acionado; confere que
 nenhum evento levanta exceção, que não sobram janelas, que os textos fixos da tela são CURTOS (o resto vai no '?'),
 que os 3 modos de abertura (só senha / senha+chave / senha ou chave) mostram os campos certos e que o
@@ -70,8 +71,8 @@ tx = " | ".join(textos(app.frame))
 ok("Só senha mestra" in tx and "Senha E chave de acesso" in tx and "Senha OU chave de acesso" in tx, "criação oferece os 3 modos")
 ok("1. Defina a senha mestra" in tx and "2. Escolha como abrir" in tx and
    "3. Proteção contra tentativas" in tx, "criação organiza as escolhas em etapas")
-ok("Só a senha abre o cofre." in tx and "Exige senha e chave juntos." in tx and
-   "Qualquer uma abre sozinha." in tx, "cada modo explica claramente o que será exigido")
+ok("Só a senha abre o cofre." in tx and "Exige senha e chave juntas" in tx and
+   "Qualquer uma abre; oferece menos proteção." in tx, "cada modo explica claramente o que será exigido")
 proximos = [w for w in todos(app.frame) if w.winfo_class() == "TLabel" and str(w.cget("text")).startswith("PRÓXIMO PASSO")]
 ok(len(proximos) == 1 and "chave de acesso" in str(proximos[0].cget("text")),
    "o próximo passo avisa que a chave será exibida uma única vez")
@@ -85,7 +86,7 @@ ok("o cofre abrirá com a senha mestra" in str(proximos[0].cget("text")),
 ok(cartao_recomendado.cget("highlightbackground") != c.CORES["prim"],
    "o destaque acompanha a opção selecionada")
 descricao_ou = next(w for w in todos(app.frame) if w.winfo_class() == "TLabel" and
-                    str(w.cget("text")).startswith("Qualquer uma abre sozinha."))
+                    str(w.cget("text")).startswith("Qualquer uma abre; oferece menos proteção."))
 descricao_ou.event_generate("<Button-1>"); root.update()
 ok("ela também poderá abrir o cofre sozinha" in str(proximos[0].cget("text")),
    "clicar na descrição seleciona o modo correspondente")

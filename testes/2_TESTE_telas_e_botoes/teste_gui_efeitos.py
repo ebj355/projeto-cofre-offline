@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Animação e efeitos: a troca de tela é única (sem quadro vazio), a janela nunca fica transparente/invisível,
 o aviso 'Verificando…/Salvando…' aparece só quando demora e some sempre (mesmo com erro), não sobram janelinhas,
 timers ou widgets após 60 trocas de tela, e a barra de força/ranking atualiza sem travar a digitação."""

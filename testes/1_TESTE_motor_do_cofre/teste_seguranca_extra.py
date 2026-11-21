@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Senha mestra fraca recusada, checagem de vazamentos (k-anonymity, rede simulada) e tempo de bloqueio configurável."""
 import os, sys, types
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))

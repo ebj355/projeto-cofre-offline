@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Teste de interface: o selo 'Tentativas restantes' da tela inicial acompanha cada senha errada, o aviso fica acima
 do botão e o MODO CONSULTA avisa que não conta tentativas. Roda no Linux com xvfb-run."""
 import os, sys, tempfile

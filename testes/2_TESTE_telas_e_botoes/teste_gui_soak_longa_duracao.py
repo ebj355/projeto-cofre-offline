@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """SOAK TEST DA INTERFACE: ciclos seguidos (padrão 60; 1.000 = cerca de 50 min, use COFRE_SOAK_CICLOS=1000) de desbloquear -> usar -> bloquear com o Tkinter de verdade.
 
 Complementa o teste de 30 ciclos (teste_gui_resiliencia_uso): aqui o uso é MUITO prolongado, para evidenciar o que só

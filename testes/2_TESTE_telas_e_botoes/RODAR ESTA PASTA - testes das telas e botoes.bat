@@ -1,6 +1,12 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
+if not defined COFRE_TEST_MINIMIZADO (
+  set "COFRE_TEST_MINIMIZADO=1"
+  start "" /min cmd.exe /d /c ""%~f0" %*"
+  exit /b
+)
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0teste_gui_windows.ps1"
 set "COD=%errorlevel%"
 echo.

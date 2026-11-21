@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Confere protecoes ASLR, DEP, High-Entropy ASLR e CFG; codigos: 0=ok, 1=protecao ausente, 2=exe nao encontrado, 9=pefile ausente."""
 import os
 import sys

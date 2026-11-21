@@ -1,4 +1,5 @@
-﻿# ============================================================================
+﻿# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
+# ============================================================================
 #  Verificação do NÚCLEO do Windows (drivers e inicialização) — SOMENTE LEITURA
 #  Procura sinais de rootkit: drivers sem assinatura, de fabricante desconhecido,
 #  em pastas estranhas, ou inicialização do Windows com proteções desligadas.

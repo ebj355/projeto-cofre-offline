@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Importação em QUARENTENA: identidade real do arquivo (magic bytes), cópia isolada que é destruída, prazo máximo,
 esquema rígido e modelo oficial. Nada disso pode tocar o cofre.dat."""
 import os, sys, tempfile, glob, zipfile, time

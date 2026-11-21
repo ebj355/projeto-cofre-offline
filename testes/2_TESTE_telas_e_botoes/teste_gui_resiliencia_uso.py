@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface sob uso real e abuso: cliques freneticos, texto absurdo, perda de foco, ciclos de abrir/fechar,
 janelas modais, tela de integridade e aviso do pendrive. Roda no Linux com xvfb-run e no Windows.
  A) Salvar clicado 15x seguidas  -> UM só item (nunca duplicado);

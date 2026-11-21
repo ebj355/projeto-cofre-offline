@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Importação de planilhas Excel/CSV (cabeçalhos bagunçados, Chrome, acentos, PIN com zero) e apagamento seguro.
 Uso:  python testes/teste_importacao.py"""
 import os, sys, tempfile

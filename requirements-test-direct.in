@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 # Entradas diretas do ambiente de testes; requirements-test-lock.txt e o lock final com hashes.
 # Manter os pacotes de runtime alinhados com requirements.txt e as ferramentas em versoes exatas.
 cryptography==50.0.2
@@ -6,6 +7,7 @@ argon2-cffi-bindings==26.1.0
 openpyxl==3.1.5
 defusedxml==0.7.1
 fido2==2.2.1
+pillow==13.0.0
 cffi==2.1.1
 pycparser==3.12
 et-xmlfile==2.0.0

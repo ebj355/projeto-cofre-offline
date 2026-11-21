@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Alerta de tentativas erradas e histórico de aberturas: conta as senhas erradas desde a última abertura, guarda o histórico CIFRADO e mostra o aviso na tela."""
 import os as _os, sys as _sys, tempfile as _tf, subprocess as _sp
 _RAIZ = _os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))
@@ -101,7 +102,7 @@ def p3():
     # suspensão / bloqueio do Windows
     app._ultimo_tique = time.time() - 120; app._vigiar_sistema(); root.update()
     ok(app.cofre is None, "PC dormiu (salto de relógio) -> cofre bloqueado")
-    root.destroy()
+    app.sair()
 root.after(800, p1); root.mainloop()
 for x in (P, P + ".tmp"):
     if os.path.exists(x): os.remove(x)

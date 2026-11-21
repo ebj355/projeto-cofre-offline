@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Reforço do computador autorizado com o segredo local (DPAPI no Windows; arquivo comum só em desenvolvimento).
 Prova: PC reforçado NÃO abre só com a identidade (MachineGuid/UUID) — precisa do segredo; sem o segredo (outro usuário,
 Windows reinstalado) cai no código de recuperação; PC não reforçado continua abrindo; misturar os dois níveis."""

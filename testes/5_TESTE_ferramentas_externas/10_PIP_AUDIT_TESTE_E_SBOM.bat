@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem pip-audit tambem no requirements-test-lock.txt e gera o inventario SBOM (CycloneDX) do requirements.txt. Precisa de internet: COFRE_ONLINE_AUDIT=1.
 rem Codigos de saida: 0 = nada encontrado | 1 = achados ou falha de rede | 9 = pulado (offline)

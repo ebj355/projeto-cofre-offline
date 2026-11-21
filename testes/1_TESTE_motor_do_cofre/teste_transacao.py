@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Transações do cofre: alteração dentro de 'with transacao()' grava; se a gravação falha (disco cheio) a alteração é desfeita."""
 import sys, os, tempfile
 sys.path.insert(0,os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Recorte de texto e de botões: em vários tamanhos de janela, nenhuma tela nem janela pode ter rótulo/botão/campo
 CORTADO (largura/altura real menor que a pedida) nem widget fora da área visível da janela. Roda no Windows ou no
 Linux (xvfb-run -a)."""
@@ -33,7 +34,11 @@ def cortados(topo, tol=3):
             if w.winfo_class() not in CLASSES or not w.winfo_ismapped(): continue
             if w.winfo_width() <= 1 or w.winfo_height() <= 1: continue
             nome = f"{w.winfo_class()}[{str(w.cget('text'))[:30]!r}]" if "text" in w.keys() else w.winfo_class()
-            if w.winfo_width() + tol < w.winfo_reqwidth() and w.winfo_class() not in ("TEntry", "Entry", "TCombobox"):
+            texto = str(w.cget("text")) if "text" in w.keys() else ""
+            imagem = str(w.cget("image")) if "image" in w.keys() else ""
+            sem_conteudo = w.winfo_class() in ("TLabel", "Label") and not texto and not imagem
+            if (w.winfo_width() + tol < w.winfo_reqwidth()
+                    and w.winfo_class() not in ("TEntry", "Entry", "TCombobox") and not sem_conteudo):
                 ruins.append(f"{nome} largura {w.winfo_width()} < {w.winfo_reqwidth()}")
             if w.winfo_height() + tol < w.winfo_reqheight():
                 ruins.append(f"{nome} altura {w.winfo_height()} < {w.winfo_reqheight()}")

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Anti-captura de tela: a janela principal e os diálogos pedem ao Windows para aparecer PRETOS em prints, gravações e acesso remoto
 (SetWindowDisplayAffinity). No Windows lê de volta com GetWindowDisplayAffinity e confere que valeu; no Linux só confere o que dá (sem erro, e a proteção está ligada em todas as janelas do código)."""
 import os, re, sys

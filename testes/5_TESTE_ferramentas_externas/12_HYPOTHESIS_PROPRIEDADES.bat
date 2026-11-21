@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Hypothesis: roda testes\1_TESTE_motor_do_cofre\teste_propriedades_hypothesis.py (ida e volta do cofre e CSV hostil com milhares de entradas geradas).
 rem Codigos de saida: 0 = passou | 1 = falhou | 9 = ambiente/hypothesis ausente (pulado)

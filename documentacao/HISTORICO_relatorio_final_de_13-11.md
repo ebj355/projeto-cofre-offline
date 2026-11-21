@@ -1,4 +1,7 @@
+<!-- ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt -->
 # Cofre de Senhas — relatório final (13/11/2026)
+
+> Registro histórico anterior à adoção da marca **Arca**, produto da **Arca Sistemas**. Os resultados e nomes abaixo descrevem o estado do projeto naquela data.
 
 ## 1. Resultado em uma linha
 Suíte completa: **77 testes, 0 falhas** (Linux/simulado). bandit: 0 achados médios/altos; pip-audit: nenhuma vulnerabilidade conhecida. **Nada disto foi executado em Windows real:** veja a seção 7 (há um teste novo para isso).

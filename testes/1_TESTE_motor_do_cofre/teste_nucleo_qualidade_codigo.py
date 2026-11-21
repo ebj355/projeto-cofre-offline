@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Qualidade de software e higiene do código-fonte, no nível de "isso aqui seria um problema de verdade se
 alguém revisasse o código" (complementa o `bandit`/`flake8` já cobertos por `teste_pentest_sast.py`, que olham
 padrões conhecidos de insegurança; aqui o foco é em coisas que uma ferramenta genérica não sabe que são

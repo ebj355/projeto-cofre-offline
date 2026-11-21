@@ -1,0 +1,14 @@
+ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
+ARCA SISTEMAS | PRODUTO ARCA
+MARCADOR INTERNO DE IDENTIFICACAO DO PROJETO
+
+Os marcadores inseridos nos arquivos de primeira autoria identificam sua associacao
+ao pacote do produto Arca, da Arca Sistemas.
+
+Este marcador textual nao e assinatura digital e nao comprova, sozinho, autoria,
+titularidade legal nem integridade contra alteracoes. Os direitos autorais e termos
+de uso permanecem conforme LICENSE; arquivos de terceiros continuam sob suas
+respectivas licencas.
+
+Uma prova criptografica verificavel exige assinatura digital com certificado confiavel
+(por exemplo, Authenticode para o executavel) e verificacao da cadeia do certificado.

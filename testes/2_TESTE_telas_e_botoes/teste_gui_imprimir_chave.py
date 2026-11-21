@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Impressão: o cofre só imprime a cópia de emergência da chave de acesso e do código de recuperação, e só depois de
 pedir a senha mestra. Itens não têm 'Imprimir'; qualquer outro título é bloqueado; a senha mestra nunca é impressa;
 o trabalho na fila do Windows tem nome genérico."""

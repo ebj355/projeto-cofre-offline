@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Arquivo de chave de acesso SELADO (.key cifrado): só o cofre dono o decifra e o carrega; outro cofre, byte
 alterado e texto puro antigo se comportam como esperado; a chave carregada realmente abre o cofre."""
 import os, sys, tempfile

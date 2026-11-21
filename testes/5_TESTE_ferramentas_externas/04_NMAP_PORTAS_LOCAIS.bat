@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Nmap: lista as 100 portas TCP mais comuns SOMENTE em 127.0.0.1 (este proprio computador).
 rem Codigos de saida: 0 = concluido | outro = erro do Nmap | 9 = Nmap nao instalado (pulado)

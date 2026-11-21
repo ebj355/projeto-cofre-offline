@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Auxiliar dos testes (não é um teste): pico de memória do processo em KB, no Linux (resource) e no Windows (psapi)."""
 
 

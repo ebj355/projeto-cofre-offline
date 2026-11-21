@@ -1,10 +1,11 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """ESQUEMA HOSTIL DENTRO DO COFRE: itens com formato errado depois de decifrados.
 
 O arquivo é autenticado (ninguém de fora o altera), mas um item pode chegar torto de uma versão antiga, de uma
 importação ou de um defeito: campo com tipo errado, `id` ausente ou repetido, aninhamento absurdo, número gigante.
 Antes da função `_sanear_itens` isso passava na abertura e quebrava DEPOIS (a auditoria de senhas dava AttributeError).
-Confere que, para cada caso: o cofre ABRE, todo campo conhecido é texto, todo `id` é texto único, a auditoria local
-e uma volta salvar/abrir funcionam, e que um cofre NORMAL passa pelo saneamento sem nenhuma alteração."""
+Confere que, para cada caso: o cofre ABRE, campos textuais conhecidos são texto, `ativo` permanece booleano, todo `id`
+é texto único, a auditoria local e uma volta salvar/abrir funcionam, e um cofre NORMAL não muda no saneamento."""
 import copy, os, sys, tempfile, importlib.util
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +38,7 @@ CASOS = {
     "ids repetidos": [{"id": "a", "servico": "primeiro"}, {"id": "a", "servico": "segundo"}, {"id": "a", "servico": "terceiro"}],
     "campos desconhecidos e nomes perigosos":
         [{"id": "z", "servico": "s", "__proto__": {"admin": True}, "constructor": "x", "evil": "x" * 1000}],
+    "estado ativo legado": [{"id": "ativo", "servico": "s", "ativo": "False"}],
     "aninhamento de 3000 níveis": [{"id": "n", "servico": "s", "notas": fundo}],
     "inteiro com 5000 dígitos": [{"id": "g", "servico": "s", "notas": 10 ** 5000}],
     "float infinito/NaN": [{"id": "f", "servico": "s", "pin": float("inf"), "chave": float("nan")}],
@@ -60,8 +62,11 @@ for nome, regs in CASOS.items():
         ok(False, f"abrir quebrou: {type(ex).__name__}: {str(ex)[:80]}")
         continue
     ok(len(a.registros) == len(regs), f"abriu com {len(a.registros)} item(ns)")
-    textos = all(isinstance(r.get(k, ""), str) for r in a.registros for k in c.CAMPOS)
-    ok(textos, "todo campo conhecido é texto")
+    textos = all(isinstance(r.get(k, ""), str) for r in a.registros for k in c.CAMPOS if k != "ativo")
+    ativos = all(isinstance(r.get("ativo", True), bool) for r in a.registros)
+    ok(textos and ativos, "campos textuais são texto e o estado ativo é booleano")
+    if nome.startswith("estado ativo"):
+        ok(a.registros[0]["ativo"] is False, "marcador legado 'False' continua desativado como booleano")
     # cópias NOVAS dos ids (caractere a caractere): fechar() zera os textos dos itens no próprio objeto
     ids = ["".join(list(r.get("id"))) if isinstance(r.get("id"), str) else r.get("id") for r in a.registros]
     servicos = ["".join(list(r.get("servico", ""))) for r in a.registros]

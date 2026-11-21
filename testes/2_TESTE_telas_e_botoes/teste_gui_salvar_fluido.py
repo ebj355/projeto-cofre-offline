@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface: o salvamento (lento num pendrive FAT32) NÃO congela a janela; o aviso 'Salvando…' só aparece
 se passar de 0,4 s; o bloqueio automático espera a gravação acabar; erros de formato da chave contam depois de 3."""
 import os, sys, tempfile, time

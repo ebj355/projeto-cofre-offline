@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """TRAVA ENTRE INSTÂNCIAS (.lock) e CONTADOR ANTI-REVERSÃO.
 1) Dois processos: o segundo recebe 'em uso' (False); a trava some sozinha quando o dono sai ou leva kill -9.
 2) Sem poder criar o .lock (pendrive protegido): não trava o programa (None -> segue).

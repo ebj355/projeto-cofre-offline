@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Teste NATIVO no Windows real: confirma o que os testes em Linux só puderam simular.
 Cobre: atributos de arquivo (oculto/sistema/somente leitura), ACL NTFS (icacls do instalador), leitura do SMBIOS
 (comparada com o PowerShell), DPAPI (criar/ler/adulterar o segredo local), fator "computador autorizado" de ponta a
@@ -89,7 +90,11 @@ def acl():
     sid = re.findall(r'S-1-[0-9-]+', saida)[-1] if "S-1-" in saida else ""
     ver("SID do usuário obtido (whoami)", sid.startswith("S-1-5-21") or sid.startswith("S-1-12-1") or sid.startswith("S-1-5-"), sid[:12] + "...")
     cod, saida = sh(["icacls", pasta, "/inheritance:r", "/grant:r", f"*{sid}:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F"])
-    ver("icacls aplicou a ACL (herança removida, só usuário e SISTEMA)", cod == 0, saida.strip().splitlines()[-1][:80] if saida.strip() else "")
+    if cod == 0:
+        cod, saida_remocao = sh(["icacls", pasta, "/remove:g", "*S-1-1-0", "*S-1-5-11", "*S-1-5-32-545"])
+        if cod != 0:
+            saida += "\n" + saida_remocao
+    ver("icacls aplicou a ACL sem grupos amplos", cod == 0, saida.strip().splitlines()[-1][:80] if saida.strip() else "")
     cod, lista = sh(["icacls", pasta])
     ent = [l.strip() for l in lista.splitlines() if ":(" in l or "):" in l.replace("OI", "")]
     info("ACL resultante:\n             " + "\n             ".join(l.strip() for l in lista.splitlines() if l.strip() and "processados" not in l.lower() and "processed" not in l.lower()))

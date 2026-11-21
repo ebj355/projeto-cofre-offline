@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Queda de energia e acesso simultâneo: mata (SIGKILL) o programa no meio de gravações repetidas e confere que o cofre
 SEMPRE abre com tudo que já tinha sido confirmado; duas instâncias gravando no mesmo arquivo nunca o corrompem; e a
 checagem de memória livre recusa o Argon2 sem gastar tentativa. Roda no Linux (e no Windows, com Python)."""
@@ -19,6 +20,7 @@ def ok(cond, msg):
 S = "cavalo azul come pizza na chuva"
 FILHO = textwrap.dedent('''
     import sys, importlib.util, time, os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(sys.argv[1])))
     spec = importlib.util.spec_from_file_location("c", sys.argv[1]); c = importlib.util.module_from_spec(spec); spec.loader.exec_module(c)
     P, S, modo, segundos, tamanho_nota = sys.argv[2], sys.argv[3], sys.argv[4], float(sys.argv[5]), int(sys.argv[6])
     barreira, pronto = (sys.argv[7], sys.argv[8]) if len(sys.argv) > 8 else ("", "")

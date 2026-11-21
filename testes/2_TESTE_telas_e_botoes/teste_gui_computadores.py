@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface (Tk): janela 'Computadores autorizados', ranking com o item do computador e tela de desbloqueio em um
 computador NÃO autorizado (pede o código de recuperação, sem gastar tentativa). Computadores simulados."""
 import os, sys, tempfile, hashlib

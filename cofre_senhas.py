@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """
-Cofre de Senhas — gerenciador de senhas 100% local, criptografado, com autodestruição.
+Arca — Cofre de Segurança, produto da Arca Sistemas.
+Gerenciador de senhas 100% local, criptografado, com autodestruição.
 Não faz conexões automaticamente. A consulta opcional de senhas vazadas usa HTTPS
 somente quando solicitada; envia apenas o prefixo de 5 caracteres do SHA-1.
 
@@ -33,7 +35,7 @@ Armazenamento: "cofre.dat" na MESMA pasta do programa, ou outro caminho:
 
 Importação: planilhas Excel (.xlsx/.xlsm) e CSV (inclusive exportações do Chrome/Samsung Pass).
 
-Dependências:  pip install cryptography argon2-cffi openpyxl defusedxml fido2
+Dependências:  pip install cryptography argon2-cffi openpyxl defusedxml fido2 pillow
 
 Mapa das seções, responsabilidades e fluxos: documentacao/GUIA_TECNICO_DO_CODIGO.md
 """
@@ -79,21 +81,10 @@ def _aviso_fatal(titulo, texto):
     print(f"{titulo}\n{texto}")
 
 
-def _dx(txt_b85):
-    """Decodifica um texto de tela ofuscado (Base85 + XOR leve). NÃO é uma fronteira de segurança: só reduz o
-    que a ferramenta `strings` mostra em claro sobre o programa. A proteção dos dados está na senha mestra,
-    não em escondido o que o programa faz ou mostra na tela."""
-    chave = b"NadaAquiProtegeSenha-AProtecaoEhDaSenhaMestra"
-    dados = base64.b85decode(txt_b85)
-    return bytes(b ^ chave[i % len(chave)] for i, b in enumerate(dados)).decode("utf-8")
+_NOME_APP = "Arca"
+_NOME_PRODUTO = "Arca — Cofre de Segurança"
+_NOME_EMPRESA = "Arca Sistemas"
 
-
-def _ofuscar_para_gerar(texto):
-    """Codifica um texto para gerar os literais ofuscados usados com `_dx` (o inverso dela). Ferramenta de
-    desenvolvimento só: não é chamada em produção, só para preparar novos textos ofuscados quando necessário."""
-    chave = b"NadaAquiProtegeSenha-AProtecaoEhDaSenhaMestra"
-    dados = texto.encode("utf-8")
-    return base64.b85encode(bytes(b ^ chave[i % len(chave)] for i, b in enumerate(dados))).decode("ascii")
 
 try:
     from argon2.low_level import hash_secret_raw, Type
@@ -105,8 +96,8 @@ try:
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
     from cryptography.exceptions import InvalidTag
 except ImportError:
-    _aviso_fatal(_dx("4GsbmBvBCza3KmB4F(n"), "Faltam bibliotecas do Python.\n\nAbra o PowerShell e rode:\n"
-                 "    python -m pip install cryptography argon2-cffi openpyxl defusedxml fido2")
+    _aviso_fatal(_NOME_APP, "Faltam bibliotecas do Python.\n\nAbra o PowerShell e rode:\n"
+                 "    python -m pip install cryptography argon2-cffi openpyxl defusedxml fido2 pillow")
     sys.exit(1)
 
 try:
@@ -115,6 +106,20 @@ try:
     from tkinter import font as tkfont
 except ImportError:
     tk = None
+
+if not os.environ.get("PYTHONPYCACHEPREFIX"):
+    _cache_pyc = os.path.join(os.path.dirname(os.path.abspath(__file__)), "testes", "CACHE", "pycache")
+    os.environ["PYTHONPYCACHEPREFIX"] = _cache_pyc
+    sys.pycache_prefix = _cache_pyc
+
+try:
+    from icones_marcas import AutocompletarMarcas, icone as icone_marca
+    from icones_marcas import normalizar as normalizar_marca
+except ImportError as e:
+    _aviso_fatal(_NOME_APP, "Falta Pillow para desenhar os ícones locais das marcas.\n\n"
+                 "Abra o PowerShell e rode:\n    python -m pip install pillow\n\n"
+                 f"Detalhe: {e}")
+    sys.exit(1)
 
 # ----------------------------------------------------------------------------
 # Núcleo criptográfico
@@ -810,7 +815,7 @@ def _dpapi(dado, proteger):
                                                       ctypes.POINTER(ctypes.c_ubyte)))
         saida = _Blob()
         if proteger:
-            ok = crypt32.CryptProtectData(ctypes.byref(entrada), _dx("4GsbmBvBCza3KmB4F(n"), ctypes.byref(entropia), None, None, 1,
+            ok = crypt32.CryptProtectData(ctypes.byref(entrada), _NOME_APP, ctypes.byref(entropia), None, None, 1,
                                           ctypes.byref(saida))
         else:
             ok = crypt32.CryptUnprotectData(ctypes.byref(entrada), None, ctypes.byref(entropia), None, None, 1,
@@ -1745,7 +1750,9 @@ def _sanear_itens(itens):
     errado de uma versão antiga, de uma importação ou de um defeito: o PIN como lista, o texto como número ou nulo,
     o `id` ausente ou repetido. Antes isso passava e quebrava DEPOIS, longe da causa (auditoria de senhas com
     AttributeError, lista da tela com id repetido). Aqui, uma vez só, na abertura:
-      - campo conhecido (CAMPOS) que não é texto vira texto: None -> "", número/booleano -> str, lista/dict -> JSON;
+      - campo textual conhecido (CAMPOS, exceto `ativo`) que não é texto vira texto: None -> "", número/booleano -> str,
+        lista/dict -> JSON;
+      - valor legado de `ativo` que não seja booleano vira booleano, preservando a regra de `_item_ativo`;
       - `id` ausente, não textual ou repetido ganha um id novo (o primeiro item com aquele id mantém o seu);
       - campos desconhecidos são mantidos como estão (compatível com versões futuras).
     Devolve quantos itens foram corrigidos (0 num cofre normal: nada muda e nada é regravado por isso)."""
@@ -1754,6 +1761,11 @@ def _sanear_itens(itens):
     for item in itens:
         mudou = False
         for campo in CAMPOS:
+            if campo == "ativo":
+                if campo in item and not isinstance(item[campo], bool):
+                    item[campo] = _item_ativo(item)
+                    mudou = True
+                continue
             valor = item.get(campo, "")
             if isinstance(valor, str):
                 continue
@@ -3507,7 +3519,7 @@ class Cofre:
         with _trava_gravacao(self.caminho):
             b1 = self.caminho + ".bak1"                 # cópia de segurança: no máx. 1 a cada 10 min
             try:
-                velha = (not os.path.exists(b1)) or time.time() - os.path.getmtime(b1) > 600
+                velha = (not os.path.exists(b1)) or abs(time.time() - os.path.getmtime(b1)) > 600
             except OSError:
                 velha = True
             # A trava abrange esta checagem e a substituição: sem ela, dois processos podiam
@@ -3854,7 +3866,7 @@ LIMITE_ARQUIVO = 50 * 1024 * 1024          # 50 MB
 # mestra de novo para ser visto, copiado ou editado -- mesmo com a "Proteção extra" (⋯ → Segurança) desligada
 # para o resto do cofre. É a camada extra de segurança específica para dados bancários (ver _liberar_protegido).
 CAMPOS = ("servico", "login", "senha", "senha_extra", "pin", "chave", "numero_conta", "agencia", "codigos",
-          "notas", "grupo", "pessoa")
+          "notas", "grupo", "pessoa", "ativo")
 CAMPOS_SECRETOS = ("senha", "senha_extra", "pin", "chave", "numero_conta", "agencia", "codigos")
 ROTULOS = {"servico": "Conta / App", "login": "Login", "senha": "Senha", "senha_extra": "Senha extra",
            "pin": "PIN", "chave": "Chave", "numero_conta": "Número da conta", "agencia": "Agência",
@@ -3864,9 +3876,15 @@ ROTULOS = {"servico": "Conta / App", "login": "Login", "senha": "Senha", "senha_
 def novo_item(**valores):
     """Cria um item (conta) com todos os campos vazios e um id novo; aceita valores iniciais."""
     item = {c: "" for c in CAMPOS}
+    item["ativo"] = True
     item.update({k: v for k, v in valores.items() if k in CAMPOS})
     item["id"] = secrets.token_hex(8)
     return item
+
+
+def _item_ativo(item):
+    """Interpreta itens antigos/importados sem estado salvo como ativos."""
+    return item.get("ativo", True) not in (False, 0, "0", "False", "false")
 
 
 _SINONIMOS = {
@@ -3943,7 +3961,10 @@ def _detectar_cabecalho(linhas):
     for i, linha in enumerate(linhas[:15]):
         mapa = {}
         for col, cel in enumerate(linha):
-            campo = _campo_do_cabecalho(cel)
+            if re.search(r"\d", str(cel or "")):
+                campo = None
+            else:
+                campo = _campo_do_cabecalho(cel)
             if campo and campo not in mapa.values():
                 mapa[col] = campo
         campos = set(mapa.values())
@@ -4248,11 +4269,10 @@ IMPORTAR_SOMENTE_COM_SELO = True     # True: o cofre só importa planilhas GERAD
 def ler_planilha(caminho, tempo_limite=None, selo=None, exigir_selo=False):
     """Importação em QUARENTENA. Retorna (registros, avisos). Etapas, todas antes de tocar no cofre:
     1) lê o arquivo UMA vez para a memória (limite 50 MB) e confere os 'magic bytes' (identidade real);
-    2) grava essa cópia numa pasta de quarentena dentro da pasta temporária privada (.tmp_cofre, no pendrive);
-    3) varre e lê a CÓPIA (nunca o original), só com bibliotecas Python, sem abrir Excel nem nenhum programa externo,
-       com tempo máximo (aborta se demorar);
+    2) analisa CSV diretamente dessa captura imutável; XLSX/XLSM são copiados para a quarentena privada;
+    3) varre e lê a captura/cópia, só com bibliotecas Python, sem abrir Excel nem nenhum programa externo, com prazo;
     4) valida o esquema (tipos, tamanhos, caracteres de controle);
-    5) destrói a quarentena. Qualquer falha descarta tudo: o cofre.dat nem chega a ser tocado.
+    5) destrói a quarentena de XLSX/XLSM. Qualquer falha descarta tudo: o cofre.dat nem chega a ser tocado.
     'selo' = (sal_k, nonce_k, wrap_k) do cofre aberto: com ele o SELO DE AUTENTICIDADE da planilha (modelo gerado
     pelo cofre) é conferido; selo falso ou estrutura alterada recusa a importação.
     'exigir_selo' = True: aceita SOMENTE planilha .xlsx com selo válido deste cofre (CSV, planilha comum, selo de
@@ -4267,20 +4287,27 @@ def ler_planilha(caminho, tempo_limite=None, selo=None, exigir_selo=False):
     if ext not in (".xlsx", ".xlsm", ".csv"):
         return _ler_planilha_arquivo(caminho, selo, exigir_selo)   # mensagens humanas de formato não suportado
     verificar_assinatura(dados[:16], ext)
-    raiz = _TEMP_PRIVADO["pasta"] or tempfile.gettempdir()
-    quarentena = os.path.join(raiz, "quarentena_" + secrets.token_hex(6))
-    os.makedirs(quarentena, mode=0o700, exist_ok=False)
-    copia = os.path.join(quarentena, "entrada" + ext)
+    if ext == ".csv":
+        quarentena = None
+        copia = caminho
+        dados_csv = dados
+    else:
+        raiz = _TEMP_PRIVADO["pasta"] or tempfile.gettempdir()
+        quarentena = os.path.join(raiz, "quarentena_" + secrets.token_hex(6))
+        os.makedirs(quarentena, mode=0o700, exist_ok=False)
+        copia = os.path.join(quarentena, "entrada" + ext)
+        dados_csv = None
     resultado, erro = [], []
     try:
-        with open(copia, "wb") as fq:
-            fq.write(dados)
-        del dados
+        if dados_csv is None:
+            with open(copia, "wb") as fq:
+                fq.write(dados)
+            del dados
 
         def trabalho():
             """Lê e valida a cópia da quarentena (roda numa thread para poder ter prazo)."""
             try:
-                regs, avisos = _ler_planilha_arquivo(copia, selo, exigir_selo)
+                regs, avisos = _ler_planilha_arquivo(copia, selo, exigir_selo, dados_csv=dados_csv)
                 resultado.append((sanear_registros(regs), avisos))
             except BaseException as ex:                  # noqa: BLE001 - qualquer falha vira recusa da importação
                 erro.append(ex)
@@ -4297,13 +4324,16 @@ def ler_planilha(caminho, tempo_limite=None, selo=None, exigir_selo=False):
                              "Nada foi importado.") from None
         return resultado[0]
     finally:
-        _destruir_quarentena(quarentena)
+        if quarentena is not None:
+            _destruir_quarentena(quarentena)
 
 
-def _ler_planilha_arquivo(caminho, selo=None, exigir_selo=False):
+def _ler_planilha_arquivo(caminho, selo=None, exigir_selo=False, dados_csv=None):
     """Lê .xlsx/.xlsm/.csv e retorna (registros, avisos). Nunca grava nada no disco.
-    Em .xlsx/.xlsm confere o selo de autenticidade (se 'selo' do cofre foi informado)."""
-    if os.path.getsize(caminho) > LIMITE_ARQUIVO:
+    Em .xlsx/.xlsm confere o selo de autenticidade (se 'selo' do cofre foi informado). CSV pode receber a captura
+    original em memória para evitar gravar texto aberto em disco."""
+    tamanho = len(dados_csv) if dados_csv is not None else os.path.getsize(caminho)
+    if tamanho > LIMITE_ARQUIVO:
         raise ValueError("Arquivo muito grande (limite de 50 MB).")
     ext = os.path.splitext(caminho)[1].lower()
     registros, avisos = [], []
@@ -4381,8 +4411,11 @@ def _ler_planilha_arquivo(caminho, selo=None, exigir_selo=False):
             wb.close()
     elif ext == ".csv":
         import csv
-        with open(caminho, "rb") as fcsv:
-            bruto = fcsv.read(LIMITE_ARQUIVO + 1)
+        if dados_csv is None:
+            with open(caminho, "rb") as fcsv:
+                bruto = fcsv.read(LIMITE_ARQUIVO + 1)
+        else:
+            bruto = dados_csv
         if b"\0" in bruto[:65536]:
             raise ValueError("Este arquivo parece binário, não um CSV de texto.")
         for cod in ("utf-8-sig", "cp1252", "latin-1"):
@@ -4391,10 +4424,28 @@ def _ler_planilha_arquivo(caminho, selo=None, exigir_selo=False):
                 break
             except UnicodeDecodeError:
                 continue
-        try:
-            dialeto = csv.Sniffer().sniff(texto[:5000], delimiters=",;\t")
-        except csv.Error:
-            dialeto = csv.excel
+        linhas_brutas = texto.splitlines()
+        primeira = linhas_brutas[0].strip() if linhas_brutas else ""
+        if primeira.lower().startswith("sep=") and len(primeira) >= 4:
+            primeira = linhas_brutas[1].strip() if len(linhas_brutas) > 1 else ""
+            inicio_texto = texto.find("\n")
+            if inicio_texto >= 0:
+                texto = texto[inicio_texto + 1:]
+        candidatos = []
+        for delimitador in (",", ";", "\t"):
+            conta = 0
+            aspas = False
+            for caractere in primeira:
+                if caractere == '"':
+                    aspas = not aspas
+                elif not aspas and caractere == delimitador:
+                    conta += 1
+            candidatos.append((conta, delimitador))
+        _, delimitador = max(candidatos, key=lambda item: item[0])
+        if max((item[0] for item in candidatos), default=0) == 0:
+            delimitador = ","
+        dialeto = csv.excel
+        dialeto.delimiter = delimitador
         import io
         try:
             linhas = list(csv.reader(io.StringIO(texto, newline=""), dialeto))
@@ -4596,7 +4647,7 @@ def criar_modelo_planilha(destino, selo=None):
     for col, larg in zip("ABCDE", (4, 30, 52, 30, 4)):
         la.column_dimensions[col].width = larg
     la.merge_cells("B1:D1")
-    la["B1"] = "Planilha de importação — Cofre de Senhas"
+    la["B1"] = "Planilha de importação — Arca"
     la["B1"].font = Font(name=FONTE, bold=True, size=18, color="FFFFFF")
     la["B1"].fill = PatternFill("solid", fgColor=NAVY)
     la["B1"].alignment = Alignment(vertical="center", indent=1)
@@ -4715,7 +4766,7 @@ def criar_modelo_planilha(destino, selo=None):
     # _ler_planilha_arquivo, que leem a linha 1 como cabeçalho). Aparece ao passar o mouse ou clicar na célula.
     from openpyxl.comments import Comment
     ws["A1"].comment = Comment("As linhas CINZENTAS abaixo (\"EXEMPLO - ...\") são só modelo: o cofre as ignora "
-                               "ao importar. Pode apagá-las e preencher as suas por cima.", "Cofre de Senhas",
+                               "ao importar. Pode apagá-las e preencher as suas por cima.", "Arca Sistemas",
                                width=260, height=90)
     exemplos = (
         ("EXEMPLO - Banco Azul", "joao.silva", "MinhaSenha#2026", "Senha6dig", "0123", "",
@@ -4923,11 +4974,11 @@ def _msg_fido(ex):
     return f"Não consegui falar com a chave FIDO. Encaixe a chave e tente de novo. ({type(ex).__name__})"
 
 
-def _fido_registrar(hwnd, nome=_dx("4GsbmBvBCza3KmB4F(n")):
+def _fido_registrar(hwnd, nome=_NOME_APP):
     """Cria uma credencial na chave física (1 toque + PIN da chave). Retorna o ID da credencial."""
     cli = _fido_cliente(hwnd)
     opcoes = {
-        "rp": {"id": RP_ID, "name": _dx("4GsbmBvBCza3KmB4F(n")},
+        "rp": {"id": RP_ID, "name": _NOME_APP},
         "user": {"id": secrets.token_bytes(16), "name": "cofre", "displayName": nome},
         "challenge": secrets.token_bytes(32),
         "pubKeyCredParams": [{"type": "public-key", "alg": -7}, {"type": "public-key", "alg": -8},
@@ -4996,7 +5047,7 @@ def _extrair_segredo(resp):
     return bytes(resp.raw_id), bytes(saida)
 
 
-def fido_registrar(hwnd, nome=_dx("4GsbmBvBCza3KmB4F(n")):
+def fido_registrar(hwnd, nome=_NOME_APP):
     """Cadastra uma chave FIDO nova (toque físico e PIN dela) e devolve os dados da credencial."""
     with processo_liberado():
         return _fido_registrar(hwnd, nome)
@@ -5008,7 +5059,7 @@ def fido_obter(hwnd, creds, salt):
         return _fido_obter(hwnd, creds, salt)
 
 
-def fido_cadastrar_e_testar(hwnd, salt, nome=_dx("4GsbmBvBCza3KmB4F(n")):
+def fido_cadastrar_e_testar(hwnd, salt, nome=_NOME_APP):
     """Registra e confere 2 vezes que a chave devolve sempre o mesmo segredo (3 toques).
     Só depois disso a chave é ligada ao cofre — se algo variar, nada é alterado."""
     cred = fido_registrar(hwnd, nome)
@@ -5723,6 +5774,7 @@ def aplicar_tema(root):
         st.theme_create("meia-noite", parent="clam")
     except tk.TclError:
         pass
+
     st.theme_use("meia-noite")
 
     root.tk_setPalette(background=C["fundo"], foreground=C["texto"], activeBackground=C["sup3"],
@@ -6127,24 +6179,27 @@ def imagem_icone(master, nome, cor=None, tam=16):
 
 
 def desenhar_marca(tam=64):
-    """Marca do programa: cadeado branco sobre quadrado arredondado em degradê índigo→violeta."""
+    """Marca Arca: cofre azul-marinho e dourado com fechadura central."""
     t = _Tela(tam, tam)
     s = tam / 64.0
-    a, b = _hex("#7c6cff"), _hex("#4338ca")
-    r0 = 15 * s
-    for faixa in range(16):           # degradê diagonal por faixas finas
-        f = faixa / 15
-        cor = "#%02x%02x%02x" % tuple(int(a[i] + (b[i] - a[i]) * f) for i in range(3))
-        t.pintar(lambda x, y, f=f: max(_sd_rrect(x, y, 0, 0, tam, tam, r0),
-                                        abs((x + y) / (2 * tam) - f - 1 / 32) * tam - tam / 32 - 0.5), cor)
-    t.pintar(lambda x, y: _sd_rrect(x, y, 0.5, 0.5, tam - 0.5, tam * 0.5, r0) if y < tam * 0.5 else 99,
-             "#ffffff", 0.08)
-    # cadeado
-    t.ret(17 * s, 29 * s, 47 * s, 51 * s, 5 * s, "#ffffff")
-    arco = _arco(32 * s, 23 * s, 9 * s, 180, 360, 20)
-    t.linha([(23 * s, 30 * s)] + arco + [(41 * s, 30 * s)], "#ffffff", 4.2 * s)
-    t.circ(32 * s, 38.5 * s, 3.2 * s, "#4f46e5")
-    t.ret(30.6 * s, 39 * s, 33.4 * s, 45 * s, 1.2 * s, "#4f46e5")
+    azul, dourado = "#102748", "#E9AE39"
+    t.pintar(lambda x, y: _sd_rrect(x, y, 0.5 * s, 0.5 * s, tam - 0.5 * s,
+                                    tam - 0.5 * s, 12 * s), azul)
+    t.ret(8 * s, 7 * s, 56 * s, 57 * s, 9 * s, dourado)
+    t.ret(11 * s, 10 * s, 53 * s, 54 * s, 7 * s, azul)
+    t.ret(14 * s, 13 * s, 50 * s, 51 * s, 5 * s, dourado)
+    t.ret(16 * s, 15 * s, 48 * s, 49 * s, 4 * s, azul)
+    t.circ(32 * s, 31 * s, 14 * s, dourado)
+    t.circ(32 * s, 31 * s, 10.5 * s, azul)
+    for angulo in range(0, 360, 45):
+        a = math.radians(angulo)
+        p1 = (32 * s + math.cos(a) * 7.6 * s, 31 * s + math.sin(a) * 7.6 * s)
+        p2 = (32 * s + math.cos(a) * 9.2 * s, 31 * s + math.sin(a) * 9.2 * s)
+        t.linha([p1, p2], dourado, 1.2 * s)
+    t.circ(32 * s, 30 * s, 3.4 * s, dourado)
+    t.ret(30.8 * s, 32 * s, 33.2 * s, 41 * s, 1.2 * s, dourado)
+    t.ret(7 * s, 21 * s, 11 * s, 27 * s, 1.5 * s, dourado)
+    t.ret(7 * s, 38 * s, 11 * s, 44 * s, 1.5 * s, dourado)
     return t
 
 
@@ -6260,7 +6315,7 @@ def _caixa_mensagem(tipo, titulo, mensagem, botoes, padrao, cancelar, icone_nome
         pass
     d = tk.Toplevel(pai)
     d.withdraw()
-    d.title(titulo or _dx("4GsbmBvBCza3KmB4F(n"))
+    d.title(titulo or _NOME_APP)
     d.resizable(False, False)
     try:
         if pai.winfo_viewable():
@@ -6362,9 +6417,44 @@ def instalar_caixas_de_mensagem():
         setattr(messagebox, nome, caixa)
 
 
+def _janela_teste_em_segundo_plano(root):
+    """Em testes automatizados, revela a janela sem ativá-la nem tirá-la de trás do app do usuário."""
+    if not EH_WINDOWS or os.environ.get("COFRE_GUI_TESTS_BACKGROUND") != "1":
+        return
+    u = ctypes.windll.user32
+    u.GetAncestor.argtypes = (wintypes.HWND, wintypes.UINT)
+    u.GetAncestor.restype = wintypes.HWND
+    hwnd = u.GetAncestor(wintypes.HWND(root.winfo_id()), 2)
+    if not hwnd:
+        raise ctypes.WinError(ctypes.get_last_error())
+    get_style = getattr(u, "GetWindowLongPtrW", u.GetWindowLongW)
+    set_style = getattr(u, "SetWindowLongPtrW", u.SetWindowLongW)
+    get_style.argtypes = (wintypes.HWND, ctypes.c_int)
+    get_style.restype = ctypes.c_ssize_t
+    set_style.argtypes = (wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t)
+    set_style.restype = ctypes.c_ssize_t
+    ctypes.set_last_error(0)
+    estilo = get_style(hwnd, -20)
+    if not estilo and ctypes.get_last_error():
+        raise ctypes.WinError(ctypes.get_last_error())
+    ctypes.set_last_error(0)
+    anterior = set_style(hwnd, -20, estilo | 0x08000000)  # WS_EX_NOACTIVATE
+    if not anterior and ctypes.get_last_error():
+        raise ctypes.WinError(ctypes.get_last_error())
+    u.SetWindowPos.argtypes = (
+        wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        ctypes.c_int, wintypes.UINT,
+    )
+    u.SetWindowPos.restype = wintypes.BOOL
+    flags = 0x0001 | 0x0002 | 0x0010 | 0x0020  # NOSIZE | NOMOVE | NOACTIVATE | FRAMECHANGED
+    if not u.SetWindowPos(hwnd, wintypes.HWND(1), 0, 0, 0, 0, flags):  # HWND_BOTTOM
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
 def revelar_janela(root):
     """Mostra a janela principal só depois de pronta: deixa-a invisível (transparência 0) enquanto o Tk desenha tudo,
     e a revela de uma vez. Assim a tela aparece inteira e estruturada, sem 'se montar' na frente do usuário."""
+    _janela_teste_em_segundo_plano(root)
     try:
         root.attributes("-alpha", 0.0)
     except tk.TclError:
@@ -6480,16 +6570,30 @@ def _cortar(texto, fonte, largura):
 
 
 class BarraLateral(tk.Frame if tk else object):
-    """Lista de grupos à esquerda (ícone, nome e contagem), com seleção destacada.
+    """Lista paginada de grupos à esquerda (ícone, nome e contagem), sem rolagem.
     Oferece os mesmos métodos do Treeview que o resto do programa usa."""
 
-    def __init__(self, mestre, **kw):
-        """Cria a barra lateral de grupos/pessoas com a mesma interface de um Treeview."""
+    def __init__(self, mestre, max_linhas=8, **kw):
+        """Cria a lista compacta de grupos/pessoas com a mesma interface de um Treeview."""
         super().__init__(mestre, bg=CORES["lateral"], **kw)
         self._itens = {}
         self._ordem = []
         self._sel = None
         self._binds = {}
+        self._entradas = []
+        self._indice = {}
+        self._pagina = 0
+        self._max_linhas = max(1, int(max_linhas))
+        self._assinatura = None
+        self._nav = tk.Frame(self, bg=CORES["lateral"])
+        self._btn_anterior = ttk.Button(self._nav, text="‹", width=3, command=lambda: self._mudar_pagina(-1))
+        self._btn_anterior.pack(side="left")
+        self._rotulo_pagina = tk.Label(self._nav, bg=CORES["lateral"], fg=CORES["fraco"],
+                                       font="CofrePequeno")
+        self._rotulo_pagina.pack(side="left", expand=True)
+        self._btn_proxima = ttk.Button(self._nav, text="›", width=3, command=lambda: self._mudar_pagina(1))
+        self._btn_proxima.pack(side="right")
+        self._nav.pack(side="bottom", fill="x", padx=8, pady=(2, 4))
 
     # compatibilidade com ttk.Treeview
     def get_children(self, item=""):
@@ -6498,29 +6602,33 @@ class BarraLateral(tk.Frame if tk else object):
 
     def exists(self, iid):
         """True se a linha existe."""
-        return iid in self._itens
+        return iid in self._indice
 
     def item(self, iid, option=None):
         """Dados de uma linha (texto, valores, marcas)."""
-        d = {"text": self._itens[iid]["compat"], "values": "", "tags": ""}
+        ent = self._entradas[self._indice[iid]]
+        d = {"text": f"  {ent['texto']}  ({ent.get('n', '')})", "values": "", "tags": ""}
         return d[option] if option else d
 
     def selection(self):
         """Linha selecionada."""
-        return (self._sel,) if self._sel in self._itens else ()
+        return (self._sel,) if self._sel in self._indice else ()
 
     def selection_set(self, iid):
         """Seleciona uma linha."""
-        if iid in self._itens:
+        if iid in self._indice:
+            pagina = self._indice[iid] // self._max_linhas
+            if pagina != self._pagina:
+                self._pagina = pagina
+                self._desenhar()
             self._selecionar(iid)
 
     def delete(self, *iids):
         """Remove linhas."""
-        for iid in iids:
-            it = self._itens.pop(iid, None)
-            if it:
-                it["linha"].destroy()
-                self._ordem.remove(iid)
+        remover = set(iids)
+        if remover:
+            self.definir([e for e in self._entradas if e["iid"] not in remover],
+                         self._sel if self._sel not in remover else None)
 
     def tag_configure(self, *a, **kw):
         """Sem efeito (existe só para parecer um Treeview)."""
@@ -6536,29 +6644,72 @@ class BarraLateral(tk.Frame if tk else object):
     # montagem
     def definir(self, entradas, selecionado=None):
         """entradas: lista de dicts com iid, texto, n, e 'icone' (nome) ou 'cor' (bolinha);
-        'secao' cria um título antes do item; 'cor_txt' muda a cor do texto.
-        Se a lista é idêntica à anterior, só atualiza a seleção (não destrói nem recria as linhas: sem piscar)."""
+        'secao' cria um título antes do item; 'cor_txt' muda a cor do texto. Linhas demais são paginadas."""
         assinatura = tuple((e["iid"], e.get("secao"), e["texto"], str(e.get("n", "")), e.get("icone"), e.get("cor"),
                             e.get("cor_txt"), e.get("cor_icone"), e.get("cor_n")) for e in entradas)
-        if assinatura == getattr(self, "_assinatura", None) and self._itens and self.winfo_children():
-            for it, e in zip(self._itens.values(), entradas):
-                it["ent"] = e
-            nova = selecionado if selecionado in self._itens else (self._ordem[0] if self._ordem else None)
-            antiga, self._sel = self._sel, nova
-            for iid in {antiga, nova}:
-                self._pintar(iid)
-            return
+        mesma = assinatura == self._assinatura
+        antiga, pagina_antiga = self._sel, self._pagina
         self._assinatura = assinatura
+        self._entradas = list(entradas)
+        self._indice = {e["iid"]: i for i, e in enumerate(self._entradas)}
+        self._ordem = [e["iid"] for e in self._entradas]
+        nova = selecionado if selecionado in self._indice else (self._ordem[0] if self._ordem else None)
+        self._sel = nova
+        if nova is not None:
+            self._pagina = self._indice[nova] // self._max_linhas
+        else:
+            self._pagina = min(self._pagina, max(0, (len(self._entradas) - 1) // self._max_linhas))
+        if not mesma or pagina_antiga != self._pagina or not self._itens:
+            self._desenhar()
+            return
+        for iid, it in self._itens.items():
+            it["ent"] = self._entradas[self._indice[iid]]
+        for iid in {antiga, nova}:
+            self._pintar(iid)
+        self._atualizar_paginacao()
+
+    def _atualizar_paginacao(self):
+        """Mostra controles apenas quando há mais de uma página."""
+        total = max(1, (len(self._entradas) + self._max_linhas - 1) // self._max_linhas)
+        if total <= 1:
+            self._nav.pack_forget()
+            return
+        self._nav.pack(side="bottom", fill="x", padx=8, pady=(2, 4))
+        self._rotulo_pagina.config(text=f"{self._pagina + 1}/{total}")
+        self._btn_anterior.config(state="normal" if self._pagina > 0 else "disabled")
+        self._btn_proxima.config(state="normal" if self._pagina + 1 < total else "disabled")
+
+    def _mudar_pagina(self, passo):
+        """Troca a página sem rolagem."""
+        total = max(1, (len(self._entradas) + self._max_linhas - 1) // self._max_linhas)
+        pagina = max(0, min(total - 1, self._pagina + passo))
+        if pagina != self._pagina:
+            self._pagina = pagina
+            self._desenhar()
+
+    def _desenhar(self):
+        """Desenha somente a página atual."""
         for w in self.winfo_children():
-            w.destroy()
+            if w is not self._nav:
+                w.destroy()
         self._itens.clear()
-        self._ordem.clear()
         C = CORES
-        for e in entradas:
+        inicio = self._pagina * self._max_linhas
+        fim = min(len(self._entradas), inicio + self._max_linhas)
+        secao_atual = ""
+        for e in self._entradas[:inicio]:
             if e.get("secao"):
+                secao_atual = e["secao"]
+        if inicio and inicio < fim and not self._entradas[inicio].get("secao") and secao_atual:
+            tk.Label(self, text=secao_atual.upper(), bg=C["lateral"], fg=C["fraco"], font="CofreRotulo",
+                     anchor="w").pack(fill="x", padx=18, pady=(16, 6))
+        for e in self._entradas[inicio:fim]:
+            if e.get("secao"):
+                secao_atual = e["secao"]
                 tk.Label(self, text=e["secao"].upper(), bg=C["lateral"], fg=C["fraco"], font="CofreRotulo",
-                         anchor="w").pack(fill="x", padx=18, pady=(16, 6))
-            linha = tk.Frame(self, bg=C["lateral"], cursor="hand2", height=_px(36))
+                         anchor="w").pack(fill="x", padx=18, pady=(8, 3) if ESCALA >= 2.0 else (16, 6))
+            altura_linha = 36 if ESCALA >= 2.0 else _px(36)
+            linha = tk.Frame(self, bg=C["lateral"], cursor="hand2", height=altura_linha)
             linha.pack(fill="x", padx=8, pady=1)
             linha.pack_propagate(False)
             barra = tk.Frame(linha, bg=C["lateral"], width=3)
@@ -6575,11 +6726,12 @@ class BarraLateral(tk.Frame if tk else object):
             ln = tk.Label(linha, text=str(e.get("n", "")), bg=C["lateral"],
                           fg=e.get("cor_n") or C["fraco"], font="CofrePequeno", padx=10)
             ln.pack(side="right")
+            if ESCALA >= 2.0:
+                linha.configure(height=max(altura_linha, ltxt.winfo_reqheight() + 4, ln.winfo_reqheight() + 4))
             item = {"linha": linha, "barra": barra, "partes": (linha, lic, ltxt, ln), "texto": ltxt,
                     "cor_txt": e.get("cor_txt") or C["lateral_txt"], "icone": lic, "ent": e,
                     "compat": f"  {e['texto']}  ({e.get('n', '')})"}
             self._itens[e["iid"]] = item
-            self._ordem.append(e["iid"])
             for w in item["partes"]:
                 if e.get("acao"):
                     w.bind("<Button-1>", lambda ev, f=e["acao"]: f())
@@ -6589,8 +6741,8 @@ class BarraLateral(tk.Frame if tk else object):
                     w.bind("<Button-3>", lambda ev, f=e["menu"]: f(ev))
                 w.bind("<Enter>", lambda ev, i=e["iid"]: self._pintar(i, hover=True))
                 w.bind("<Leave>", lambda ev, i=e["iid"]: self._pintar(i))
-        self._sel = selecionado if selecionado in self._itens else (self._ordem[0] if self._ordem else None)
-        for iid in self._ordem:
+        self._atualizar_paginacao()
+        for iid in self._itens:
             self._pintar(iid)
 
     def item_em(self, x_root, y_root):
@@ -6652,19 +6804,28 @@ def _ponto_img(master, cor, tam=10):
 
 
 class ListaContas(tk.Frame if tk else object):
-    """Lista de contas com avatar e duas linhas (nome e login), desenhada num Canvas.
+    """Lista paginada de contas com avatar e duas linhas (nome e login), desenhada num Canvas.
     Oferece os métodos do ttk.Treeview usados pelo programa (selection, item, ...)."""
     ALT = 60
 
     def __init__(self, mestre, **kw):
-        """Cria a lista de contas (canvas com rolagem, seleção e estado vazio)."""
+        """Cria a lista de contas (canvas paginado, seleção e estado vazio)."""
         super().__init__(mestre, bg=CORES["fundo"], **kw)
         C = CORES
         self.ALT = _px(60)
+        self._pagina = 0
+        self._por_pagina = 1
+        self._nav = ttk.Frame(self)
+        self._btn_anterior = ttk.Button(self._nav, text="‹ Anterior", style="Acao.TButton",
+                                        command=lambda: self._mudar_pagina(-1))
+        self._btn_anterior.pack(side="left")
+        self._rotulo_pagina = ttk.Label(self._nav, style="Fraco.TLabel")
+        self._rotulo_pagina.pack(side="left", expand=True)
+        self._btn_proxima = ttk.Button(self._nav, text="Próxima ›", style="Acao.TButton",
+                                       command=lambda: self._mudar_pagina(1))
+        self._btn_proxima.pack(side="right")
+        self._nav.pack(side="bottom", fill="x", padx=12, pady=(4, 8))
         self.canvas = tk.Canvas(self, bg=C["fundo"], highlightthickness=0, bd=0, takefocus=1)
-        self.barra = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=self._rolagem)
-        self.barra.pack(side="right", fill="y", padx=(0, 2))
         self.canvas.pack(side="left", fill="both", expand=True)
         self._linhas = []
         self._idx = {}
@@ -6678,34 +6839,53 @@ class ListaContas(tk.Frame if tk else object):
         self.ao_menu = None             # função(iid_da_conta, evento) chamada no clique direito
         self._arraste = None
         c = self.canvas
-        c.bind("<Configure>", lambda e: self._desenhar() if e.width != self._larg else self._garantir_visiveis())
+        c.bind("<Configure>", self._ao_redimensionar)
         c.bind("<Button-1>", self._clique)
         c.bind("<B1-Motion>", self._arrastando)
         c.bind("<ButtonRelease-1>", self._soltou)
         c.bind("<Button-3>", self._clique_direito)
         c.bind("<Motion>", self._mover)
         c.bind("<Leave>", lambda e: self._pos_hover(None))
-        c.bind("<MouseWheel>", lambda e: c.yview_scroll(int(-e.delta / 120) or (-1 if e.delta > 0 else 1), "units"))
-        c.bind("<Button-4>", lambda e: c.yview_scroll(-1, "units"))
-        c.bind("<Button-5>", lambda e: c.yview_scroll(1, "units"))
         c.bind("<Up>", lambda e: self._andar(-1))
         c.bind("<Down>", lambda e: self._andar(1))
         c.bind("<Home>", lambda e: self._andar(-10 ** 6))
         c.bind("<End>", lambda e: self._andar(10 ** 6))
-        c.configure(yscrollincrement=self.ALT // 3)
 
-    def _rolagem(self, a, b):
-        """Mostra a barra de rolagem só quando a lista não cabe na tela."""
-        self.barra.set(a, b)
-        self._garantir_visiveis()            # rolou: desenha as linhas que acabaram de aparecer
+    def _ao_redimensionar(self, evento):
+        """Ajusta o número de contas por página ao espaço realmente disponível."""
         try:
-            precisa = float(a) > 0.0 or float(b) < 1.0
-            if precisa and not self.barra.winfo_ismapped():
-                self.barra.pack(side="right", fill="y", padx=(0, 2), before=self.canvas)
-            elif not precisa and self.barra.winfo_ismapped():
-                self.barra.pack_forget()
-        except (tk.TclError, ValueError):
+            por_pagina = max(1, (evento.height - _px(16)) // self.ALT)
+            mudou_pagina = por_pagina != self._por_pagina
+            mudou_largura = evento.width != self._larg
+            if mudou_pagina:
+                self._por_pagina = por_pagina
+                self._pagina = min(self._pagina, self._ultima_pagina())
+                self._atualizar_paginacao()
+            if mudou_pagina or mudou_largura:
+                self._desenhar()
+        except (tk.TclError, AttributeError):
             pass
+
+    def _ultima_pagina(self):
+        return max(0, (len(self._linhas) - 1) // max(1, self._por_pagina))
+
+    def _atualizar_paginacao(self):
+        """Atualiza a navegação por páginas, sem barra ou rolagem."""
+        total = max(1, self._ultima_pagina() + 1)
+        if total <= 1:
+            self._nav.pack_forget()
+            return
+        self._nav.pack(side="bottom", fill="x", padx=12, pady=(4, 8))
+        self._rotulo_pagina.config(text=f"{self._pagina + 1} de {total}  ·  {len(self._linhas)} contas")
+        self._btn_anterior.config(state="normal" if self._pagina > 0 else "disabled")
+        self._btn_proxima.config(state="normal" if self._pagina < total - 1 else "disabled")
+
+    def _mudar_pagina(self, passo):
+        """Vai à página anterior ou seguinte."""
+        pagina = max(0, min(self._ultima_pagina(), self._pagina + passo))
+        if pagina != self._pagina:
+            self._pagina = pagina
+            self._desenhar()
 
     # compatibilidade com ttk.Treeview
     def bind(self, seq=None, func=None, add=None):
@@ -6735,7 +6915,7 @@ class ListaContas(tk.Frame if tk else object):
         return (self._sel,) if self._sel in self._idx else ()
 
     def selection_set(self, iid):
-        """Seleciona um item e rola até ele."""
+        """Seleciona um item e mostra a página que o contém."""
         if iid in self._idx:
             self._sel = iid
             self._pos_selecao()
@@ -6743,17 +6923,13 @@ class ListaContas(tk.Frame if tk else object):
             self.canvas.event_generate("<<TreeviewSelect>>", when="tail")
 
     def see(self, iid):
-        """Rola a lista até o item ficar visível."""
+        """Vai à página que contém o item."""
         if iid not in self._idx:
             return
-        c = self.canvas
-        total = max(1, len(self._linhas) * self.ALT + _px(16))
-        y0 = self._idx[iid] * self.ALT + _px(8)
-        topo, base = c.canvasy(0), c.canvasy(c.winfo_height())
-        if y0 < topo:
-            c.yview_moveto(y0 / total)
-        elif y0 + self.ALT > base:
-            c.yview_moveto((y0 + self.ALT - c.winfo_height()) / total)
+        pagina = self._idx[iid] // max(1, self._por_pagina)
+        if pagina != self._pagina:
+            self._pagina = pagina
+            self._desenhar()
 
     def delete(self, *iids):
         """Esvazia a lista."""
@@ -6768,6 +6944,7 @@ class ListaContas(tk.Frame if tk else object):
         """linhas: dicts com iid, titulo, login, sub, contem, cor, alerta (0/1/2)."""
         assinatura = (tuple(tuple(sorted((k, str(v)) for k, v in r.items())) for r in linhas), tuple(vazio))
         igual = assinatura == getattr(self, "_assinatura", None)
+        selecao_anterior = self._sel
         self._assinatura = assinatura
         self._linhas = linhas
         self._idx = {r["iid"]: i for i, r in enumerate(linhas)}
@@ -6775,8 +6952,15 @@ class ListaContas(tk.Frame if tk else object):
         if self._sel is not None and self._sel not in self._idx:
             self._sel = None
             igual = False
+        if self._sel in self._idx:
+            self._pagina = self._idx[self._sel] // max(1, self._por_pagina)
+        else:
+            self._pagina = min(self._pagina, self._ultima_pagina())
+        self._atualizar_paginacao()
         if not igual:                      # lista idêntica: não apaga e redesenha tudo (evita piscar)
             self._desenhar()
+        elif selecao_anterior != self._sel:
+            self._pos_selecao()
 
     def _img(self, chave, fabrica):
         """Imagem com cache para o desenho das linhas."""
@@ -6801,7 +6985,6 @@ class ListaContas(tk.Frame if tk else object):
                               justify="center", width=min(420, w - 40))
             c.configure(scrollregion=(0, 0, w, h))
             return
-        F, P = FONTES["CofreForte"], FONTES["CofrePequeno"]
         q = _px
         larg_hl = w - q(16)
         self._hl_sel = self._img(("sel", larg_hl), lambda: imagem_nove_fatias(
@@ -6811,15 +6994,14 @@ class ListaContas(tk.Frame if tk else object):
         c.create_image(-999, -999, image=self._hl_hover, anchor="nw", tags="hover")
         c.create_image(-999, -999, image=self._hl_sel, anchor="nw", tags="sel")
         self._feitas = set()
-        c.configure(scrollregion=(0, 0, w, q(16) + len(self._linhas) * self.ALT))
+        visiveis = min(self._por_pagina, len(self._linhas) - self._pagina * self._por_pagina)
+        c.configure(scrollregion=(0, 0, w, max(c.winfo_height(), q(16) + visiveis * self.ALT)))
         self._garantir_visiveis()
         self._pos_selecao()
         self._pos_hover(self._hover)
 
     def _garantir_visiveis(self):
-        """DESENHO SOB DEMANDA: só as linhas que aparecem na janela (mais uma folga) viram itens do canvas. Com 1.500
-        contas isso são ~30 linhas em vez de 1.500, e a lista abre/atualiza/filtra sem travar. Ao rolar, as que
-        faltam são desenhadas na hora."""
+        """Desenha apenas as contas da página atual."""
         c = self.canvas
         if not self._linhas or not hasattr(self, "_feitas"):
             return
@@ -6827,32 +7009,21 @@ class ListaContas(tk.Frame if tk else object):
         C = CORES
         F, P = FONTES["CofreForte"], FONTES["CofrePequeno"]
         w = self._larg or max(c.winfo_width(), 200)
-        alt_jan = max(c.winfo_height(), 400)
-        topo = c.canvasy(0)
-        i0 = max(0, int((topo - q(8)) // self.ALT) - 6)
-        i1 = min(len(self._linhas), int((topo + alt_jan - q(8)) // self.ALT) + 7)
+        inicio = self._pagina * self._por_pagina
+        fim = min(len(self._linhas), inicio + self._por_pagina)
         novas = False
-        for i in range(i0, i1):
+        for i in range(inicio, fim):
             if i in self._feitas:
                 continue
             self._feitas.add(i)
             novas = True
             r = self._linhas[i]
-            y = q(8) + i * self.ALT
+            y = q(8) + (i - inicio) * self.ALT
             meio = y + self.ALT / 2
-            marca = r.get("marca")
-            if marca is None:
-                marca = marca_servico(r["titulo"], r.get("grupo", ""))
-                r["marca"] = marca
-            cor = r.get("cor")
-            if cor is None:
-                cor = C["prim_fundo"] if marca else C["sup3"]
-                r["cor"] = cor
-            av = self._img(("av", cor), lambda cor=cor: desenhar_avatar(cor, 38).imagem(c))
+            servico = r.get("titulo", "")
+            av = self._img(("marca", normalizar_marca(servico), q(38)),
+                           lambda servico=servico: icone_marca(servico, q(38), master=c))
             c.create_image(q(36), meio, image=av)
-            c.create_text(q(36), meio, text=marca or (r["titulo"].strip()[:1] or "?").upper(),
-                          fill=C["texto"],
-                          font="CofreForte")
             direita = w - q(18)
             icones = []
             if r.get("alerta"):
@@ -6872,8 +7043,10 @@ class ListaContas(tk.Frame if tk else object):
     def _pos_selecao(self):
         """Posiciona o retângulo de seleção."""
         c = self.canvas
-        if self._sel in self._idx:
-            c.coords("sel", _px(8), _px(8) + self._idx[self._sel] * self.ALT + _px(3))
+        inicio = self._pagina * self._por_pagina
+        if self._sel in self._idx and inicio <= self._idx[self._sel] < inicio + self._por_pagina:
+            local = self._idx[self._sel] - inicio
+            c.coords("sel", _px(8), _px(8) + local * self.ALT + _px(3))
         else:
             c.coords("sel", -9999, -9999)
 
@@ -6881,14 +7054,17 @@ class ListaContas(tk.Frame if tk else object):
         """Posiciona o destaque da linha sob o mouse."""
         self._hover = i
         c = self.canvas
-        if i is not None and 0 <= i < len(self._linhas) and self._linhas[i]["iid"] != self._sel:
-            c.coords("hover", _px(8), _px(8) + i * self.ALT + _px(3))
+        inicio = self._pagina * self._por_pagina
+        if i is not None and inicio <= i < min(len(self._linhas), inicio + self._por_pagina) and \
+                self._linhas[i]["iid"] != self._sel:
+            local = i - inicio
+            c.coords("hover", _px(8), _px(8) + local * self.ALT + _px(3))
         else:
             c.coords("hover", -9999, -9999)
 
     def _linha_em(self, y):
         """Índice da linha na altura y do canvas."""
-        i = int((self.canvas.canvasy(y) - _px(8)) // self.ALT)
+        i = self._pagina * self._por_pagina + int((y - _px(8)) // self.ALT)
         return i if 0 <= i < len(self._linhas) else None
 
     def _mover(self, e):
@@ -7473,7 +7649,7 @@ class App:
         self._clip_valor = None
         self.tema = _carregar_preferencia_tema()
         _definir_tema(self.tema)
-        root.title(_dx("4GsbmBvBCza3KmB4F(n"))
+        root.title(_NOME_PRODUTO)
         aplicar_tema(root)
         instalar_caixas_de_mensagem()
         try:
@@ -7482,8 +7658,24 @@ class App:
         except tk.TclError:
             pass
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
-        larg, alt = min(_px(1200), int(sw * 0.94)), min(_px(780), int(sh * 0.9))
-        root.geometry(f"{larg}x{alt}+{max(0, (sw - larg) // 2)}+{max(0, (sh - alt) // 3)}")
+        area_x, area_y, area_larg, area_alt = 0, 0, sw, sh
+        if EH_WINDOWS:
+            class RECT(ctypes.Structure):
+                _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long),
+                            ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+
+            try:
+                area = RECT()
+                if ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(area), 0):
+                    area_x, area_y = area.left, area.top
+                    area_larg, area_alt = area.right - area.left, area.bottom - area.top
+            except (AttributeError, OSError, ctypes.ArgumentError, TypeError):
+                pass
+        larg = min(_px(1500), max(_px(640), area_larg - _px(64)))
+        alt = min(_px(960), max(1, area_alt - _px(132)))
+        x = area_x + max(0, (area_larg - larg - _px(16)) // 2)
+        y = area_y + max(0, (area_alt - alt - _px(48)) // 2)
+        root.geometry(f"{larg}x{alt}+{x}+{y}")
         root.minsize(min(_px(1040), larg), min(_px(660), alt))
         for ev in ("<KeyPress>", "<Button>", "<MouseWheel>"):
             root.bind_all(ev, self._atividade, add="+")
@@ -7563,8 +7755,8 @@ class App:
         janela = tela.create_window(0, 0, window=conteudo, anchor="center")
         tela.create_text(0, 0, text="Criptografado e só neste computador",
                          fill=C["fraco"], font="CofrePequeno", tags="rodape")
-        PAD = _px(36)
-        estado = {"wh": None, "desl": 0.0}
+        PAD = _px(24)
+        estado = {"wh": None}
 
         def redesenhar(event=None):
             """Recentraliza o conteúdo quando a janela muda de tamanho."""
@@ -7575,12 +7767,6 @@ class App:
                 cw = conteudo.winfo_reqwidth() + 2 * PAD
                 ch = conteudo.winfo_reqheight() + 2 * PAD
                 cy = max(ch / 2 + 18, (h - 44) / 2)
-                excesso = ch + 18 + 44 - h
-                if excesso > 0:                 # conteúdo maior que a janela: rola com a roda do mouse
-                    estado["desl"] = max(-excesso, min(0.0, estado["desl"]))
-                    cy += estado["desl"]
-                else:
-                    estado["desl"] = 0.0
                 tela.delete("brilho")
                 brilho_radial(tela, w / 2, cy - ch * 0.42, max(w, h) * 0.85, "#1e1b4b", C["fundo"])
                 if estado["wh"] != (cw, ch):
@@ -7600,19 +7786,8 @@ class App:
             except tk.TclError:
                 pass
 
-        def rolar(event):
-            """Rola o conteúdo da tela com a roda do mouse."""
-            if self.frame is not tela:
-                return
-            passo = -1 if getattr(event, "num", 0) == 4 else 1 if getattr(event, "num", 0) == 5 else \
-                (-1 if event.delta > 0 else 1)
-            estado["desl"] -= passo * _px(48)
-            redesenhar()
-
         tela.bind("<Configure>", redesenhar, add="+")
         conteudo.bind("<Configure>", lambda e: redesenhar(), add="+")
-        for ev in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
-            self._ligar_raiz(ev, rolar)
         return conteudo
 
     def _ligar_raiz(self, sequencia, funcao):
@@ -8035,26 +8210,25 @@ class App:
                     "A senha mestra protege tudo. Ela nunca sai deste computador e não pode ser recuperada: "
                     "se a esquecer, ninguém consegue abrir o cofre.\n\nLocal do cofre:\n"
                     + os.path.abspath(self.caminho), CORES["fundo"]).pack(side="left", padx=(8, 0))
-        ttk.Label(tt, text="Configure a senha e escolha como você vai abrir o cofre.",
+        ttk.Label(tt, text="Defina a senha e a forma de abrir o cofre.",
                   style="C.Suave.TLabel").pack(anchor="w")
-        ttk.Separator(f).pack(fill="x", pady=(18, 16))
+        ttk.Separator(f).pack(fill="x", pady=(10, 8))
 
         colunas = ttk.Frame(f, style="C.TFrame")
         colunas.pack(fill="x")
-        esq = ttk.Frame(colunas, style="Card.TFrame", width=_px(380), padding=(_px(16), _px(14)))
+        esq = ttk.Frame(colunas, style="Card.TFrame", width=_px(380), padding=(_px(12), _px(10)))
         esq.pack(side="left", fill="y", anchor="n")
         ttk.Frame(colunas, style="C.TFrame", width=_px(18)).pack(side="left")
-        dir_ = ttk.Frame(colunas, style="Card.TFrame", padding=(_px(16), _px(14)))
+        dir_ = ttk.Frame(colunas, style="Card.TFrame", padding=(_px(12), _px(10)))
         dir_.pack(side="left", fill="both", expand=True, anchor="n")
 
         ttk.Label(esq, text="1. Defina a senha mestra", style="C.H2.TLabel",
                   image=imagem_icone(self.root, "cadeado", C["prim_txt"], 16), compound="left").pack(anchor="w")
         ttk.Label(esq, text="Se esquecer esta senha, não será possível recuperar o cofre.",
-                  style="C.Suave.TLabel", wraplength=_px(340), justify="left").pack(anchor="w", pady=(4, 14))
-        ttk.Label(esq, text="Faça um backup cifrado fora do pendrive. "
-                  "As cópias locais também são apagadas após erros de senha.",
+                  style="C.Suave.TLabel", wraplength=_px(340), justify="left").pack(anchor="w", pady=(3, 8))
+        ttk.Label(esq, text="Faça backup cifrado fora do pendrive. Cópias locais podem ser apagadas após erros.",
                   style="C.Suave.TLabel", wraplength=_px(340), justify="left",
-                  foreground=C["alerta"]).pack(anchor="w", pady=(0, 12))
+                  foreground=C["alerta"]).pack(anchor="w", pady=(0, 8))
         self._rotulo_campo(esq, f"Nova senha  (mínimo {MIN_SENHA} caracteres)").pack(anchor="w")
         l1fr = ttk.Frame(esq, style="C.TFrame")
         l1fr.pack(fill="x", pady=(4, 0))
@@ -8074,7 +8248,7 @@ class App:
         l2.pack(fill="x", pady=(4, 0))
         confere = ttk.Label(esq, text="", style="C.TLabel")
         confere.pack(anchor="w", pady=(6, 0))
-        self._dicas_mestra.pack(fill="x", pady=(10, 0))
+        self._dicas_mestra.pack(fill="x", pady=(6, 0))
 
         modo = tk.IntVar(value=MODO_E)
         usar_fido = tk.BooleanVar(value=False)
@@ -8105,7 +8279,7 @@ class App:
                     "Perdendo a chave, o código de recuperação em papel a substitui. Só passa a valer depois de "
                     "cadastrar a primeira chave (próximo passo).",
                     CORES["fundo"]).pack(side="left", padx=(4, 0))
-        ttk.Label(dir_, text="Escolha uma opção. A descrição mostra o que será exigido para abrir.",
+        ttk.Label(dir_, text="Escolha como abrir o cofre.",
                   style="C.Suave.TLabel", wraplength=_px(420), justify="left").pack(anchor="w", pady=(4, 2))
 
         cartoes = {}
@@ -8122,8 +8296,8 @@ class App:
             cartao = tk.Frame(pai, bg=C["sup2"], bd=0, cursor="hand2",
                               highlightbackground=C["borda"], highlightcolor=C["prim"],
                               highlightthickness=_px(1))
-            cartao.pack(fill="x", pady=(_px(5), 0))
-            corpo = ttk.Frame(cartao, style="Card2.TFrame", padding=(_px(10), _px(6)))
+            cartao.pack(fill="x", pady=(_px(3), 0))
+            corpo = ttk.Frame(cartao, style="Card2.TFrame", padding=(_px(8), _px(4)))
             corpo.pack(fill="both", expand=True)
 
             def mudou():
@@ -8153,22 +8327,22 @@ class App:
             return cartao
 
         opcao_cartao(dir_, modo, MODO_S, "Só senha mestra",
-                     "Só a senha abre o cofre. É simples; use uma frase longa e exclusiva.", atualizar_proximo)
+                     "Só a senha abre o cofre. Use uma frase longa e exclusiva.", atualizar_proximo)
         opcao_cartao(dir_, modo, MODO_E, "Senha E chave de acesso  (recomendado)",
-                     "Exige senha e chave juntos. Guarde a chave em local seguro.", atualizar_proximo)
+                     "Exige senha e chave juntas; guarde a chave em local seguro.", atualizar_proximo)
         opcao_cartao(dir_, modo, MODO_OU, "Senha OU chave de acesso",
-                     "Qualquer uma abre sozinha. É mais fácil recuperar, mas oferece menos proteção.",
+                     "Qualquer uma abre; oferece menos proteção.",
                      atualizar_proximo)
 
-        fido = ttk.Frame(dir_, style="Card2.TFrame", padding=(_px(10), _px(6)))
-        fido.pack(fill="x", pady=(_px(7), 0))
+        fido = ttk.Frame(dir_, style="Card2.TFrame", padding=(_px(8), _px(4)))
+        fido.pack(fill="x", pady=(_px(4), 0))
         ttk.Checkbutton(fido, text="Exigir também a chave FIDO", variable=usar_fido,
                         style="S2.TCheckbutton", command=atualizar_proximo).pack(anchor="w")
-        ttk.Label(fido, text="Opcional: chave física USB/NFC compatível; o cadastro será solicitado após criar.",
+        ttk.Label(fido, text="Opcional: chave física USB/NFC; cadastro após criar.",
                   style="S2.Suave.TLabel", wraplength=_px(420), justify="left").pack(
                       anchor="w", padx=(_px(28), 0))
 
-        ttk.Separator(dir_).pack(fill="x", pady=(_px(12), _px(10)))
+        ttk.Separator(dir_).pack(fill="x", pady=(_px(8), _px(6)))
         nivel = tk.StringVar(value=nivel_recomendado())      # PC com pouca RAM livre começa em "Alta" (sem paginação)
         cab_nivel = ttk.Frame(dir_, style="C.TFrame")
         cab_nivel.pack(anchor="w", fill="x")
@@ -8180,14 +8354,14 @@ class App:
                     "• Máxima (1 GB): escolha se o computador tiver memória livre suficiente.\n"
                     "• Alta (256 MB): alternativa para computadores com pouca memória livre.",
                     CORES["fundo"]).pack(side="left", padx=(4, 0))
-        ttk.Label(dir_, text="A opção Alta só é necessária se o computador tiver pouca memória livre.",
-                  style="C.Suave.TLabel", wraplength=_px(420), justify="left").pack(anchor="w", pady=(4, 2))
+        ttk.Label(dir_, text="Alta é indicada para computadores com pouca memória livre.",
+                  style="C.Suave.TLabel", wraplength=_px(420), justify="left").pack(anchor="w", pady=(2, 1))
         opcao_cartao(dir_, nivel, "maximo", "Máxima — 1 GB por tentativa",
-                     "Maior custo para cada tentativa de adivinhar; requer mais memória.")
+                     "Maior proteção; requer mais memória.")
         opcao_cartao(dir_, nivel, "alto", "Alta — 256 MB por tentativa",
-                     "Use se o computador não tiver memória livre para a opção Máxima.")
+                     "Alternativa para pouca memória.")
         proximo = ttk.Label(dir_, text="", style="C.Suave.TLabel", wraplength=_px(420), justify="left")
-        proximo.pack(anchor="w", pady=(_px(10), 0))
+        proximo.pack(anchor="w", pady=(_px(6), 0))
         atualizar_proximo()
 
         def criar(event=None):
@@ -8273,7 +8447,7 @@ class App:
         f = self._limpar_tela("centro")
         self._img_marca = desenhar_marca(64).imagem(self.root)
         ttk.Label(f, image=self._img_marca, style="C.TLabel").pack()
-        ttk.Label(f, text=_dx("4GsbmBvBCza3KmB4F(n"), style="C.Titulo.TLabel").pack(pady=(12, 0))
+        ttk.Label(f, text=_NOME_PRODUTO, style="C.Titulo.TLabel").pack(pady=(12, 0))
         modo_cofre, exige_fido = MODO_OU, False
         rest = None
         exige_pc, pc_ok = False, True
@@ -8703,7 +8877,8 @@ class App:
 
     def _vigiar_sistema(self):
         """Vigia periódica: bloqueia se o PC dormiu, se a sessão foi travada ou se surgiu ferramenta espiã/depurador."""
-        agora = time.time()
+        agora_parede = time.time()
+        agora = time.monotonic()
         try:
             if self._ocultadores and not self._app_sem_foco():
                 self._mostrar_conteudo()          # voltou ao programa: tira o aviso "Conteúdo oculto"
@@ -8718,12 +8893,12 @@ class App:
                     self._sem_foco_desde = agora
                 elif agora - self._sem_foco_desde >= BLOQUEIO_SEM_FOCO_S:
                     self._sem_foco_desde = None
-                    self._ultimo_tique = agora
+                    self._ultimo_tique = agora_parede
                     self.bloquear()
                     return
             else:
                 self._sem_foco_desde = None
-            if self.cofre is not None and (agora - self._ultimo_tique > 20 or sessao_bloqueada()):
+            if self.cofre is not None and (agora_parede - getattr(self, "_ultimo_tique", agora_parede) > 20 or sessao_bloqueada()):
                 # pulo no relógio = o PC dormiu/hibernou; ou a sessão do Windows foi bloqueada
                 self.bloquear()
             elif self.cofre is not None:
@@ -9296,7 +9471,7 @@ class App:
         proteger_contra_captura(d)
         barra_titulo_escura(d)
         d.bind("<Map>", lambda e=None: proteger_contra_captura(d) if e is None or e.widget is d else None, add="+")
-        d.after_idle(lambda: self._revelar_dialogo(d))
+        d.after(0, lambda: self._revelar_dialogo(d))
         return d
 
     def _revelar_dialogo(self, d):
@@ -9369,54 +9544,63 @@ class App:
                 "O recomendado é um pendrive. Salvar no disco do Windows mesmo assim?", parent=pai, perigoso=True)
         return True
 
-    def _corpo_rolavel(self, d, padding, rodape=None):
-        """Conteúdo do diálogo numa área que só ganha barra de rolagem se a tela for baixa demais
-        (notebook com 768 px, ou zoom de 125%/150%). Em telas grandes, nada muda.
-        'rodape' (opcional): frame já empacotado com side="bottom" ANTES desta chamada; ele fica sempre
-        visível (botões de ação nunca saem da tela) e a altura dele é descontada da área rolável."""
-        caixa = ttk.Frame(d)
-        caixa.pack(fill="both", expand=True)
-        tela = tk.Canvas(caixa, bg=CORES["fundo"], highlightthickness=0, bd=0, yscrollincrement=_px(24))
-        barra = ttk.Scrollbar(caixa, orient="vertical", command=tela.yview)
-        tela.configure(yscrollcommand=barra.set)
-        tela.pack(side="left", fill="both", expand=True)
-        fr = ttk.Frame(tela, padding=padding)
-        tela.create_window(0, 0, window=fr, anchor="nw")
-        estado = {"barra": False, "pos": False, "pendente": None, "aplicado": None}
+    def _corpo_dialogo(self, d, padding, rodape=None):
+        """Mantém o rodapé visível e só permite rolagem vertical quando o corpo não cabe na tela."""
+        area = ttk.Frame(d)
+        area.pack(fill="both", expand=True)
+        canvas = tk.Canvas(area, bg=CORES["fundo"], highlightthickness=0, bd=0)
+        barra = ttk.Scrollbar(area, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=barra.set)
+        fr = ttk.Frame(canvas, padding=padding)
+        janela = canvas.create_window((0, 0), window=fr, anchor="nw")
+        canvas.pack(side="left", fill="both", expand=True)
+        estado = {"pos": False, "pendente": None, "aplicado": None, "rolagem": False}
+
+        def ajustar_largura(event):
+            canvas.itemconfigure(janela, width=event.width)
 
         def aplicar():
-            """Aplica de fato o novo tamanho (uma vez só por rajada de <Configure> — ver 'ajustar' abaixo)."""
+            """Dimensiona o corpo e ativa rolagem apenas se a altura disponível for insuficiente."""
             estado["pendente"] = None
             try:
-                d.update_idletasks()                  # o conteúdo precisa estar medido antes de ler o tamanho pedido
-                w, h = fr.winfo_reqwidth(), fr.winfo_reqheight()
+                d.update_idletasks()
+                w = fr.winfo_reqwidth()
+                h = fr.winfo_reqheight()
                 reserva = rodape.winfo_reqheight() if rodape is not None else 0
-                limite = max(_px(320), int(d.winfo_screenheight() * 0.86) - reserva)
-                if (w, h) == estado["aplicado"]:      # tamanho não mudou de verdade: nada a refazer
-                    return
-                estado["aplicado"] = (w, h)
-                tela.configure(width=w, height=min(h, limite), scrollregion=(0, 0, w, h))
-                precisa = h > limite
-                if precisa != estado["barra"]:
-                    estado["barra"] = precisa
-                    if precisa:
+                sw, sh = d.winfo_screenwidth(), d.winfo_screenheight()
+                if rodape is not None:
+                    w = max(w, rodape.winfo_reqwidth())
+                largura = min(max(w, _px(860)), max(_px(640), sw - _px(48)))
+                altura = min(max(h + reserva, _px(520)), max(_px(420), sh - _px(64)))
+                corpo_altura = max(1, altura - reserva)
+                rolagem = h > corpo_altura
+                if rolagem != estado["rolagem"]:
+                    if rolagem:
                         barra.pack(side="right", fill="y")
                     else:
                         barra.pack_forget()
-                        tela.yview_moveto(0)
+                    estado["rolagem"] = rolagem
+                    d.update_idletasks()
+                canvas.configure(height=corpo_altura, scrollregion=canvas.bbox("all"))
+                dimensoes = (largura, altura, rolagem)
+                if dimensoes == estado["aplicado"]:
+                    return
+                estado["aplicado"] = dimensoes
+                d.geometry(f"{largura}x{altura}")
+                d.update_idletasks()
+                canvas.configure(scrollregion=canvas.bbox("all"))
                 if not estado["pos"]:
                     estado["pos"] = True
                     d.after_idle(lambda: self._centralizar(d))
             except tk.TclError:
                 pass
 
+        def configurar_corpo(event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            ajustar()
+
         def ajustar(event=None):
-            """Ajusta a área de rolagem ao tamanho do conteúdo. Agrupa (debounce de 30 ms) várias mudanças de
-            <Configure> que chegam juntas — por exemplo quando o painel de força da senha se reconstrói em
-            várias etapas a cada tecla — numa só atualização. Sem isso, CADA tecla digitada (inclusive pelo
-            teclado virtual, que dispara <<Atualizar>> a cada clique) fazia esta janela encolher e crescer
-            várias vezes em sequência: o "glitch" relatado pelo usuário ao usar o teclado virtual era esta
-            janela (a de trás, por baixo do teclado) se reajustando repetidamente, não o teclado em si."""
+            """Agrupa as mudanças de tamanho do conteúdo para evitar redimensionamentos repetidos."""
             if estado["pendente"] is not None:
                 try:
                     d.after_cancel(estado["pendente"])
@@ -9427,17 +9611,13 @@ class App:
             except tk.TclError:
                 pass
 
-        def rolar(event):
-            """Rola o corpo do diálogo com a roda do mouse."""
-            if not estado["barra"]:
-                return
-            num = getattr(event, "num", 0)
-            passo = -1 if num == 4 else 1 if num == 5 else (-1 if event.delta > 0 else 1)
-            tela.yview_scroll(passo * 2, "units")
+        canvas.bind("<Configure>", ajustar_largura, add="+")
+        fr.bind("<Configure>", configurar_corpo, add="+")
+        if rodape is not None:
+            rodape.bind("<Configure>", ajustar, add="+")
 
         def preparar():
-            """Chamado por _revelar_dialogo ANTES de mostrar a janela: dimensiona a área de rolagem agora, de forma
-            síncrona, para o diálogo já nascer no tamanho final (sem 'montar' e se ajeitar na frente do usuário)."""
+            """Mede o conteúdo antes de mostrar o diálogo."""
             if estado["pendente"] is not None:
                 try:
                     d.after_cancel(estado["pendente"])
@@ -9448,11 +9628,6 @@ class App:
             aplicar()
             d.update_idletasks()
         d._preparar_corpo = preparar
-        fr.bind("<Configure>", ajustar, add="+")
-        if rodape is not None:
-            rodape.bind("<Configure>", ajustar, add="+")
-        for ev in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
-            d.bind(ev, rolar, add="+")
         return fr
 
     def _centralizar(self, d):
@@ -9473,6 +9648,14 @@ class App:
             d.geometry(f"+{x}+{y}" if visivel else f"{w}x{h}+{x}+{y}")
         except tk.TclError:
             pass
+
+    def _recalcular_dialogo(self, d):
+        """Ajusta o tamanho e a posição do diálogo depois que seu conteúdo muda."""
+        d.update_idletasks()
+        preparar = getattr(d, "_preparar_corpo", None)
+        if callable(preparar):
+            preparar()
+        self._centralizar(d)
 
     @staticmethod
     def _bloquear_copia(widget):
@@ -9783,7 +9966,7 @@ class App:
                    image=imagem_icone(self.root, "backup", C["texto"]), compound="left").pack(side="left", padx=8)
         def imprimir_chave():
             """Imprime SÓ a chave de acesso (cópia de emergência; pede a senha mestra), direto na impressora."""
-            self._imprimir("COFRE DE SENHAS — CHAVE DE ACESSO", [("Chave de acesso", chave_txt)], mestre=d)
+            self._imprimir("ARCA — CHAVE DE ACESSO", [("Chave de acesso", chave_txt)], mestre=d)
 
         ttk.Button(bt, text="Imprimir só a chave…", command=imprimir_chave,
                    image=imagem_icone(self.root, "imprimir", C["texto"]), compound="left").pack(side="left")
@@ -9848,7 +10031,12 @@ class App:
                     "se faltar algo, use a cópia .bak mais nova (ou o seu backup externo)."))
         self._img_marca = desenhar_marca(30).imagem(self.root)
         tk.Label(cab, image=self._img_marca, bg=C["fundo"]).pack(side="left", padx=(20, 10))
-        tk.Label(cab, text=_dx("4GsbmBvBCza3KmB4F(n"), bg=C["fundo"], fg=C["texto"], font="CofreSub").pack(side="left")
+        marca_texto = tk.Frame(cab, bg=C["fundo"])
+        marca_texto.pack(side="left")
+        tk.Label(marca_texto, text=_NOME_APP, bg=C["fundo"], fg=C["texto"],
+                 font="CofreSub").pack(anchor="w")
+        tk.Label(marca_texto, text=_NOME_EMPRESA.upper(), bg=C["fundo"], fg=C["fraco"],
+                 font="CofreTexto").pack(anchor="w")
 
         busca_fr = tk.Frame(cab, bg=C["fundo"])
         busca_fr.pack(side="left", padx=(36, 0))
@@ -9941,33 +10129,14 @@ class App:
         lat.pack_propagate(False)
         self._painel_seg = tk.Frame(lat, bg=C["lateral"])
         self._painel_seg.pack(side="bottom", fill="x", padx=12, pady=12)
-        rolo = tk.Canvas(lat, bg=C["lateral"], highlightthickness=0, bd=0)
-        rolo.pack(fill="both", expand=True)
-        interno = tk.Frame(rolo, bg=C["lateral"])
-        janela = rolo.create_window(0, 0, window=interno, anchor="nw")
-        interno.bind("<Configure>", lambda e: rolo.configure(scrollregion=(0, 0, e.width, e.height)), add="+")
-        rolo.bind("<Configure>", lambda e: rolo.itemconfigure(janela, width=e.width), add="+")
-        self.lateral_pessoas = BarraLateral(interno)
+        interno = tk.Frame(lat, bg=C["lateral"])
+        interno.pack(fill="both", expand=True)
+        self.lateral_pessoas = BarraLateral(interno, max_linhas=4)
         self.lateral_pessoas.pack(fill="x", pady=(8, 0))
         self.lateral_pessoas.bind("<<TreeviewSelect>>", self._ao_escolher_pessoa)
-        self.lateral = BarraLateral(interno)
+        self.lateral = BarraLateral(interno, max_linhas=8)
         self.lateral.pack(fill="x")
         self.lateral.bind("<<TreeviewSelect>>", self._ao_escolher_grupo)
-
-        def rolar_lateral(event):
-            """Rola a barra lateral com a roda do mouse."""
-            try:
-                if not str(event.widget).startswith(str(lat)):
-                    return
-                if interno.winfo_height() <= rolo.winfo_height():
-                    return
-                num = getattr(event, "num", 0)
-                passo = -1 if num == 4 else 1 if num == 5 else (-1 if event.delta > 0 else 1)
-                rolo.yview_scroll(passo * 2, "units")
-            except (tk.TclError, AttributeError):
-                pass
-        for ev in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
-            self._ligar_raiz(ev, rolar_lateral)
         tk.Frame(corpo, bg=C["borda"], width=1).pack(side="left", fill="y")
 
         # ----- Coluna 3: detalhes -----
@@ -9980,7 +10149,7 @@ class App:
         meio = tk.Frame(corpo, bg=C["fundo"])
         meio.pack(side="left", fill="both", expand=True)
         topo_lista = tk.Frame(meio, bg=C["fundo"])
-        topo_lista.pack(fill="x", padx=(22, 16), pady=(16, 6))
+        topo_lista.pack(fill="x", padx=(14, 16), pady=(16, 6))
         self._titulo_lista = tk.Label(topo_lista, text="Todas as contas", bg=C["fundo"], fg=C["texto"],
                                       font="CofreSub", anchor="w")
         self._titulo_lista.pack(side="left")
@@ -10374,6 +10543,9 @@ class App:
         if r.get("grupo"):
             ttk.Label(chips, text=" " + r["grupo"], image=_ponto_img(self.root, tom_para(r["grupo"]), 8),
                       compound="left", style="C.Suave.TLabel").pack(side="left", padx=(0, 12))
+        ttk.Label(chips, text="Em uso" if _item_ativo(r) else "Inativa",
+                  style="C.TLabel", foreground=C["ok"] if _item_ativo(r) else C["fraco"]).pack(
+                      side="left", padx=(0, 12))
         if self._protecao_global():          # agora é um ajuste do cofre todo (⋯ → Segurança → Proteção extra), não por item
             ttk.Label(chips, text=" Proteção extra ativa", image=imagem_icone(self.root, "cadeado", C["prim_txt"], 14),
                       compound="left", style="C.TLabel", foreground=C["prim_txt"]).pack(side="left")
@@ -11143,13 +11315,32 @@ class App:
         self._modal(d)
         rodape = ttk.Frame(d, padding=(_px(26), _px(8), _px(26), _px(16)))
         rodape.pack(side="bottom", fill="x")          # Salvar/Cancelar ficam SEMPRE visíveis (fora da rolagem)
-        fr = self._corpo_rolavel(d, (26, 22, 26, 8), rodape=rodape)
-        self._cabecalho_dialogo(fr, "editar" if reg else "novo", "Editar item" if reg else "Novo item",
-                                "Tudo o que você digitar aqui fica criptografado dentro do cofre.")
+        fr = self._corpo_dialogo(d, (20, 16, 20, 10), rodape=rodape)
         campos = {}
-        barra_modo = ttk.Frame(fr)
-        barra_modo.pack(fill="x")
-        bt_tour = ttk.Button(barra_modo, text="?", style="Acao.TButton", width=3)
+        self._cabecalho_dialogo(
+            fr, "editar" if reg else "novo", "Editar item" if reg else "Novo item",
+            "Apenas Conta / App é obrigatória")
+        linha_acoes = ttk.Frame(fr)
+        linha_acoes.pack(fill="x", pady=(0, 8))
+        status = tk.BooleanVar(value=_item_ativo(reg) if reg else True)
+        estilo_status = ttk.Style(d)
+        estilo_status.configure("StatusAtiva.TButton", foreground=C["ok"], padding=(_px(10), _px(5)))
+        estilo_status.configure("StatusInativa.TButton", foreground=C["fraco"], padding=(_px(10), _px(5)))
+        estilo_status.configure("AjudaItem.TButton", foreground=C["fraco"], padding=(_px(2), _px(2)))
+        bt_status = ttk.Button(linha_acoes, style="StatusAtiva.TButton")
+        bt_status.pack(side="right", padx=(8, 0))
+
+        def atualizar_status():
+            """Atualiza a etiqueta de estado sem alterar os demais dados do item."""
+            ativa = status.get()
+            bt_status.configure(text="Em uso" if ativa else "Inativa",
+                                style="StatusAtiva.TButton" if ativa else "StatusInativa.TButton")
+
+        bt_status.configure(command=lambda: (status.set(not status.get()), atualizar_status()))
+        self._dica(bt_status, "Indica se você ainda usa esta conta. Marcar como inativa só muda o rótulo: "
+                              "não apaga a senha nem bloqueia o acesso; o item continua salvo e pode ser reativado.")
+        atualizar_status()
+        bt_tour = ttk.Button(linha_acoes, text="?", style="AjudaItem.TButton")
         bt_tour.pack(side="right")
         self._dica(bt_tour, "Como preencher: um passeio guiado explicando cada campo do formulário.")
 
@@ -11158,18 +11349,30 @@ class App:
         topo.pack(fill="x")
         topo.columnconfigure(0, weight=3)
         topo.columnconfigure(1, weight=2)
-        ttk.Label(topo, text=("NOME DO SITE OU APP" if not reg else ROTULOS["servico"].upper()),
-                  style="Campo.TLabel").grid(row=0, column=0, sticky="w")
-        rot_grupo = ttk.Label(topo, text="GRUPO", style="Campo.TLabel")
-        rot_grupo.grid(row=0, column=1, sticky="w", padx=(12, 0))
-        ent = ttk.Entry(topo, width=30)
-        ent.grid(row=1, column=0, sticky="ew", pady=(4, 12))
+        ttk.Label(topo, text="IDENTIFICAÇÃO E ORGANIZAÇÃO", style="C.Campo.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        ttk.Label(topo, text=ROTULOS["servico"].upper() + " *", style="C.Campo.TLabel").grid(
+            row=1, column=0, sticky="w")
+        ttk.Label(topo, text="GRUPO / CATEGORIA", style="C.Campo.TLabel").grid(
+            row=1, column=1, sticky="w", padx=(12, 0))
+        linha_servico = ttk.Frame(topo, style="C.TFrame")
+        linha_servico.grid(row=2, column=0, sticky="ew", pady=(4, 12))
+        linha_servico.columnconfigure(0, weight=1)
+        ent = ttk.Entry(linha_servico, width=30, style="C.TEntry")
+        ent.grid(row=0, column=0, sticky="ew")
         campos["servico"] = ent
-        self._pista_entrada(ent, "Ex.: Gmail, banco ou aplicativo")
+        self._pista_entrada(ent, "Ex.: Instagram, banco ou aplicativo")
+        prev_marca = ttk.Label(linha_servico, style="C.TLabel")
+        prev_marca.grid(row=0, column=1, padx=(8, 0))
+        lista_marcas = tk.Frame(topo, bg=C["sup"], highlightthickness=1,
+                                highlightbackground=C["borda"])
+        lista_marcas.grid(row=3, column=0, sticky="ew", pady=(0, 4))
+        autocompletar = AutocompletarMarcas(ent, prev_marca, lista_marcas)
         NOVO_GRUPO = "＋ Criar novo grupo…"        # 1ª opção da lista: o usuário escolhe o próprio nome de grupo
-        cg = ttk.Combobox(topo, width=20, values=[NOVO_GRUPO] + list(self._grupos_sugeridos()))
-        cg.grid(row=1, column=1, sticky="ew", padx=(12, 0), pady=(4, 12))
-        dica_grupo = ttk.Label(topo, text="", style="Fraco.TLabel", wraplength=_px(220), justify="left")
+        cg = ttk.Combobox(topo, width=20, values=[NOVO_GRUPO] + list(self._grupos_sugeridos()),
+                          style="C.TCombobox")
+        cg.grid(row=2, column=1, sticky="ew", padx=(12, 0), pady=(4, 12))
+        dica_grupo = ttk.Label(topo, text="", style="C.Fraco.TLabel", wraplength=_px(220), justify="left")
 
         def escolheu_grupo(event=None):
             """Ao escolher '＋ Criar novo grupo…': limpa o campo e deixa digitar o nome que quiser."""
@@ -11177,25 +11380,26 @@ class App:
                 cg.set("")
                 cg.focus_set()
                 dica_grupo.config(text="Digite o nome do seu grupo. Ele é criado ao salvar.")
-                dica_grupo.grid(row=4, column=1, sticky="w", padx=(12, 0), pady=(0, 6))
+                dica_grupo.grid(row=3, column=1, sticky="w", padx=(12, 0), pady=(0, 6))
         cg.bind("<<ComboboxSelected>>", escolheu_grupo)
         cg.insert(0, (reg or {}).get("grupo", "") or (self.filtro_grupo.get()
                                                      if self.filtro_grupo.get() not in ("Todos", "(sem grupo)", "⚠ Atenção")
                                                      else ""))
         campos["grupo"] = cg
-        ttk.Label(topo, text=("USUÁRIO OU E-MAIL" if not reg else ROTULOS["login"].upper()),
-                  style="Campo.TLabel").grid(row=2, column=0, sticky="w")
-        rot_pessoa = ttk.Label(topo, text="PESSOA", style="Campo.TLabel")
-        rot_pessoa.grid(row=2, column=1, sticky="w", padx=(12, 0))
-        ent = ttk.Entry(topo, width=30)
-        ent.grid(row=3, column=0, sticky="ew", pady=(4, 0))
+        ttk.Label(topo, text="LOGIN / E-MAIL / USUÁRIO", style="C.Campo.TLabel").grid(
+            row=4, column=0, sticky="w")
+        ttk.Label(topo, text="PESSOA (PERFIL)", style="C.Campo.TLabel").grid(
+            row=4, column=1, sticky="w", padx=(12, 0))
+        ent = ttk.Entry(topo, width=30, style="C.TEntry")
+        ent.grid(row=5, column=0, sticky="ew", pady=(4, 0))
         campos["login"] = ent
         self._pista_entrada(ent, "Ex.: usuario@exemplo.com")
         NOVO_PESSOA = "＋ Criar novo perfil…"       # mesma ideia do grupo: 1ª opção da lista deixa claro que dá
                                                      # para criar um perfil novo (reclamação real do usuário: a
                                                      # lista de sugestões parecia fechada, sem jeito de adicionar)
-        cp = ttk.Combobox(topo, width=20, values=[NOVO_PESSOA] + [self._nome_pessoa(x) for x in self._pessoas()])
-        cp.grid(row=3, column=1, sticky="ew", padx=(12, 0), pady=(4, 0))
+        cp = ttk.Combobox(topo, width=20, values=[NOVO_PESSOA] + [self._nome_pessoa(x) for x in self._pessoas()],
+                          style="C.TCombobox")
+        cp.grid(row=5, column=1, sticky="ew", padx=(12, 0), pady=(4, 0))
         if reg:
             cp.insert(0, self._nome_pessoa(self._pessoa_de(reg)))
         else:
@@ -11214,48 +11418,88 @@ class App:
         if reg:
             campos["servico"].insert(0, reg.get("servico", ""))
             campos["login"].insert(0, reg.get("login", ""))
+            autocompletar.atualizar_previsualizacao()
             for chave in ("servico", "login"):
                 getattr(campos[chave], "_pista_atualizar", lambda: None)()
 
-        # Segredos
-        cab_seg = ttk.Frame(fr)
-        cab_seg.pack(fill="x", pady=(18, 6))
-        ttk.Label(cab_seg, text="  Segredos", image=imagem_icone(self.root, "chave", C["prim_txt"], 16),
-                  compound="left", font="CofreForte").pack(side="left")
+        # Credenciais secretas
+        credenciais = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
+        credenciais.pack(fill="x", pady=(12, 0))
+        cab_seg = ttk.Frame(credenciais, style="C.TFrame")
+        cab_seg.pack(fill="x")
+        ttk.Label(cab_seg, text="CREDENCIAIS SECRETAS", style="C.Campo.TLabel").pack(side="left")
         mostrar = tk.BooleanVar(value=False)
-        ttk.Checkbutton(cab_seg, text="Mostrar", variable=mostrar, style="Switch.TCheckbutton",
+        ttk.Checkbutton(cab_seg, text="Mostrar", variable=mostrar, style="C.Switch.TCheckbutton",
                         command=lambda: alternar()).pack(side="right")
-        # Caixas "este item também tem...": cada campo extra só aparece quando a caixa é marcada
+        linha_adicionar = ttk.Frame(credenciais, style="C.TFrame")
+        linha_adicionar.pack(fill="x", pady=(8, 10))
         CAMPOS_EXTRA = (("codigos", "Código de recuperação"), ("pin", "PIN"), ("senha_extra", "Senha extra"),
                         ("chave", "Chave / token"), ("numero_conta", "Número da conta"), ("agencia", "Agência"))
         tem = {k: tk.BooleanVar(value=bool(reg and (reg.get(k) or "").strip())) for k, _ in CAMPOS_EXTRA}
-        marcas = ttk.Frame(fr, style="Card2.TFrame", padding=(_px(14), _px(10)))
-        marcas.pack(fill="x", pady=(0, 8))
-        ttk.Label(marcas, text="ESTE ITEM TAMBÉM TEM", style="Campo.TLabel").pack(anchor="w", pady=(0, 2))
-        linha_marcas = ttk.Frame(marcas)
-        linha_marcas.pack(fill="x")
-        for i, (k, rot) in enumerate(CAMPOS_EXTRA):
-            ttk.Checkbutton(linha_marcas, text=rot, variable=tem[k], style="Switch.TCheckbutton",
-                            command=lambda: aplicar_campos()).grid(row=i // 3, column=i % 3, sticky="w",
-                                                                    padx=(0, 18))
-        grade = ttk.Frame(fr, style="Card.TFrame", padding=(_px(12), _px(10)))
+        rótulos_extra = {
+            "codigos": "Códigos de recuperação",
+            "senha_extra": "Senha extra",
+            "pin": "PIN numérico",
+            "chave": "Chave / token",
+            "numero_conta": "Número da conta",
+            "agencia": "Agência",
+        }
+        selecao_credencial = ttk.Combobox(
+            linha_adicionar, state="readonly", width=24,
+            values=[rótulos_extra[k] for k, _ in CAMPOS_EXTRA if not tem[k].get()],
+            style="C.TCombobox")
+
+        def atualizar_seletor_credenciais():
+            """Lista apenas as credenciais ainda não adicionadas ao formulário."""
+            opcoes = [rótulos_extra[k] for k, _ in CAMPOS_EXTRA if not tem[k].get()]
+            selecao_credencial.configure(values=opcoes)
+            if opcoes:
+                if selecao_credencial.get() not in opcoes:
+                    selecao_credencial.set(opcoes[0])
+                botao_adicionar.configure(state="normal")
+            else:
+                selecao_credencial.set("Todas adicionadas")
+                botao_adicionar.configure(state="disabled")
+
+        def adicionar_credencial():
+            """Inclui no formulário a credencial selecionada."""
+            escolhida = selecao_credencial.get()
+            chave = next((k for k, rot in rótulos_extra.items() if rot == escolhida), None)
+            if chave is not None:
+                tem[chave].set(True)
+                aplicar_campos()
+
+        botao_adicionar = ttk.Button(linha_adicionar, text="+ Adicionar", style="Acao.TButton",
+                                     command=adicionar_credencial)
+        botao_adicionar.pack(side="right", padx=(8, 0))
+        selecao_credencial.pack(side="left", fill="x", expand=True)
+        grade = ttk.Frame(credenciais, style="S2.TFrame")
         grade.pack(fill="x")
         grade.columnconfigure(0, weight=1, uniform="s")
         grade.columnconfigure(1, weight=1, uniform="s")
         secretos = []
         grupos_campo = {k: [] for k in ("pin", "senha_extra", "chave", "numero_conta", "agencia")}   # widgets de
                                                                                             # cada campo extra
-        dicas_item = PainelForca(fr, self, largura=_px(660), compacto=True)
+        dicas_item = PainelForca(credenciais, self, largura=_px(660), pref="C.", compacto=True)
         for i, chave in enumerate(("senha", "senha_extra", "pin", "chave", "numero_conta", "agencia")):
             col, lin = i % 2, (i // 2) * 3
             px = (0, 10) if col == 0 else (10, 0)
-            rot_c = ttk.Label(grade, text=ROTULOS[chave].upper(), style="Campo.TLabel")
-            rot_c.grid(row=lin, column=col, sticky="w", padx=px)
-            linha = ttk.Frame(grade)
+            cab_campo = ttk.Frame(grade, style="S2.TFrame")
+            cab_campo.grid(row=lin, column=col, sticky="ew", padx=px)
+            rot_c = ttk.Label(cab_campo, text=ROTULOS[chave].upper(), style="S2.Campo.TLabel")
+            rot_c.pack(side="left")
+            grupo_campo = []
+            if chave != "senha":
+                bt_remover = ttk.Button(cab_campo, text="×", style="Icone.TButton", width=2,
+                                        command=lambda k=chave: (tem[k].set(False), aplicar_campos()))
+                bt_remover.pack(side="right")
+                grupo_campo.extend((cab_campo, bt_remover))
+                grupos_campo[chave].extend((cab_campo, bt_remover))
+            linha = ttk.Frame(grade, style="S2.TFrame")
             linha.grid(row=lin + 1, column=col, sticky="ew", padx=px, pady=(4, 0))
             if chave != "senha":
-                grupos_campo[chave] += [rot_c, linha]
-            caixa, ent = self._linha_secreta(linha, 18, olho=False)
+                grupos_campo[chave].append(linha)
+            caixa, ent = self._linha_secreta(linha, 18, olho=False, pref="S2.")
             caixa.pack(side="left", fill="x", expand=True)
             if reg:
                 ent.insert(0, reg.get(chave, ""))
@@ -11277,29 +11521,29 @@ class App:
                 bgr.pack(side="left", fill="y", padx=(6, 0))
                 self._dica(bgr, "Gerar uma senha forte (escolha o tipo e o tamanho)")
                 med = self._medidor(grade, ent, pin=(chave == "pin"), dicas_lbl=dicas_item,
-                                    titulo=ROTULOS[chave])
+                                    pref="S2.", titulo=ROTULOS[chave])
                 med.grid(row=lin + 2, column=col, sticky="w", padx=px, pady=(6, 12))
                 if chave != "senha":
                     grupos_campo[chave].append(med)
             else:
-                ttk.Frame(grade, height=8).grid(row=lin + 2, column=col)
-        dicas_item.pack(fill="x", pady=(0, 6))
+                ttk.Frame(grade, style="S2.TFrame", height=8).grid(row=lin + 2, column=col)
+        dicas_item.pack(fill="x", pady=(6, 0))
         if senha_inicial and not reg:
             campos["senha"].insert(0, senha_inicial)
             getattr(campos["senha"], "_pista_atualizar", lambda: None)()
         for _k in ("senha", "senha_extra", "pin"):
             campos[_k].event_generate("<<AtualizarJa>>")      # painéis de força já prontos no 1º quadro
 
-        extras = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
+        extras = ttk.Frame(credenciais, style="S2.TFrame", padding=(_px(2), _px(8), _px(2), 0))
+        ttk.Label(extras, text=ROTULOS["codigos"].upper(), style="S2.Campo.TLabel").pack(anchor="w", pady=(4, 4))
         extras_notas = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
-        extras.pack(fill="x")
-        ttk.Label(extras, text=ROTULOS["codigos"].upper(), style="Campo.TLabel").pack(anchor="w", pady=(10, 4))
-        fc = ttk.Frame(extras)
+        extras_notas.pack(fill="x", pady=(12, 0))
+        fc = ttk.Frame(extras, style="S2.TFrame")
         fc.pack(fill="x")
         codigos = self._texto_multilinha(fc, 8, mono=True)
         atualizar_pista_codigos = self._pista_texto(codigos, "Um código de recuperação por linha")
-        barra_cod = ttk.Frame(fc)
-        cont_cod = ttk.Label(barra_cod, text="", style="Fraco.TLabel")
+        barra_cod = ttk.Frame(fc, style="S2.TFrame")
+        cont_cod = ttk.Label(barra_cod, text="", style="S2.Fraco.TLabel")
 
         def contar_codigos(event=None):
             """Mostra quantos códigos há na caixa (um por linha)."""
@@ -11339,7 +11583,7 @@ class App:
         codigos.bind("<KeyRelease>", contar_codigos, add="+")
         contar_codigos()
         oculto = ttk.Label(fc, text="••••••   (oculto — ligue Mostrar)" if (reg or {}).get("codigos")
-                           else "(vazio — ligue Mostrar para preencher)", style="Fraco.TLabel")
+                           else "(vazio — ligue Mostrar para preencher)", style="S2.Fraco.TLabel")
         oculto.pack(anchor="w", pady=(2, 0))
         if reg:
             codigos.insert("1.0", reg.get("codigos", ""))
@@ -11369,8 +11613,9 @@ class App:
                 codigos.pack_forget()
                 barra_cod.pack_forget()
                 oculto.pack(anchor="w", pady=(2, 0))
+            self._recalcular_dialogo(d)
 
-        ttk.Label(extras_notas, text="NOTAS", style="Campo.TLabel").pack(anchor="w", pady=(14, 4))
+        ttk.Label(extras_notas, text="NOTAS", style="C.Campo.TLabel").pack(anchor="w", pady=(14, 4))
         notas = self._texto_multilinha(extras_notas, 3)
         notas.pack(fill="x")
         atualizar_pista_notas = self._pista_texto(notas, "Anotações importantes sobre esta conta…")
@@ -11387,6 +11632,7 @@ class App:
             dados["codigos"] = codigos.get("1.0", "end").strip("\n")
             dados["notas"] = notas.get("1.0", "end").rstrip("\n")
             dados["pessoa"] = _limpar_texto(self._valor_pessoa(cp.get())).strip()
+            dados["ativo"] = status.get()
             if not dados["servico"]:
                 messagebox.showerror("Erro", "Informe a conta / app.", parent=d)
                 return
@@ -11417,19 +11663,18 @@ class App:
 
         # ---- modo simples x completo (revelação progressiva) ----
         def aplicar_campos():
-            """Mostra só os campos extras (PIN, senha extra, chave, códigos de recuperação, notas) cujas caixas
-            estão marcadas. O que já está digitado fica guardado quando a caixa é desmarcada (só some da tela)."""
+            """Atualiza a lista e a visibilidade das credenciais extras."""
             for k, grupo in grupos_campo.items():
                 for w in grupo:
                     try:
                         w.grid() if tem[k].get() else w.grid_remove()
                     except tk.TclError:
                         pass
+            atualizar_seletor_credenciais()
             extras.pack_forget()
             if tem["codigos"].get():
-                extras.pack(fill="x", before=ancora)
-            d.update_idletasks()
-            self._centralizar(d)
+                extras.pack(fill="x")
+            self._recalcular_dialogo(d)
 
         ttk.Button(rod, text="Salvar", command=salvar, style="Primario.TButton",
                    image=imagem_icone(self.root, "ok", "#ffffff"), compound="left").pack(side="right")
@@ -11852,7 +12097,7 @@ class App:
         """Gerador de senhas local (estilo 1Password) + verificador (estilo Kaspersky).
         Se 'alvo' for informado, o botão 'Usar esta senha' preenche o campo (e 'extra', se houver).
         Aberto sozinho (menu / Ctrl+G), o botão principal é 'Usar em um novo item': a senha não fica solta.
-        Os botões ficam num rodapé FIXO (nunca somem atrás da rolagem em telas baixas) e os textos de análise
+        Os botões ficam num rodapé fixo e os textos de análise
         (composição, tempo para quebrar) ficam escondidos até o clique em 'Ver detalhes'."""
         import math
         C = CORES
@@ -11860,7 +12105,7 @@ class App:
         self._modal(d)
         rodape = ttk.Frame(d, padding=(_px(26), _px(10), _px(26), _px(16)))
         rodape.pack(side="bottom", fill="x")          # empacotado ANTES do corpo: fica sempre visível
-        cartao = self._corpo_rolavel(d, (26, 22, 26, 8), rodape=rodape)
+        cartao = self._corpo_dialogo(d, (26, 22, 26, 8), rodape=rodape)
         self._cabecalho_dialogo(cartao, "gerar", "Gerador de senhas", "Gerado neste computador. Nada vai para a internet.")
 
         tipo = tk.StringVar(value=modo_inicial)
@@ -11995,6 +12240,7 @@ class App:
             else:
                 info.pack_forget()
                 bt_det.config(text="Ver detalhes da senha  ▸")
+            self._recalcular_dialogo(d)
         bt_det.config(command=alternar_detalhes)
         if senha_mestra:
             av = ttk.Frame(cartao, style="Card2.TFrame", padding=(12, 10))
@@ -12328,7 +12574,7 @@ class App:
     # ---------- impressão ----------
     # Únicos documentos que o cofre imprime: a cópia de emergência da chave de acesso e do código de recuperação.
     # Senhas, itens, backups e a senha mestra NUNCA são impressos (nenhuma outra tela chama esta função).
-    TITULOS_IMPRESSAO = ("COFRE DE SENHAS — CHAVE DE ACESSO", "COFRE DE SENHAS — CÓDIGO DE RECUPERAÇÃO")
+    TITULOS_IMPRESSAO = ("ARCA — CHAVE DE ACESSO", "ARCA — CÓDIGO DE RECUPERAÇÃO")
     AVISO_IMPRESSAO = ("Impressão bloqueada para senhas e credenciais. Liberada só para a cópia de emergência "
                        "da chave de acesso e do código de recuperação (pede a senha mestra).")
 
@@ -12575,7 +12821,7 @@ class App:
         bt.pack(fill="x", pady=(14, 0))
         def imprimir_codigo():
             """Imprime SÓ o código de recuperação (cópia de emergência; pede a senha mestra)."""
-            self._imprimir("COFRE DE SENHAS — CÓDIGO DE RECUPERAÇÃO", [("Código de recuperação", codigo)], mestre=d)
+            self._imprimir("ARCA — CÓDIGO DE RECUPERAÇÃO", [("Código de recuperação", codigo)], mestre=d)
 
         ttk.Button(bt, text="Imprimir só o código…", command=imprimir_codigo,
                    image=imagem_icone(self.root, "imprimir", CORES["texto"]), compound="left").pack(side="left")
@@ -13033,6 +13279,7 @@ class App:
                 self.tree._linhas = []
                 self.tree._idx = {}
                 self.tree._sel = None
+                self.tree._assinatura = None
         except (AttributeError, tk.TclError):
             pass
         try:
@@ -13044,9 +13291,17 @@ class App:
             if hasattr(self, "lateral_pessoas"):
                 self.lateral_pessoas._itens = {}
                 self.lateral_pessoas._ordem = []
+                self.lateral_pessoas._entradas = []
+                self.lateral_pessoas._indice = {}
+                self.lateral_pessoas._assinatura = None
+                self.lateral_pessoas._sel = None
             if hasattr(self, "lateral"):
                 self.lateral._itens = {}
                 self.lateral._ordem = []
+                self.lateral._entradas = []
+                self.lateral._indice = {}
+                self.lateral._assinatura = None
+                self.lateral._sel = None
         except (AttributeError, tk.TclError):
             pass
         for nome in ("tree", "lateral", "lateral_pessoas", "detalhe", "campo_busca", "busca"):
@@ -13113,17 +13368,13 @@ class App:
 
     def _cancelar_todos_after(self):
         """Cancela TODOS os after() pendentes nesta janela antes de destruí-la (vigia periódica, timers de
-        bloqueio por inatividade, limpeza de clipboard, passeio guiado, etc.). Sem isso, um desses timers pode
-        disparar DEPOIS do destroy() e o Tcl gera um erro de 'invalid command name' (bgerror) -- em tese visível
-        ao usuário na hora de fechar o programa. Achado real de pentest (rodada de 2026-11-13, bateria no Windows
-        de verdade): cancelar por id individual exigiria rastrear cada timer separadamente (vários já são
-        cancelados assim em pontos específicos), então aqui é feita uma varredura defensiva de todos os after()
-        ainda pendentes no interpretador Tcl desta janela, cobrindo também qualquer timer futuro que vier a ser
-        adicionado sem cancelamento explícito."""
+        bloqueio por inatividade, limpeza de clipboard, passeio guiado, etc.). A lista do Tcl é global ao
+        interpretador, mas cada widget guarda seus próprios comandos Python; usar root.after_cancel() em um timer
+        criado por um widget deixa o comando registrado no dono errado e causa TclError durante destroy()."""
         try:
             for identificador in self.root.tk.call("after", "info"):
                 try:
-                    self.root.after_cancel(identificador)
+                    self.root.tk.call("after", "cancel", identificador)
                 except (tk.TclError, ValueError):
                     pass
         except (AttributeError, tk.TclError):
@@ -13163,7 +13414,7 @@ for _nome in ("configurar_bloqueio", "configurar_protecao_extra", "_adicionar_pe
 def main():
     """Ponto de entrada: confere o ambiente, endurece o processo e abre a janela do programa."""
     if tk is None:
-        _aviso_fatal(_dx("4GsbmBvBCza3KmB4F(n"), "Tkinter não encontrado.\n\nInstale o Python oficial de python.org "
+        _aviso_fatal(_NOME_APP, "Tkinter não encontrado.\n\nInstale o Python oficial de python.org "
                      "(ele já vem com Tkinter).")
         sys.exit(1)
     caminho = sys.argv[1] if len(sys.argv) > 1 else os.path.join(pasta_base(), ARQUIVO_PADRAO)
@@ -13287,7 +13538,7 @@ if __name__ == "__main__":
         raise
     except BaseException:
         diag_registrar(DIAG_NAO_TRATADO, sys.exc_info()[1], sys.exc_info()[2])
-        _aviso_fatal(_dx("4GsbmBvBCza3KmB4F(n"), "O cofre encontrou um erro e fechou.\n\nUm código do erro (sem senhas, "
+        _aviso_fatal(_NOME_APP, "O cofre encontrou um erro e fechou.\n\nUm código do erro (sem senhas, "
                      "cifrado) foi guardado; abra o cofre de novo e veja em ⋯ › Diagnóstico. "
                      "Seus dados no cofre.dat não foram alterados.")
         sys.exit(1)

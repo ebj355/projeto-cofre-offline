@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """RASTROS NO HOST (pasta temporária privada) e POLÍTICA OPCIONAL "EXIGIR NTFS".
 - isolar_temporarios: TEMP/TMP/TMPDIR e tempfile passam a apontar para <base>/.tmp_cofre; um arquivo temporário criado
   ali some em limpar_temporarios; resto de queda anterior é apagado ao iniciar; atalho no lugar da pasta -> None e nada

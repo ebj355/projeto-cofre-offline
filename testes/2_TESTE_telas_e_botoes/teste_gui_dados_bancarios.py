@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface: dados bancários (número da conta / agência) no formulário de item.
 Verifica que os campos aparecem ao marcar as caixas, salvam e sobrevivem a fechar/reabrir o cofre (cifrados),
 e que a camada extra de proteção (pedir a senha mestra de novo) vale para itens bancários mesmo com a
@@ -38,9 +39,13 @@ ok("numero_conta" in c.CAMPOS_SECRETOS and "agencia" in c.CAMPOS_SECRETOS, "nume
 
 d = novo()
 for rot in ("Número da conta", "Agência"):
-    cx = achar(d, rot, "TCheckbutton")
-    ok(cx is not None, f"existe a caixa '{rot}'")
-    cx.invoke(); root.update()
+    seletor = next((w for w in todos(d) if w.winfo_class() == "TCombobox"
+                    and rot in list(w.cget("values"))), None)
+    ok(seletor is not None, f"credencial '{rot}' está disponível para adicionar")
+    if seletor is not None:
+        seletor.set(rot)
+        achar(d, "+ Adicionar").invoke()
+        root.update()
 v = " | ".join(str(w.cget("text")) for w in todos(d) if w.winfo_class() == "TLabel" and w.winfo_ismapped())
 ok("NÚMERO DA CONTA" in v and "AGÊNCIA" in v, "campos Número da conta / Agência aparecem marcados")
 
@@ -52,8 +57,9 @@ topo_ents[1].insert(0, "123.456-7")      # login
 # texto (vários campos compartilham o mesmo pai "grade").
 def campo_por_rotulo(rot):
     lbl = next(w for w in todos(d) if w.winfo_class() == "TLabel" and str(w.cget("text")) == rot)
-    pai = lbl.master
-    info = lbl.grid_info()
+    cabecalho = lbl.master
+    pai = cabecalho.master
+    info = cabecalho.grid_info()
     lin, col = int(info["row"]), int(info["column"])
     linha_w = next(w for w in pai.winfo_children()
                    if w.grid_info().get("row") == lin + 1 and w.grid_info().get("column") == col)

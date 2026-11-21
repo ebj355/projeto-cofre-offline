@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """CORRUPÇÃO FORÇADA do arquivo do cofre: truncado em vários pontos, zerado, cheio de lixo, cabeçalho estragado, 1 byte
 virado em posições espalhadas, arquivo vazio, lixo no fim e uma PASTA no lugar do arquivo. Em TODOS os casos o programa
 tem de (1) nunca abrir como se estivesse bom, (2) nunca dar erro técnico solto (TypeError/IndexError/struct.error...):

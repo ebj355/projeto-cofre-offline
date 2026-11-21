@@ -1,3 +1,4 @@
+@rem ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 @echo off
 rem Bandit: analise estatica do cofre_senhas.py. Fica em testes\5_TESTE_ferramentas_externas\ e entra sozinho na RAIZ do projeto.
 rem Codigos de saida: 0 = nada encontrado | 1 = ha achados para revisar | 2 = cofre_senhas.py nao encontrado | 9 = Python/Bandit nao instalado (pulado)

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Gravação em pendrive e diagnóstico: gravação atômica com releitura (SHA-256), pendrive removido/protegido/cheio/em uso,
 cópias rotativas (.bak1 a .bak5), manifesto interno e o registro de diagnóstico cifrado (sem texto, sem caminho,
 rotativo, lido só com o cofre aberto). Roda no Linux e no Windows."""

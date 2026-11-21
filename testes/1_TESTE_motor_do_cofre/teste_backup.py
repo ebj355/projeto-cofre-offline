@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Cópias de segurança (.bak1-5): criadas ao salvar, restauração de cópia boa, contador zerado/dados alterados recusam SEM destruir e devolvem a tentativa."""
 import sys, os, importlib.util, tempfile, shutil
 spec=importlib.util.spec_from_file_location('c',os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','..','cofre_senhas.py'));c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)

@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Checksum v5 e defeitos de mídia: setor zerado, setor 0xFF, cauda cortada, lixo no final, arquivo vazio, setores trocados.
 Regra: nenhum desses danos pode gastar tentativa, destruir o cofre ou deixar a interface sem saída: o programa recusa abrir
 (ArquivoCorrompido/ArquivoInvalido), o arquivo fica EXATAMENTE como estava e a cópia de segurança mais recente restaura o cofre."""

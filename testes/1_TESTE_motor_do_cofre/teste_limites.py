@@ -1,3 +1,4 @@
+# ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Valores-limite, memória e vazamento: senhas extremas, itens extremos, zerar_objeto sem corromper vizinhos."""
 import gc, os, secrets, sys, tempfile, unicodedata
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "6_TESTE_ferramentas_dos_testes"))  # testes/6_TESTE_ferramentas_dos_testes/ -> _util_mem.py
