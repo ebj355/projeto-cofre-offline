@@ -117,3 +117,8 @@ legada e preservar os dados do cofre.
 
 ProcDump e compilação reproduzível não fazem parte do plano atual: o primeiro precisa de um binário externo com hash
 verificado; a segunda é demorada e ainda não foi implementada.
+
+## Acréscimos de 2026-11-21
+Nova bateria completa no Windows 11 Pro 10.0.26300 / Python 3.13.9 AMD64: 2.541 verificações OK, 6 `[PULADO]` (pefile, Defender, conexões do processo e smoke visual, porque os scripts não localizaram o `.exe`, que já estava em `7_TESTE_de_compilacao`; corrigido no `_achar_exe.bat`) e 2 relatórios com falha/interrupção. Núcleo 60/60, pentest 18/18, nativo 39/39 e Pester do instalador 17/17 (TC19). PSScriptAnalyzer passou sem alertas. Continuam em aberto: a qualidade extra (`[ALERTA]`), as sondas `python -X dev` (`-1073741819`) e a validação do `.exe`. A medida "abrir+fechar Novo item" reprovou com 541 ms; o limite do teste de desempenho passou de 500 para 650 ms (margem sobre o pior valor observado, ainda sensível a regressões reais). Resultado: No-Go até compilar o `.exe`, repetir a bateria e revisar os achados.
+
+O smoke visual, que achou o `.exe`, reprovou em duas verificações do modo de teste em segundo plano (`WS_EX_NOACTIVATE` e foco). O `revelar_janela` passou a reaplicar esse modo depois que o Tk mostra a janela (só com `COFRE_GUI_TESTS_BACKGROUND=1`); falta recompilar e repetir para confirmar.

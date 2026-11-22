@@ -982,7 +982,7 @@ def abrir_chave_selada(dados, sal_k, nonce_k, wrap_k):
     try:
         chave = ChaCha20Poly1305(kek).decrypt(dados[16:28], dados[28:], MAGIC_CHAVE + ident)
     except InvalidTag:
-        raise ChaveMalFormada("O arquivo de chave está danificado ou foi alterado. Use a chave anotada em papel.")
+        raise ChaveMalFormada("O arquivo de chave está danificado ou foi alterado. Use a chave anotada em papel.") from None
     txt = base64.b32encode(chave).decode("ascii") + _dv_chave(chave)
     return "-".join(txt[i:i + 4] for i in range(0, 34, 4))
 
@@ -2215,8 +2215,8 @@ def _hibp_baixar(prefixo, timeout=15):
     import urllib.request
     if not HIBP_URL.startswith("https://"):          # nunca aceita file:, ftp: nem http: (sem criptografia)
         raise ValueError("endereço do serviço precisa ser HTTPS")
-    pedido = urllib.request.Request(HIBP_URL + prefixo, headers={"Add-Padding": "true", "User-Agent": "CofreSenhas-local"})
-    with urllib.request.urlopen(pedido, timeout=timeout) as r:   # nosec B310 - esquema https conferido acima
+    pedido = urllib.request.Request(HIBP_URL + prefixo, headers={"Add-Padding": "true", "User-Agent": "CofreSenhas-local"})  # noqa: S310 - https conferido na linha anterior
+    with urllib.request.urlopen(pedido, timeout=timeout) as r:   # nosec B310 - esquema https conferido acima  # noqa: S310
         if r.status != 200:
             raise OSError(f"o serviço respondeu {r.status}")
         dados = r.read(4 * 1024 * 1024 + 1)
@@ -3373,11 +3373,11 @@ class Cofre:
             if consulta:                            # nada foi gasto nem pode ser destruído: só informa
                 erro = SenhaIncorreta(restantes)
                 erro.consulta = True
-                raise erro
+                raise erro from None
             if restantes == 0:
                 destruir(caminho)
-                raise CofreDestruido()
-            raise SenhaIncorreta(restantes)
+                raise CofreDestruido() from None
+            raise SenhaIncorreta(restantes) from None
         except (MemoryError, HashingError):
             if not consulta:
                 _devolver_tentativa(caminho, h)     # faltou memória: a senha nem foi testada
@@ -3391,7 +3391,7 @@ class Cofre:
             # arquivo, devolve a tentativa e orienta a restaurar a cópia de segurança.
             if not consulta:
                 _devolver_tentativa(caminho, h)
-            raise ArquivoCorrompido("O conteúdo do cofre não confere (arquivo danificado ou alterado).")
+            raise ArquivoCorrompido("O conteúdo do cofre não confere (arquivo danificado ou alterado).") from None
 
         c = cls(caminho, dek, h["max_t"], registros, h["t"], h["m"], h["p"], h["modo"])
         c._seq = _seq_de(meta)
@@ -3455,8 +3455,8 @@ class Cofre:
                 # devolve a tentativa e orienta. (Quem já migrou para o formato atual não passa por este caminho.)
                 _devolver_tentativa(caminho, {"hl": HEADER_V1_LEN, "contador": contador})
                 raise ArquivoCorrompido("Senha incorreta, ou o arquivo está danificado. Nada foi apagado. "
-                                        "Se este é um cofre atual, restaure uma cópia de segurança (.bak1).")
-            raise SenhaIncorreta(restantes)
+                                        "Se este é um cofre atual, restaure uma cópia de segurança (.bak1).") from None
+            raise SenhaIncorreta(restantes) from None
         # Converte para o formato atual, com chave de acesso
         c = cls(caminho, secrets.token_bytes(32), max_t, json.loads(texto.decode("utf-8")), t, m, p)
         c.chave_gerada = c._definir_chave_acesso()
@@ -3533,7 +3533,7 @@ class Cofre:
                     diag_registrar(DIAG_CONFLITO)
                     raise ErroGravacao("O arquivo do cofre não está mais no lugar (o pendrive foi removido ou trocado?). "
                                        "Nada foi gravado. Encaixe o pendrive de novo e tente outra vez; se ele estiver "
-                                       "encaixado, feche e abra o cofre.")
+                                       "encaixado, feche e abra o cofre.") from None
                 if _assinatura(atual) != assin:
                     diag_registrar(DIAG_CONFLITO)
                     raise ConflitoGravacao("O arquivo do cofre foi alterado por outra janela ou programa depois "
@@ -4352,7 +4352,7 @@ def _ler_planilha_arquivo(caminho, selo=None, exigir_selo=False, dados_csv=None)
         try:
             import openpyxl
         except ImportError:
-            raise ValueError("Falta a biblioteca de Excel. Rode:  pip install openpyxl defusedxml")
+            raise ValueError("Falta a biblioteca de Excel. Rode:  pip install openpyxl defusedxml") from None
         try:
             import zipfile
             with zipfile.ZipFile(caminho) as z:                 # zip bomb: limita o tamanho descompactado
@@ -4362,11 +4362,11 @@ def _ler_planilha_arquivo(caminho, selo=None, exigir_selo=False, dados_csv=None)
                 if maior > 200 * 1024 * 1024 or total > 400 * 1024 * 1024 or (total > 20 * 1024 * 1024 and total / comp > 200):
                     raise ValueError("A planilha descompactada é grande demais (ou suspeita). Importação recusada.")
         except zipfile.BadZipFile:
-            raise ValueError("Não foi possível ler a planilha (arquivo corrompido ou protegido por senha).")
+            raise ValueError("Não foi possível ler a planilha (arquivo corrompido ou protegido por senha).") from None
         try:
             wb = openpyxl.load_workbook(caminho, read_only=True, data_only=True)
         except Exception as ex:
-            raise ValueError(f"Não foi possível ler a planilha (está protegida por senha ou corrompida?).\n{ex}")
+            raise ValueError(f"Não foi possível ler a planilha (está protegida por senha ou corrompida?).\n{ex}") from None
         try:
             estado_selo, texto_selo = verificar_selo_planilha(wb, selo)
             if estado_selo == "adulterado":
@@ -4909,7 +4909,7 @@ def _fido_cliente(hwnd):
         from fido2.client import DefaultClientDataCollector
         from fido2.client.windows import WindowsClient
     except ImportError:
-        raise FidoErro("Falta a biblioteca FIDO. Rode:  pip install fido2  (ou use o instalar_cofre).")
+        raise FidoErro("Falta a biblioteca FIDO. Rode:  pip install fido2  (ou use o instalar_cofre).") from None
     if not WindowsClient.is_available():
         raise FidoErro("Este Windows não oferece suporte a chaves FIDO (requer Windows 10 1903 ou mais novo).")
     coletor = DefaultClientDataCollector("https://" + RP_ID, verify=lambda *a: True)
@@ -4995,7 +4995,7 @@ def _fido_registrar(hwnd, nome=_NOME_APP):
     except FidoErro:
         raise
     except Exception as ex:
-        raise FidoErro(_msg_fido(ex))
+        raise FidoErro(_msg_fido(ex)) from None
     prf = r.client_extension_results.prf
     if not prf or not getattr(prf, "enabled", False):
         raise FidoErro("A chave FIDO não entregou o recurso necessário (hmac-secret / PRF). " + _diagnostico_fido())
@@ -5018,7 +5018,7 @@ def _fido_obter(hwnd, creds, salt):
     except FidoErro:
         raise
     except Exception as ex:
-        raise FidoErro(_msg_fido(ex))
+        raise FidoErro(_msg_fido(ex)) from None
     return _extrair_segredo(resp)
 
 
@@ -6451,10 +6451,40 @@ def _janela_teste_em_segundo_plano(root):
         raise ctypes.WinError(ctypes.get_last_error())
 
 
+def _primeiro_plano_de_teste():
+    """So em teste (COFRE_GUI_TESTS_BACKGROUND=1): devolve a janela que esta em primeiro plano AGORA, para devolver o
+    foco a ela depois de mostrar a janela do cofre. Fora do teste devolve 0 e nada acontece."""
+    if not EH_WINDOWS or os.environ.get("COFRE_GUI_TESTS_BACKGROUND") != "1":
+        return 0
+    try:
+        u = ctypes.windll.user32
+        u.GetForegroundWindow.restype = wintypes.HWND
+        return u.GetForegroundWindow() or 0
+    except (OSError, AttributeError):
+        return 0
+
+
+def _reforcar_segundo_plano_de_teste(root, anterior):
+    """So em teste: o Tk cria a janela de verdade so quando ela e mostrada e, ao criar, perde o estilo
+    WS_EX_NOACTIVATE aplicado antes. Aplica de novo com a janela ja mostrada e devolve o foco a quem o tinha."""
+    if not EH_WINDOWS or os.environ.get("COFRE_GUI_TESTS_BACKGROUND") != "1":
+        return
+    try:
+        _janela_teste_em_segundo_plano(root)
+        if anterior:
+            u = ctypes.windll.user32
+            u.SetForegroundWindow.argtypes = (wintypes.HWND,)
+            u.SetForegroundWindow.restype = wintypes.BOOL
+            u.SetForegroundWindow(anterior)
+    except (OSError, AttributeError):
+        pass                                  # modo de teste: se nao der, o teste visual do .exe aponta a falha
+
+
 def revelar_janela(root):
     """Mostra a janela principal só depois de pronta: deixa-a invisível (transparência 0) enquanto o Tk desenha tudo,
     e a revela de uma vez. Assim a tela aparece inteira e estruturada, sem 'se montar' na frente do usuário."""
     _janela_teste_em_segundo_plano(root)
+    anterior_teste = _primeiro_plano_de_teste()
     try:
         root.attributes("-alpha", 0.0)
     except tk.TclError:
@@ -6464,6 +6494,7 @@ def revelar_janela(root):
         root.update()
     except tk.TclError:
         pass
+    _reforcar_segundo_plano_de_teste(root, anterior_teste)   # so em teste
     try:
         root.attributes("-alpha", 1.0)
     except tk.TclError:

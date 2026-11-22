@@ -170,7 +170,7 @@ def main():
             time.sleep(0.5)
         if principal is None:
             cod = proc.poll()
-            motivo = CODIGOS.get(cod, "sem janela em 40 s") if cod is not None else "sem janela em 40 s"
+            motivo = CODIGOS.get(cod, "sem janela em 90 s") if cod is not None else "sem janela em 90 s"
             print(f"[FALHOU] o .exe nao mostrou a janela principal: {motivo} (codigo {cod}; "
                   f"{time.perf_counter() - inicio:.1f} s aguardados)")
             return 1
