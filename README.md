@@ -755,7 +755,7 @@ Os números **1 a 6** abaixo são a ordem de execução do BAT, não o prefixo d
 | `testes/5_TESTE_ferramentas_externas/` | Ferramentas independentes do executável compilado: Bandit, pip-audit, Nmap local, PSScriptAnalyzer, busca de segredos, qualidade extra, SBOM, Hypothesis e verificação de integridade do repositório. O pytest é opcional no menu e repete as baterias 1 e 2. |
 | `testes/6_TESTE_ferramentas_dos_testes/` | **Não são testes:** executores, ajudantes, limpeza, geradores de relatórios, cobertura e ponte para o `pytest`. |
 | `testes/7_TESTE_de_compilacao/` | **Depois de compilar:** confere proteções PE com pefile, varre o executável com o Windows Defender e verifica as conexões do processo aberto. Sem executável, registra `[PULADO]`. |
-| `testes/resultados/` | Relatórios individuais, resumos, SARIF e log. Os consolidados ficam separados em `testes/resultados/resultado completo/` (`RESULTADO COMPLETO.txt` e `resultado_rodar_todos_windows.txt`). A bateria nova limpa a anterior; não vai para o Git. |
+| `testes/resultados/` | Relatórios individuais, resumos, SARIF e log. Os consolidados ficam separados em `testes/resultados/resultados completos/` (`RESULTADO COMPLETO.txt` e `resultado_rodar_todos_windows.txt`). A bateria nova limpa a anterior; não vai para o Git. |
 
 ### 14.2 Riscos cobertos
 
@@ -773,7 +773,7 @@ O [`PLANO_DE_TESTES.md`](testes/PLANO_DE_TESTES.md) organiza os testes por risco
 
 ### 14.3 Como rodar
 
-**No Windows (mais fácil):** primeiro rode **`3 - BAIXAR PACOTES - so para instalar sem internet.bat`** com internet para preparar os wheels das ferramentas; depois dê dois cliques em **`2 - TESTAR TUDO - roda todos os testes.bat`**. Ele executa as etapas 1 a 7: núcleo (incluindo Hypothesis), instalador, Windows nativo, interface, pentest, ferramentas externas e verificações pós-compilação. O pytest 03 fica fora porque repete as baterias 1 e 2. Compile o `CofreSenhas.exe` antes da etapa 7; sem executável ou processo aberto, o relatório registra `[PULADO]`. Para executar somente essa pasta, rode `testes\7_TESTE_de_compilacao\RODAR ESTA PASTA - testes de compilacao.bat`. Exemplo combinado: `2 - TESTAR TUDO - roda todos os testes.bat H OFFLINE POS-COMPILACAO` (o argumento POS-COMPILACAO é compatível, mas não é necessário). A etapa 6 consulta a base atual do `pip-audit` pela internet; `OFFLINE` pula essa consulta. Os resultados individuais ficam em `testes\resultados\`; os dois relatórios consolidados ficam em `testes\resultados\resultado completo\`: `RESULTADO COMPLETO.txt` reúne todos os arquivos individuais e `resultado_rodar_todos_windows.txt` reúne as etapas por bateria.
+**No Windows (mais fácil):** primeiro rode **`3 - BAIXAR PACOTES - so para instalar sem internet.bat`** com internet para preparar os wheels das ferramentas; depois dê dois cliques em **`2 - TESTAR TUDO - roda todos os testes.bat`**. Ele executa as etapas 1 a 7: núcleo (incluindo Hypothesis), instalador, Windows nativo, interface, pentest, ferramentas externas e verificações pós-compilação. O pytest 03 fica fora porque repete as baterias 1 e 2. Compile o `CofreSenhas.exe` antes da etapa 7; sem executável ou processo aberto, o relatório registra `[PULADO]`. Para executar somente essa pasta, rode `testes\7_TESTE_de_compilacao\RODAR ESTA PASTA - testes de compilacao.bat`. Exemplo combinado: `2 - TESTAR TUDO - roda todos os testes.bat H OFFLINE POS-COMPILACAO` (o argumento POS-COMPILACAO é compatível, mas não é necessário). A etapa 6 consulta a base atual do `pip-audit` pela internet; `OFFLINE` pula essa consulta. Os resultados individuais ficam em `testes\resultados\`; os dois relatórios consolidados ficam em `testes\resultados\resultados completos\`: `RESULTADO COMPLETO.txt` reúne todos os arquivos individuais e `resultado_rodar_todos_windows.txt` reúne as etapas por bateria.
 
 **Pela linha de comando:**
 
@@ -790,7 +790,7 @@ Para a ponte opcional do pytest, use `testes\5_TESTE_ferramentas_externas\03_PYT
 ### 14.4 Relatórios, depuração e boas maneiras
 
 - **`log_depuracao.txt`**: saída **completa** (com tracebacks), horário, duração e comando de cada teste. É o arquivo para abrir quando algo falha.
-- **`testes\resultados\resultado completo\RESULTADO COMPLETO.txt`**: conteúdo de todos os arquivos individuais `resultado_*.txt` da rodada, cada um com o nome do arquivo e separadores. Os arquivos individuais continuam disponíveis; a bateria completa do Windows gera novamente o TXT a cada execução.
+- **`testes\resultados\resultados completos\RESULTADO COMPLETO.txt`**: conteúdo de todos os arquivos individuais `resultado_*.txt` da rodada, cada um com o nome do arquivo e separadores. Os arquivos individuais continuam disponíveis; a bateria completa do Windows gera novamente o TXT a cada execução.
 - **`resumo_testes.md` / `.json` / `resultados.sarif`**: tabela legível, JSON comparável entre rodadas e SARIF só com as falhas.
 - **Bateria nova substitui a antiga:** `limpar_resultados.py` apaga os resultados anteriores antes de começar, para nunca misturar "ontem" com "hoje". No fim, `limpar_artefatos_testes.py` apaga pastas temporárias órfãs.
 - **Respeito ao seu PC:** por padrão, os testes rodam em prioridade baixa, esperam haver RAM livre e fazem pausa entre si. Para uma rodada autorizada em prioridade alta, defina `COFRE_TEST_HIGH_PRIORITY=1`; as janelas GUI continuam no segundo plano.

@@ -93,7 +93,9 @@ exit /b 0
 :consolidar
 rem Junta o resumo e os 4 relatorios individuais num arquivo so, igual ao RESULTADO COMPLETO.txt dos outros testes.
 rem Os arquivos individuais continuam separados em testes\resultados\.
-set "COMPLETO=testes\resultados\RESULTADO COMPLETO DE COMPILACAO.txt"
+set "PASTA_COMPLETOS=testes\resultados\resultados completos"
+if not exist "%PASTA_COMPLETOS%" mkdir "%PASTA_COMPLETOS%"
+set "COMPLETO=%PASTA_COMPLETOS%\RESULTADO COMPLETO DE COMPILACAO.txt"
 set "NOK=0"
 set "NPUL=0"
 set "NFAL=0"

@@ -270,7 +270,7 @@ def avaliar_senha(senha):
     return None
 
 
-VERSAO_PROGRAMA = "2026.11.12.4"            # versão do programa (mostrada pelo instalador)
+VERSAO_PROGRAMA = "2026.11.22.2"            # versão do programa (mostrada pelo instalador)
 COMPILADO = "__compiled__" in globals()        # True no .exe gerado pelo Nuitka
 
 
@@ -1233,8 +1233,9 @@ def _limpar_temporarios_interrompidos(caminho):
 # hash ou memória. Cada registro é selado com a chave PÚBLICA do cofre (X25519 + ChaCha20-Poly1305), então dá
 # para registrar mesmo com o cofre trancado; a chave privada fica DENTRO do cofre (meta), e só o cofre aberto lê.
 # ----------------------------------------------------------------------------
-DIAG_MAGIC = b"CDIAG01\x00"
-DIAG_REG = struct.Struct(">BHiHII")          # versão do registro, código, errno, linha, versão do programa, minutos
+DIAG_MAGIC = b"CDIAG02\x00"
+DIAG_REG = struct.Struct(">BHiHII24s28s28s")  # versão do registro, código, errno, linha, versão do programa, minutos,
+                                              # tipo do erro, função onde parou, função que a chamou (só nomes de código)
 DIAG_TAM = 32 + 12 + DIAG_REG.size + 16       # chave efêmera + nonce + dado + etiqueta
 DIAG_CAB = len(DIAG_MAGIC) + 32               # magic + chave pública
 DIAG_MAX = 200                                # ao passar disso, mantém só os DIAG_MANTER mais recentes
@@ -1362,10 +1363,53 @@ def _diag_rotacionar(arq):
     _gravar_diag_atomico(arq, novo)
 
 
+def _diag_bytes(texto, n):
+    """Texto (só nomes de código) em ASCII com no máximo n bytes, para caber no registro de tamanho fixo."""
+    return str(texto or "").encode("ascii", "replace")[:n]
+
+
+def _diag_local(ex=None, tb=None):
+    """(tipo do erro, função onde parou, função que a chamou, linha) do ponto deste programa onde o erro ocorreu.
+    Só nomes de classe/função e número de linha: nunca a mensagem do erro, caminhos ou valores."""
+    tipo = type(ex).__name__ if ex is not None else ""
+    nome = os.path.basename(__file__)
+    quadros = []                                          # (arquivo é este?, linha, função), do mais externo ao mais interno
+    if tb is None and ex is not None:
+        tb = getattr(ex, "__traceback__", None)
+    if tb is not None:
+        t = tb
+        while t is not None:
+            c = t.tb_frame.f_code
+            quadros.append((os.path.basename(c.co_filename) == nome, min(t.tb_lineno, 65535), c.co_name))
+            t = t.tb_next
+    else:                                                 # sem traceback (evento sem exceção): usa quem chamou o registro
+        f = sys._getframe(1)
+        while f is not None:
+            c = f.f_code
+            if c.co_name not in ("diag_registrar", "interno", "_diag_local", "diag_referencia"):
+                quadros.insert(0, (os.path.basename(c.co_filename) == nome, min(f.f_lineno, 65535), c.co_name))
+                if len(quadros) >= 6:
+                    break
+            f = f.f_back
+    proprios = [q for q in quadros if q[0]] or quadros[:1]
+    if not proprios:
+        return tipo, "", "", 0
+    linha, func = proprios[-1][1], proprios[-1][2]
+    chamador = proprios[-2][2] if len(proprios) > 1 else ""
+    return tipo, func, chamador, linha
+
+
+def diag_referencia(ex=None, tb=None):
+    """Linha curta para mostrar na hora do erro e para o suporte: versão, tipo do erro, função e linha."""
+    tipo, func, _chamador, linha = _diag_local(ex, tb)
+    partes = [f"v{_versao_num()}", tipo or "sem exceção", func or "?", f"L{linha}"]
+    return " · ".join(partes)
+
+
 @_com_apoio_liberado
 def diag_registrar(codigo, ex=None, tb=None):
     """Acrescenta um registro cifrado ao diagnóstico. NUNCA levanta erro e nunca guarda texto, caminho ou segredo:
-    só o código do evento, o errno do sistema, a linha do programa, a versão e o minuto."""
+    só o código do evento, o errno do sistema, o tipo do erro, a função e a linha do programa, a versão e o minuto."""
     try:
         arq = _DIAG["arq"]
         if not arq:
@@ -1378,14 +1422,9 @@ def diag_registrar(codigo, ex=None, tb=None):
                 err = 0
             if not -2 ** 31 <= err < 2 ** 31:
                 err = 0
-            if tb is None:
-                tb = getattr(ex, "__traceback__", None)
-        linha, nome = 0, os.path.basename(__file__)
-        while tb is not None:
-            if os.path.basename(tb.tb_frame.f_code.co_filename) == nome or not linha:
-                linha = min(tb.tb_lineno, 65535)
-            tb = tb.tb_next
-        dado = DIAG_REG.pack(1, int(codigo) & 0xFFFF, err, linha, _versao_num(), int(time.time() // 60) & 0xFFFFFFFF)
+        tipo, func, chamador, linha = _diag_local(ex, tb)
+        dado = DIAG_REG.pack(2, int(codigo) & 0xFFFF, err, linha, _versao_num(), int(time.time() // 60) & 0xFFFFFFFF,
+                             _diag_bytes(tipo, 24), _diag_bytes(func, 28), _diag_bytes(chamador, 28))
         with _TRAVA_DIAG:
             pub = _DIAG["pub"]
             if pub is None:
@@ -1403,7 +1442,16 @@ def diag_registrar(codigo, ex=None, tb=None):
 
 
 def diag_ler(caminho_cofre, priv_bytes):
-    """Lê o registro com a chave privada do cofre. Devolve (lista de (minuto, código, errno, linha, versão), quantidade
+    """Igual a diag_ler_completo, mas cada registro traz só (minuto, código, errno, linha, versão)."""
+    res = diag_ler_completo(caminho_cofre, priv_bytes)
+    if res is None:
+        return None
+    return [r[:5] for r in res[0]], res[1]
+
+
+def diag_ler_completo(caminho_cofre, priv_bytes):
+    """Lê o registro com a chave privada do cofre. Devolve (lista de (minuto, código, errno, linha, versão, tipo, função,
+    chamador), quantidade
     de registros que não passaram na autenticação) ou None se o arquivo é de outra chave/não existe."""
     arq = os.path.abspath(caminho_cofre) + ".diag"
     try:
@@ -1418,8 +1466,10 @@ def diag_ler(caminho_cofre, priv_bytes):
     corpo = bruto[DIAG_CAB:]
     for i in range(len(corpo) // DIAG_TAM):          # um registro cortado no fim (queda de energia) é ignorado
         try:
-            v, cod, err, linha, ver, minuto = DIAG_REG.unpack(_diag_abrir(priv_bytes, corpo[i * DIAG_TAM:(i + 1) * DIAG_TAM]))
-            regs.append((minuto, cod, err, linha, ver))
+            v, cod, err, linha, ver, minuto, tipo, func, cham = DIAG_REG.unpack(
+                _diag_abrir(priv_bytes, corpo[i * DIAG_TAM:(i + 1) * DIAG_TAM]))
+            regs.append((minuto, cod, err, linha, ver, *(x.rstrip(b"\x00").decode("ascii", "replace")
+                                                         for x in (tipo, func, cham))))
         except Exception:
             ruins += 1
     return regs, ruins
@@ -1439,6 +1489,18 @@ def diag_descrever(codigo, err):
     """Frase legível para um registro (só para mostrar dentro do cofre aberto)."""
     t = DIAG_CODIGOS.get(codigo, f"Evento {codigo}")
     return t + (f" – {_causa_io(err)}" if err else "")
+
+
+def diag_relatorio(regs):
+    """Texto simples (sem segredos) com todos os registros, do mais novo ao mais antigo, para copiar e enviar."""
+    import datetime
+    linhas = [f"Relatório de diagnóstico do Cofre de Senhas - programa v{_versao_num()}"]
+    for minuto, cod, err, linha, ver, tipo, func, cham in reversed(regs):
+        q = datetime.datetime.fromtimestamp(minuto * 60).strftime("%d/%m/%Y %H:%M")
+        onde = f"{func or '?'} (linha {linha})" + (f", chamada por {cham}" if cham else "")
+        linhas.append(f"- {q} | v{ver} | {diag_descrever(cod, err)} | erro: {tipo or '-'}"
+                      f"{f' (errno {err})' if err else ''} | onde: {onde}")
+    return "\n".join(linhas)
 
 
 MAX_SENHA = 1024                      # maior senha mestra aceita (caracteres): acima disso só serve para esgotar CPU/memória
@@ -3676,6 +3738,39 @@ class Cofre:
         self.copias_nao_apagadas = apagar_copias(self.caminho)
         return r
 
+    def adicionar_chave_acesso(self, novo_modo, senha=None):
+        """Cofre criado SO com senha mestra: acrescenta depois a chave de acesso (sem recriar o cofre).
+        novo_modo = MODO_E (senha E chave juntas, recomendado) ou MODO_OU (senha OU chave).
+        Gera chave de acesso nova e chave interna (DEK) nova, como em gerar_nova_chave_acesso. Se a gravacao falhar,
+        volta tudo ao que era (inclusive o modo). Devolve o texto da chave, que e mostrado UMA vez."""
+        if self.modo != MODO_S:
+            raise ValueError("Este cofre já tem chave de acesso.")
+        if novo_modo not in (MODO_E, MODO_OU):
+            raise ValueError("Modo inválido: escolha 'senha E chave' ou 'senha OU chave'.")
+
+        def mudar():
+            """Operacao interna: reembrulha a chave dos dados conforme o novo modo (numa transacao)."""
+            if self._ks is None:
+                if not senha:
+                    raise ValueError("Informe a senha mestra para adicionar a chave de acesso.")
+                if not self.confere_senha(senha):
+                    raise ChaveMalFormada("Senha mestra incorreta.")
+                self._ks = derivar_chave(unicodedata.normalize("NFC", senha), self.sal_pw, self.t, self.m, self.p)
+            self.dek = secrets.token_bytes(32)           # chave interna nova: copias antigas (so com senha) morrem
+            self.modo = novo_modo
+            ktxt = self._definir_chave_acesso()
+            if novo_modo == MODO_OU:                     # no E o embrulho ja foi refeito com senha+chave
+                self.nonce_pw, self.wrap_pw = _embrulhar(self._ks, self.dek)
+            return ktxt
+        modo_antes = self.modo
+        try:
+            r = self._com_desfazer(mudar)
+        except BaseException:
+            self.modo = modo_antes
+            raise
+        self.copias_nao_apagadas = apagar_copias(self.caminho)   # ainda abririam so com a senha
+        return r
+
     def _registrar_abertura(self, meta, erros_antes):
         """Guarda (cifrado) quando o cofre foi aberto e quantas tentativas erradas houve antes."""
         import datetime
@@ -3715,6 +3810,46 @@ class Cofre:
         if self._salt_pendente is None:
             self._salt_pendente = secrets.token_bytes(32)
         return self._salt_pendente
+
+    def verificar_estado_arquivos(self):
+        """Confere, SEM alterar nada, o arquivo principal e as cópias automáticas (.bak1-.bak5) com a chave já
+        aberta. Devolve o resultado de cada parte para a tela "Verificar integridade do cofre".
+        Cada conferência é uma tupla (situação, itens, salvamento, detalhe); situação: "ok", "ausente", "antiga"
+        (formato antigo, não conferível), "falha" (conteúdo não confere) ou "erro" (não foi possível ler)."""
+        chave = _chave_dados(self.dek, _fator_total(self._F, self._G))
+
+        def conferir(caminho):
+            """Lê e decifra um arquivo de cofre e confere o manifesto interno (contagem e hash dos itens)."""
+            try:
+                with open(caminho, "rb") as f:
+                    bruto = f.read(LIMITE_COFRE + 1)
+            except FileNotFoundError:
+                return ("ausente", 0, 0, "")
+            except OSError as ex:
+                return ("erro", 0, 0, texto_erro(ex))
+            if len(bruto) > LIMITE_COFRE:
+                return ("falha", 0, 0, "arquivo maior que o limite aceito")
+            if bruto[:8] == MAGIC_V1:
+                return ("antiga", 0, 0, "formato antigo")
+            try:
+                itens, meta = _decifrar_dados(chave, _ler_cabecalho(bruto), bruto)
+            except (ArquivoInvalido, InvalidTag, ValueError, TypeError, UnicodeError, struct.error):
+                return ("falha", 0, 0, "o conteúdo não confere (danificado ou alterado)")
+            total = len(itens)
+            for r in itens:                      # só queremos o resultado: apaga o texto em claro desta leitura
+                for v in r.values():
+                    zerar_objeto(v)
+            return ("ok", total, _seq_de(meta), "")
+
+        sobras = [os.path.basename(x) for x in [self.caminho + ".danificado"] + glob.glob(
+            glob.escape(self.caminho) + ".*.danificado") if os.path.exists(x)]
+        return {
+            "principal": conferir(self.caminho),
+            "copias": [(os.path.basename(c), *conferir(c)) for c in _copias(self.caminho)],
+            "sobras": sorted(set(sobras)),
+            "reversao": bool(self.alerta_reversao),
+            "consulta": bool(self.somente_leitura),
+        }
 
     def estado_fido(self):
         """Guarda uma cópia do estado FIDO para poder desfazer a operação."""
@@ -3778,6 +3913,20 @@ class Cofre:
         """Devolve o estado guardado por estado_pc."""
         self.pc, self._G, self.fido, self._F = estado
 
+    def pcs_multiplos(self):
+        """True se o usuário respondeu SIM a 'tem mais computadores para autorizar?'. Padrão: não (só 1 PC)."""
+        return bool(self.meta.get("pcs_multiplos"))
+
+    def limite_pc(self):
+        """Quantos computadores podem estar autorizados: 1 até o usuário liberar mais; no máximo MAX_PC."""
+        return MAX_PC if self.pcs_multiplos() else 1
+
+    def definir_pcs_multiplos(self, sim):
+        """Muda a resposta. Não deixa voltar para 'só 1 PC' enquanto houver mais de um autorizado."""
+        if not sim and self.pc and len(self.pc["maquinas"]) > 1:
+            raise ValueError("Remova os outros computadores antes de limitar o cofre a 1 computador.")
+        self.meta["pcs_multiplos"] = bool(sim)
+
     def pc_adicionar(self, nome, local=False):
         """Autoriza ESTE computador. No PRIMEIRO ativa a exigência e devolve o código de recuperação (texto);
         nos seguintes devolve None. Precisa do cofre aberto (a chave dos dados já está na memória).
@@ -3796,7 +3945,10 @@ class Cofre:
             self._G = secrets.token_bytes(32)
             self.pc = {"salt": secrets.token_bytes(32), "rec": None, "maquinas": []}
             codigo = self._definir_codigo()
-        if len(self.pc["maquinas"]) >= MAX_PC:
+        if len(self.pc["maquinas"]) >= self.limite_pc():
+            if self.limite_pc() <= 1:
+                raise ValueError("O cofre está limitado a 1 computador. Para autorizar outro, responda SIM a "
+                                 f"'Tem mais computadores para autorizar?' (libera até {MAX_PC}).")
             raise ValueError(f"Limite de {MAX_PC} computadores autorizados atingido.")
         idm = _id_pc(self.pc["salt"], material)
         if any(m["id"] == idm for m in self.pc["maquinas"]):
@@ -5213,10 +5365,17 @@ def _cores_da_paleta(nome):
     return cores
 
 
+_IMAGENS_APOSENTADAS = []              # imagens da paleta anterior, mantidas vivas até a próxima troca
+
+
 def _definir_tema(nome):
     """Aplica os valores globais de cor e limpa imagens cacheadas com a paleta anterior."""
-    global TEMA_ATUAL
+    global TEMA_ATUAL, _IMAGENS_APOSENTADAS
     novas = _cores_da_paleta(nome)
+    # As telas antigas ainda estão visíveis até a nova ficar pronta e seus botões usam estas imagens: se o cache
+    # fosse esvaziado agora, o Python apagaria as imagens do Tk e qualquer redesenho da tela antiga daria
+    # "image doesn't exist". Guardamos a geração anterior viva até a PRÓXIMA troca de tema.
+    _IMAGENS_APOSENTADAS = [dict(_CACHE_ICONES), dict(_PONTOS)]
     CORES.clear()
     CORES.update(novas)
     TEMA_ATUAL = nome
@@ -5750,6 +5909,9 @@ def _instalar_limpeza_de_campos():
     tk.Entry._cofre_limpa = True
 
 
+_GERACAO_TEMA_TTK = 0                  # contador: um nome de tema ttk novo a cada aplicar_tema()
+
+
 def aplicar_tema(root):
     """Aplica cores, fontes e estilos ttk do tema atual a todos os widgets do programa."""
     C = CORES
@@ -5770,12 +5932,13 @@ def aplicar_tema(root):
         else:
             P[n] = t.imagem(root)
     root._imagens_tema = P                      # mantém as imagens vivas
-    try:
-        st.theme_create("meia-noite", parent="clam")
-    except tk.TclError:
-        pass
-
-    st.theme_use("meia-noite")
+    # Cada aplicação cria um tema ttk NOVO (nome único). Recriar os elementos (element_create) num tema que já os
+    # tem dá "Duplicate element" -- era o que travava o cofre ao trocar as cores (2ª chamada desta função).
+    global _GERACAO_TEMA_TTK
+    _GERACAO_TEMA_TTK += 1
+    nome_tema_ttk = f"meia-noite-{_GERACAO_TEMA_TTK}"
+    st.theme_create(nome_tema_ttk, parent="clam")
+    st.theme_use(nome_tema_ttk)
 
     root.tk_setPalette(background=C["fundo"], foreground=C["texto"], activeBackground=C["sup3"],
                        activeForeground=C["texto"], highlightColor=C["prim"], highlightBackground=C["fundo"],
@@ -6340,7 +6503,7 @@ def _caixa_mensagem(tipo, titulo, mensagem, botoes, padrao, cancelar, icone_nome
     textos = ttk.Frame(topo)
     textos.pack(side="left", fill="both", expand=True)
     ttk.Label(textos, text=titulo or "", style="H2.TLabel").pack(anchor="w")
-    ttk.Label(textos, text=mensagem or "", wraplength=440, justify="left").pack(anchor="w", pady=(6, 0))
+    ttk.Label(textos, text=mensagem or "", wraplength=_px(440), justify="left").pack(anchor="w", pady=(6, 0))
     barra = ttk.Frame(corpo)
     barra.pack(fill="x", pady=(20, 0))
     alvo_foco = None
@@ -6363,7 +6526,10 @@ def _caixa_mensagem(tipo, titulo, mensagem, botoes, padrao, cancelar, icone_nome
         d.geometry(f"+{max(0, x)}+{max(0, y)}")
     except tk.TclError:
         pass
+    anterior_teste = _primeiro_plano_de_teste()      # so em teste: quem tem o foco agora
     d.deiconify()
+    d.update_idletasks()
+    _reforcar_segundo_plano_de_teste(d, anterior_teste)   # so em teste: a caixa nao rouba o foco do usuario
     barra_titulo_escura(d)
     proteger_contra_captura(d)
     _grab_seguro(d)
@@ -6567,6 +6733,52 @@ def _normalizar_nome_visual(texto):
     sem_acentos = unicodedata.normalize("NFKD", str(texto or ""))
     ascii_nome = sem_acentos.encode("ascii", "ignore").decode("ascii").casefold()
     return re.sub(r"[^a-z0-9]+", " ", ascii_nome).strip()
+
+
+_PALAVRAS_GRUPO = {
+    "Banco": ("nubank itau bradesco bancodobrasil bb caixa santander inter c6 c6bank btg btgpactual safra sicredi "
+              "sicoob banrisul neon next willbank pagbank pagseguro picpay mercadopago paypal pix wise revolut "
+              "original pan xp rico clear nuinvest genial binance mercadobitcoin bitcoin coinbase bitso metamask "
+              "tradingview corretora investimentos cartao visa mastercard elo amex americanexpress hipercard "
+              "alelo sodexo ticket vr stone cielo ton sumup infinitepay recargapay crefisa bmg agibank daycoval "
+              "creditas seguro seguros porto portoseguro allianz mapfre unimed amil"),
+    "Redes sociais": ("instagram insta facebook fb whatsapp zap wpp telegram x twitter tiktok linkedin pinterest "
+                      "snapchat reddit discord twitch threads kwai bluesky tumblr signal messenger wechat tinder "
+                      "bumble badoo quora medium kick onlyfans patreon behance dribbble"),
+    "E-mail": ("gmail google outlook hotmail yahoo icloud apple protonmail email mail onedrive googledrive drive "
+               "dropbox mega mediafire nuvem microsoft office365"),
+    "Trabalho": ("github gitlab bitbucket slack zoom notion trello asana teams figma canva adobe aws azure "
+                 "cloudflare vercel netlify heroku docker npm openai chatgpt claude anthropic gemini perplexity "
+                 "wordpress godaddy hostinger hostgator locaweb jira calendly evernote shopify wix"),
+    "Streaming": ("netflix primevideo prime disney disneyplus max hbo hbomax globoplay paramount paramountplus "
+                  "appletv crunchyroll starplus telecine premiere spotify deezer applemusic youtubemusic tidal "
+                  "soundcloud audible dazn espn mubi plutotv tubi vimeo youtube twitchprime kindle"),
+    "Jogos": ("steam epic epicgames playstation psn xbox nintendo riot riotgames battlenet ea ubisoft roblox "
+              "minecraft garena gog origin blizzard valorant freefire pubg fortnite genshin rockstar bethesda "
+              "supercell faceit gamersclub leagueoflegends lol cs2 dota2 betano bet365 blaze"),
+    "Compras": ("amazon mercadolivre ml shopee aliexpress magalu americanas casasbahia shein kabum olx temu ifood "
+                "magazineluiza rappi ubereats carrefour netshoes centauro renner zara fastshop pontofrio correios loja"),
+    "Governo": ("gov govbr inss receita receitafederal detran sus cnh fgts carteira ctps cartorio serasa spc sefaz "
+                "prefeitura tribunal cpf cnpj mei esocial bolsafamilia cadunico ipva iptu"),
+}
+_GRUPO_DA_PALAVRA = {p_: g_ for g_, ps_ in _PALAVRAS_GRUPO.items() for p_ in ps_.split()}
+
+
+def grupo_recomendado(servico):
+    """Tipo de grupo que combina com o nome da conta digitada ('Bradesco' -> 'Banco', 'Instagram' -> 'Redes
+    sociais'...), ou None se nao reconhecer. E so uma RECOMENDACAO: nada e escolhido sem o usuario aceitar."""
+    nome = _normalizar_nome_visual(servico)
+    if len(nome) < 2:
+        return None
+    junto = nome.replace(" ", "")
+    if junto in _GRUPO_DA_PALAVRA:
+        return _GRUPO_DA_PALAVRA[junto]
+    for t in nome.split():
+        if t in _GRUPO_DA_PALAVRA and (len(t) > 1 or t == junto):
+            return _GRUPO_DA_PALAVRA[t]
+        if t.startswith("banco") or t.startswith("bank") or t.endswith("bank"):
+            return "Banco"
+    return None
 
 
 def marca_servico(servico, grupo=""):
@@ -7783,11 +7995,11 @@ class App:
         self._tela_pendente = (tela, antigo)
         self.root.after_idle(self._publicar_tela)
         conteudo = ttk.Frame(tela, style="C.TFrame")
-        janela = tela.create_window(0, 0, window=conteudo, anchor="center")
+        janela = tela.create_window(0, 0, window=conteudo, anchor="n")   # ancorado no TOPO: o que aparece/some embaixo nao mexe no resto
         tela.create_text(0, 0, text="Criptografado e só neste computador",
                          fill=C["fraco"], font="CofrePequeno", tags="rodape")
         PAD = _px(24)
-        estado = {"wh": None}
+        estado = {"wh": None, "maxw": 0, "maxh": 0}
 
         def redesenhar(event=None):
             """Recentraliza o conteúdo quando a janela muda de tamanho."""
@@ -7795,8 +8007,11 @@ class App:
                 w, h = tela.winfo_width(), tela.winfo_height()
                 if w < 50:
                     return
-                cw = conteudo.winfo_reqwidth() + 2 * PAD
-                ch = conteudo.winfo_reqheight() + 2 * PAD
+                # O cartao so CRESCE enquanto esta tela existe (nunca encolhe): trocar de opcao, abrir/fechar uma
+                # explicacao ou mudar o numero de linhas de um texto nao faz mais a tela "se redimensionar".
+                cw = max(conteudo.winfo_reqwidth() + 2 * PAD, estado["maxw"])
+                ch = max(conteudo.winfo_reqheight() + 2 * PAD, estado["maxh"])
+                estado["maxw"], estado["maxh"] = cw, ch
                 cy = max(ch / 2 + 18, (h - 44) / 2)
                 tela.delete("brilho")
                 brilho_radial(tela, w / 2, cy - ch * 0.42, max(w, h) * 0.85, "#1e1b4b", C["fundo"])
@@ -7810,7 +8025,7 @@ class App:
                     tela.create_image(0, 0, image=tela._placa, tags=("cartao", "placa"))
                 tela.coords("sombra", w / 2, cy + 6)
                 tela.coords("placa", w / 2, cy)
-                tela.coords(janela, w / 2, cy)
+                tela.coords(janela, w / 2, cy - ch / 2 + PAD)
                 tela.coords("rodape", w / 2, max(h - 22, cy + ch / 2 + 22))
                 tela.tag_lower("cartao")
                 tela.tag_lower("brilho")
@@ -7926,7 +8141,7 @@ class App:
                 j.wm_overrideredirect(True)
                 j.configure(bg=CORES["borda2"])
                 tk.Label(j, text=texto, bg=CORES["sup3"], fg=CORES["texto"], font="CofrePequeno",
-                         padx=10, pady=5, justify="left", wraplength=300).pack(padx=1, pady=1)
+                         padx=10, pady=5, justify="left", wraplength=_px(300)).pack(padx=1, pady=1)
                 j.update_idletasks()
                 x = widget.winfo_rootx() + widget.winfo_width() // 2 - j.winfo_reqwidth() // 2
                 y = widget.winfo_rooty() + widget.winfo_height() + 6
@@ -8320,13 +8535,13 @@ class App:
             for valor, cartao in cartoes.get(id(variavel), ()):
                 selecionado = variavel.get() == valor
                 cartao.configure(highlightbackground=C["prim"] if selecionado else C["borda"],
-                                 highlightthickness=_px(2) if selecionado else _px(1))
+                                 highlightthickness=_px(2))      # espessura FIXA: so a cor muda (senao o cartao "pula")
 
         def opcao_cartao(pai, variavel, valor, titulo, descricao, comando=None):
             """Opção de segurança em cartão clicável, com explicação e seleção destacada."""
             cartao = tk.Frame(pai, bg=C["sup2"], bd=0, cursor="hand2",
                               highlightbackground=C["borda"], highlightcolor=C["prim"],
-                              highlightthickness=_px(1))
+                              highlightthickness=_px(2))
             cartao.pack(fill="x", pady=(_px(3), 0))
             corpo = ttk.Frame(cartao, style="Card2.TFrame", padding=(_px(8), _px(4)))
             corpo.pack(fill="both", expand=True)
@@ -8391,8 +8606,23 @@ class App:
                      "Maior proteção; requer mais memória.")
         opcao_cartao(dir_, nivel, "alto", "Alta — 256 MB por tentativa",
                      "Alternativa para pouca memória.")
-        proximo = ttk.Label(dir_, text="", style="C.Suave.TLabel", wraplength=_px(420), justify="left")
-        proximo.pack(anchor="w", pady=(_px(6), 0))
+        proximo_fr = ttk.Frame(dir_, style="C.TFrame")
+        proximo_fr.pack(fill="x", pady=(_px(6), 0))
+        proximo = ttk.Label(proximo_fr, text="", style="C.Suave.TLabel", wraplength=_px(420), justify="left")
+        proximo.pack(anchor="w")
+        # Reserva a altura do MAIOR texto possivel: trocar de opcao nao muda mais a altura da tela.
+        modo_orig, fido_orig, altura_max = modo.get(), usar_fido.get(), 0
+        for m_ in (MODO_S, MODO_E, MODO_OU):
+            for fi_ in (False, True):
+                modo.set(m_)
+                usar_fido.set(fi_)
+                atualizar_proximo()
+                proximo.update_idletasks()
+                altura_max = max(altura_max, proximo.winfo_reqheight())
+        modo.set(modo_orig)
+        usar_fido.set(fido_orig)
+        proximo_fr.configure(height=altura_max)
+        proximo_fr.pack_propagate(False)
         atualizar_proximo()
 
         def criar(event=None):
@@ -8436,6 +8666,7 @@ class App:
                 self.mostrar_chave_acesso(chave, self.cofre.modo)
                 zerar_objeto(chave)
             self.tela_principal()
+            self._autorizar_primeiro_pc_na_criacao()
             self.root.after(700, self._oferecer_passeio)      # 1ª entrada: oferece o guia (espera janelas abertas)
             if usar_fido.get():              # marcou "Exigir também a chave FIDO": cadastra já
                 self.gerenciar_fido()
@@ -8592,7 +8823,7 @@ class App:
                 texto_ff = "  Este cofre exige também a chave FIDO."
             ttk.Label(ff, text=texto_ff,
                       image=imagem_icone(self.root, "chave", C["prim_txt"], 16), compound="left",
-                      style="C.TLabel", wraplength=380, justify="left").pack(anchor="w")
+                      style="C.TLabel", wraplength=_px(380), justify="left").pack(anchor="w")
             lrec = ttk.Frame(ff, style="C.TFrame")
             self._rotulo_campo(lrec, "Código de recuperação").pack(anchor="w")
             cx3, e_rec = self._linha_secreta(lrec, 36, "C.", placeholder="Código de recuperação")
@@ -8791,6 +9022,8 @@ class App:
                 self.mostrar_chave_acesso(chave_nova, self.cofre.modo)
                 zerar_objeto(chave_nova)
             self.tela_principal()
+            if os.environ.get("COFRE_SEM_VERIFICACAO_INICIAL") != "1":     # testes de interface podem desligar
+                self.verificar_integridade_cofre(automatica=True)
             self._alerta_invasao()
             if getattr(self, "_msg_abertura", ""):
                 self.status.config(text=self._msg_abertura)
@@ -8831,7 +9064,7 @@ class App:
         bt_abrir = ttk.Button(f, text="Desbloquear", style="C.Primario.TButton", command=abrir,
                               image=imagem_icone(self.root, "aberto", C["prim_fg"]), compound="left")
         bt_abrir.pack(fill="x", pady=(20, 0))
-        lbl = ttk.Label(f, text=info, foreground=C["alerta"], style="C.TLabel", wraplength=400, justify="center",
+        lbl = ttk.Label(f, text=info, foreground=C["alerta"], style="C.TLabel", wraplength=_px(400), justify="center",
                         anchor="center")
         lbl.pack(fill="x", pady=(12, 0), before=bt_abrir)           # o aviso fica ACIMA do botão, junto dos campos
         bt_abrir.pack_configure(pady=(12, 0))
@@ -9200,7 +9433,7 @@ class App:
         import datetime
         try:
             priv = base64.b64decode(self.cofre.meta.get("diag_priv", ""), validate=True)
-            res = diag_ler(self.caminho, priv)
+            res = diag_ler_completo(self.caminho, priv)
         except Exception:
             priv, res = None, None
         d = self._nova_janela("Diagnóstico")
@@ -9209,22 +9442,40 @@ class App:
         fr.pack(fill="both", expand=True)
         self._cabecalho_dialogo(fr, "info", "Diagnóstico",
                                 "Registro interno de falhas do sistema (gravação, leitura, integridade). Fica cifrado "
-                                "ao lado do cofre e guarda só códigos: nunca senhas, caminhos ou conteúdo. Os 200 "
+                                "ao lado do cofre e guarda só códigos e nomes de função: nunca senhas, caminhos ou conteúdo. Os 200 "
                                 "mais recentes são mantidos.")
-        tree = ttk.Treeview(fr, columns=("quando", "o_que", "ref"), show="headings", height=12)
+        tree = ttk.Treeview(fr, columns=("quando", "o_que", "erro", "onde"), show="headings", height=12)
         tree.heading("quando", text="Quando")
         tree.heading("o_que", text="O que aconteceu")
-        tree.heading("ref", text="Referência")
-        tree.column("quando", width=130)
-        tree.column("o_que", width=430)
-        tree.column("ref", width=130, anchor="center")
+        tree.heading("erro", text="Tipo do erro")
+        tree.heading("onde", text="Onde (função · linha · versão)")
+        tree.column("quando", width=120)
+        tree.column("o_que", width=270)
+        tree.column("erro", width=110)
+        tree.column("onde", width=240)
         n_ruins = 0
+        regs_completos = []
         if res:
-            regs, n_ruins = res
-            for minuto, cod, err, linha, ver in reversed(regs):
+            regs_completos, n_ruins = res
+            for minuto, cod, err, linha, ver, tipo, func, cham in reversed(regs_completos):
                 q = datetime.datetime.fromtimestamp(minuto * 60).strftime("%d/%m/%Y %H:%M")
-                tree.insert("", "end", values=(q, diag_descrever(cod, err), f"v{ver} L{linha}"))
+                tree.insert("", "end", values=(q, diag_descrever(cod, err), tipo or "-",
+                                               f"{func or '?'} · L{linha} · v{ver}"))
         tree.pack(fill="both", expand=True)
+        detalhe = ttk.Label(fr, text="Clique numa linha para ver o detalhe do erro.", style="Fraco.TLabel",
+                            wraplength=_px(640), justify="left")
+        detalhe.pack(anchor="w", pady=(8, 0))
+
+        def mostrar_detalhe(_e=None):
+            """Explica por extenso o registro selecionado."""
+            sel = tree.selection()
+            if not sel:
+                return
+            minuto, cod, err, linha, ver, tipo, func, cham = list(reversed(regs_completos))[tree.index(sel[0])]
+            detalhe.configure(text=f"{diag_descrever(cod, err)}. Tipo: {tipo or 'não informado'}. Parou na função "
+                                   f"{func or '?'} (linha {linha})" + (f", chamada por {cham}" if cham else "")
+                                   + f". Versão do programa: {ver}.")
+        tree.bind("<<TreeviewSelect>>", mostrar_detalhe)
         if res is None:
             aviso = "Ainda não há registro (nenhuma falha anotada) ou ele pertence a outra versão deste cofre."
         elif n_ruins:
@@ -9246,7 +9497,16 @@ class App:
                 messagebox.showerror("Erro", texto_erro(ex), parent=d)
                 return
             d.destroy()
+        def copiar_relatorio():
+            """Copia um texto sem segredos com todos os erros, para colar numa conversa de suporte."""
+            if not regs_completos:
+                messagebox.showinfo("Diagnóstico", "Não há erros anotados para copiar.", parent=d)
+                return
+            d.clipboard_clear()
+            d.clipboard_append(diag_relatorio(regs_completos))
+            detalhe.configure(text="Relatório copiado. Cole-o na conversa de suporte (não contém senhas nem caminhos).")
         ttk.Button(bt, text="Limpar registro", command=limpar).pack(side="left")
+        ttk.Button(bt, text="Copiar relatório", command=copiar_relatorio).pack(side="left", padx=(8, 0))
         ttk.Button(bt, text="Fechar", command=d.destroy, style="Primario.TButton").pack(side="right")
 
     @staticmethod
@@ -9267,6 +9527,80 @@ class App:
             return h.hexdigest()
         except OSError:
             return None
+
+    def verificar_integridade_cofre(self, automatica=False):
+        """Tela "Verificar integridade do cofre": estado do arquivo principal e das cópias automáticas, mostrada
+        assim que o cofre abre (automatica=True) e também no menu Segurança. Só lê; nunca grava nem altera nada."""
+        if self.cofre is None:
+            return
+        C = CORES
+        try:
+            r = self.cofre.verificar_estado_arquivos()
+        except Exception as ex:                      # a conferência nunca pode impedir o uso do cofre
+            diag_registrar(DIAG_INTEGRIDADE, ex)
+            r = None
+        d = self._nova_janela("Verificar integridade do cofre")
+        self._modal(d)
+        fr = ttk.Frame(d, padding=(26, 22, 26, 20))
+        fr.pack(fill="both", expand=True)
+        linhas = []                                   # (símbolo, cor, texto)
+        if r is None:
+            nivel, resumo = "atencao", "Não foi possível conferir agora. Veja o Diagnóstico e tente de novo."
+        else:
+            sit, itens, seq, det = r["principal"]
+            problema = sit in ("falha", "erro", "ausente") or r["reversao"] or any(
+                c[1] == "falha" for c in r["copias"])
+            if sit == "ok":
+                linhas.append(("✔", C["ok"], f"Arquivo principal: íntegro  ({itens} item(ns), salvamento nº {seq})"))
+            else:
+                linhas.append(("✖", C["perigo"], "Arquivo principal: " + ("não encontrado" if sit == "ausente" else
+                              "NÃO confere" + (f" — {det}" if det else ""))))
+            boas = 0
+            for i, (nome, csit, citens, cseq, cdet) in enumerate(r["copias"], 1):
+                rotulo = f"Cópia automática {i}" + (" (mais nova)" if i == 1 else "")
+                if csit == "ok":
+                    boas += 1
+                    linhas.append(("✔", C["ok"], f"{rotulo}: íntegra  ({citens} item(ns), salvamento nº {cseq})"))
+                elif csit == "ausente":
+                    linhas.append(("•", C["fraco"], f"{rotulo}: ainda não existe"))
+                elif csit == "antiga":
+                    linhas.append(("•", C["fraco"], f"{rotulo}: formato antigo (não conferida)"))
+                else:
+                    linhas.append(("✖", C["perigo"], f"{rotulo}: DANIFICADA" + (f" — {cdet}" if cdet else "")))
+            if r["reversao"]:
+                linhas.append(("✖", C["perigo"], "Uma cópia automática é mais NOVA que o arquivo principal: ele pode "
+                                                  "ter sido trocado por uma versão antiga. Confira seus itens mais recentes."))
+            if r["sobras"]:
+                linhas.append(("!", C["alerta"], "Há arquivo(s) danificado(s) guardado(s) ao lado do cofre: "
+                               + ", ".join(r["sobras"])))
+            if r["consulta"]:
+                linhas.append(("!", C["alerta"], "Modo consulta: nada é gravado nesta sessão, então não são criadas cópias novas."))
+            if problema:
+                nivel, resumo = "problema", "PROBLEMA encontrado. Não altere nada ainda; veja abaixo e, se preciso, restaure uma cópia ou o backup cifrado externo."
+            elif boas == 0 or r["sobras"] or r["consulta"]:
+                nivel, resumo = "atencao", "Cofre íntegro, mas com ressalvas (veja abaixo)."
+                if boas == 0:
+                    linhas.append(("!", C["alerta"], "Nenhuma cópia automática legível ainda. Faça um backup cifrado externo em Backup do cofre."))
+            else:
+                nivel, resumo = "ok", "Cofre íntegro. Arquivo principal e cópias automáticas conferem."
+        cor = {"ok": C["ok"], "atencao": C["alerta"], "problema": C["perigo"]}[nivel]
+        self._cabecalho_dialogo(fr, "escudo", "Verificar integridade do cofre",
+                                "Estado do arquivo do cofre antes de você usá-lo. Esta conferência só lê; não altera nada.")
+        ttk.Label(fr, text=resumo, foreground=cor, wraplength=_px(640), justify="left").pack(anchor="w", pady=(4, 12))
+        caixa = ttk.Frame(fr, style="Card2.TFrame", padding=(14, 12))
+        caixa.pack(fill="x")
+        for simbolo, cor_l, texto in linhas:
+            linha = ttk.Frame(caixa, style="Card2.TFrame")
+            linha.pack(fill="x", pady=2)
+            ttk.Label(linha, text=simbolo, foreground=cor_l, style="S2.TLabel", width=2).pack(side="left", anchor="n")
+            ttk.Label(linha, text=texto, style="S2.TLabel", wraplength=_px(600), justify="left").pack(side="left")
+        bt = ttk.Frame(fr)
+        bt.pack(fill="x", pady=(16, 0))
+        ttk.Button(bt, text="Verificar o programa (.exe)…", command=self.verificar_integridade).pack(side="left")
+        ttk.Button(bt, text="Fechar", command=d.destroy, style="Primario.TButton").pack(side="right")
+        d.bind("<Escape>", lambda e: d.destroy())
+        if automatica:
+            self.root.wait_window(d)                  # o aviso de abertura só aparece depois de você ver o estado
 
     def verificar_integridade(self):
         """Mostra o SHA-256 do próprio programa (.exe), para comparar à mão com o número anotado em papel na
@@ -9516,8 +9850,10 @@ class App:
             if preparar is not None:
                 preparar()                 # tamanho final decidido ANTES de aparecer
             self._centralizar(d)
+            anterior_teste = _primeiro_plano_de_teste()   # so em teste
             d.deiconify()
             d.update_idletasks()
+            _reforcar_segundo_plano_de_teste(d, anterior_teste)   # so em teste: dialogo nao rouba o foco
             if getattr(d, "_quer_grab", False):
                 _grab_seguro(d)
         except tk.TclError:
@@ -9585,7 +9921,7 @@ class App:
         fr = ttk.Frame(canvas, padding=padding)
         janela = canvas.create_window((0, 0), window=fr, anchor="nw")
         canvas.pack(side="left", fill="both", expand=True)
-        estado = {"pos": False, "pendente": None, "aplicado": None, "rolagem": False}
+        estado = {"pos": False, "pendente": None, "aplicado": None, "rolagem": False, "lmax": 0, "amax": 0}
 
         def ajustar_largura(event):
             canvas.itemconfigure(janela, width=event.width)
@@ -9602,7 +9938,13 @@ class App:
                 if rodape is not None:
                     w = max(w, rodape.winfo_reqwidth())
                 largura = min(max(w, _px(860)), max(_px(640), sw - _px(48)))
-                altura = min(max(h + reserva, _px(520)), max(_px(420), sh - _px(64)))
+                piso = getattr(d, "_altura_padrao", None) or _px(520)
+                altura = min(max(h + reserva, piso), max(_px(420), sh - _px(64)))
+                # O dialogo so CRESCE (nunca encolhe) enquanto aberto: abrir/fechar "detalhes" ou trocar de opcao
+                # nao faz a janela ficar mudando de tamanho e de posicao.
+                largura = max(largura, estado["lmax"])
+                altura = max(altura, estado["amax"])
+                estado["lmax"], estado["amax"] = largura, altura
                 corpo_altura = max(1, altura - reserva)
                 rolagem = h > corpo_altura
                 if rolagem != estado["rolagem"]:
@@ -9947,7 +10289,7 @@ class App:
         caixa_av = ttk.Frame(fr, style="Card2.TFrame", padding=(14, 12))
         caixa_av.pack(fill="x", pady=(0, 14))
         ttk.Label(caixa_av, text="Aparece só agora: guarde-a antes de fechar.", foreground=CORES["alerta"],
-                  justify="left", style="S2.TLabel", wraplength=440).pack(side="left", anchor="w")
+                  justify="left", style="S2.TLabel", wraplength=_px(440)).pack(side="left", anchor="w")
         self._ajuda(caixa_av, "Guarde a chave", aviso, CORES["alerta"]).pack(side="right")
         var = tk.StringVar(value=chave_txt)
         ent = ttk.Entry(fr, textvariable=var, width=40, font="CofreMonoG",
@@ -10004,7 +10346,7 @@ class App:
         lp_ = ttk.Frame(fr)
         lp_.pack(anchor="w", pady=(8, 0))
         ttk.Label(lp_, text="Impressão bloqueada para senhas; liberada só para esta cópia de emergência "
-                  "(pede a senha mestra).", style="C.Fraco.TLabel", wraplength=470, justify="left").pack(side="left")
+                  "(pede a senha mestra).", style="C.Fraco.TLabel", wraplength=_px(470), justify="left").pack(side="left")
         self._ajuda(lp_, "Sobre imprimir", "O cofre só imprime a chave de acesso e o código de recuperação (senhas, "
                     "itens, backups e a senha mestra nunca são impressos) e pede a senha mestra antes."
                     "\n\nO Windows guarda o que você imprime "
@@ -10123,6 +10465,7 @@ class App:
             ("Backup do cofre…", "backup", self.backup),
             None,
             "Segurança",
+            ("Verificar integridade do cofre…", "escudo", self.verificar_integridade_cofre),
             ("Verificar integridade do programa…", "escudo", self.verificar_integridade),
             ("Segurança adicional (visão geral)…", "escudo", self.tela_seguranca_adicional),
             ("Chaves FIDO…", "chave", self.gerenciar_fido),
@@ -10574,7 +10917,7 @@ class App:
         if r.get("grupo"):
             ttk.Label(chips, text=" " + r["grupo"], image=_ponto_img(self.root, tom_para(r["grupo"]), 8),
                       compound="left", style="C.Suave.TLabel").pack(side="left", padx=(0, 12))
-        ttk.Label(chips, text="Em uso" if _item_ativo(r) else "Inativa",
+        ttk.Label(chips, text="Ativa" if _item_ativo(r) else "Desativada",
                   style="C.TLabel", foreground=C["ok"] if _item_ativo(r) else C["fraco"]).pack(
                       side="left", padx=(0, 12))
         if self._protecao_global():          # agora é um ajuste do cofre todo (⋯ → Segurança → Proteção extra), não por item
@@ -10637,11 +10980,11 @@ class App:
                     bcod.config(command=lambda c_=cod, b_=bcod, n_=n_cod: self._copiar_codigo(c_, b_, n_))
                     bcod.pack(side="right")
                     ttk.Label(lc, text=f"{n_cod}.", style="C.Fraco.TLabel", width=3).pack(side="left", anchor="n")
-                    ttk.Label(lc, text=cod, style="C.Valor.TLabel", font="CofreMono", wraplength=190,
+                    ttk.Label(lc, text=cod, style="C.Valor.TLabel", font="CofreMono", wraplength=_px(190),
                               justify="left").pack(side="left", anchor="w", fill="x", expand=True)
             else:
                 ttk.Label(linha, text=mostra, style="C.Valor.TLabel" if secreto else "C.TLabel",
-                          font="CofreMono" if secreto else "CofreTexto", wraplength=250, justify="left").pack(
+                          font="CofreMono" if secreto else "CofreTexto", wraplength=_px(250), justify="left").pack(
                     side="left", anchor="w")
             if campo in ("senha", "senha_extra"):
                 nota, rot, bits, _ = avaliar_forca(valor)
@@ -10655,7 +10998,7 @@ class App:
             if not primeiro:
                 ttk.Separator(campos).pack(fill="x", pady=10)
             ttk.Label(campos, text="NOTAS", style="C.Campo.TLabel").pack(anchor="w")
-            ttk.Label(campos, text=r["notas"], style="C.Suave.TLabel", wraplength=350, justify="left").pack(
+            ttk.Label(campos, text=r["notas"], style="C.Suave.TLabel", wraplength=_px(350), justify="left").pack(
                 anchor="w", pady=(3, 0))
 
 
@@ -10809,6 +11152,29 @@ class App:
         mine = self._grupos(pessoa)
         minhas = {chave_ordem_alfabetica(g) for g in mine}
         return mine + [g for g in self.SUGESTOES_GRUPO if chave_ordem_alfabetica(g) not in minhas]
+
+    _SINONIMOS_GRUPO = {
+        "Banco": {"banco", "bancos", "bancosefinancas", "financas", "financeiro", "finanicas"},
+        "Redes sociais": {"redessociais", "redesocial", "social", "sociais", "redes"},
+        "E-mail": {"email", "emails", "emailenuvem", "nuvem", "google"},
+        "Trabalho": {"trabalho", "work", "profissional", "dev", "desenvolvimento"},
+        "Streaming": {"streaming", "entretenimento", "filmes", "musica", "series"},
+        "Jogos": {"jogos", "games", "game"},
+        "Compras": {"compras", "lojas", "loja", "shopping"},
+        "Governo": {"governo", "gov", "documentos"},
+    }
+
+    def _nome_grupo_recomendado(self, servico):
+        """Nome do grupo a RECOMENDAR para esta conta: um grupo que o usuario ja tem e combina com o tipo (ex.:
+        'Bancos'); se nao tiver, o nome padrao ('Banco'). None quando o tipo nao e reconhecido."""
+        tipo = grupo_recomendado(servico)
+        if tipo is None:
+            return None
+        sinonimos = self._SINONIMOS_GRUPO.get(tipo, set()) | {chave_ordem_alfabetica(tipo).replace(" ", "")}
+        for g in self._grupos_sugeridos():
+            if chave_ordem_alfabetica(g).replace(" ", "") in sinonimos:
+                return g
+        return tipo
 
     def _novo_grupo(self, mover_id=None):
         """Cria um grupo (categoria) com o nome que o usuário quiser DENTRO do perfil escolhido; com mover_id, já
@@ -11329,7 +11695,10 @@ class App:
             self.busca.set(estado["busca"])
             self.atualizar_lista()
             if estado["id"] is not None:
-                self.tree.selection_set(estado["id"])
+                try:
+                    self.tree.selection_set(estado["id"])
+                except tk.TclError:                    # o item não aparece com o filtro atual: não é motivo para travar
+                    pass
 
         ttk.Button(botoes, text="Aplicar", command=aplicar_escolha, style="Primario.TButton").pack(side="right")
         d.bind("<Escape>", lambda e: d.destroy())
@@ -11347,6 +11716,7 @@ class App:
         rodape = ttk.Frame(d, padding=(_px(26), _px(8), _px(26), _px(16)))
         rodape.pack(side="bottom", fill="x")          # Salvar/Cancelar ficam SEMPRE visíveis (fora da rolagem)
         fr = self._corpo_dialogo(d, (20, 16, 20, 10), rodape=rodape)
+        d._altura_padrao = _px(760)               # tamanho PADRAO fixo: nao muda quando as credenciais extras ficam ocultas
         campos = {}
         self._cabecalho_dialogo(
             fr, "editar" if reg else "novo", "Editar item" if reg else "Novo item",
@@ -11359,16 +11729,17 @@ class App:
         estilo_status.configure("StatusInativa.TButton", foreground=C["fraco"], padding=(_px(10), _px(5)))
         estilo_status.configure("AjudaItem.TButton", foreground=C["fraco"], padding=(_px(2), _px(2)))
         bt_status = ttk.Button(linha_acoes, style="StatusAtiva.TButton")
-        bt_status.pack(side="right", padx=(8, 0))
+        if reg:                                   # item NOVO nasce "em uso" sem botao; so a edicao permite marcar inativa
+            bt_status.pack(side="right", padx=(8, 0))
 
         def atualizar_status():
             """Atualiza a etiqueta de estado sem alterar os demais dados do item."""
             ativa = status.get()
-            bt_status.configure(text="Em uso" if ativa else "Inativa",
+            bt_status.configure(text="Ativa" if ativa else "Desativada",
                                 style="StatusAtiva.TButton" if ativa else "StatusInativa.TButton")
 
         bt_status.configure(command=lambda: (status.set(not status.get()), atualizar_status()))
-        self._dica(bt_status, "Indica se você ainda usa esta conta. Marcar como inativa só muda o rótulo: "
+        self._dica(bt_status, "Indica se você ainda usa esta conta. Marcar como desativada só muda o rótulo: "
                               "não apaga a senha nem bloqueia o acesso; o item continua salvo e pode ser reativado.")
         atualizar_status()
         bt_tour = ttk.Button(linha_acoes, text="?", style="AjudaItem.TButton")
@@ -11413,10 +11784,54 @@ class App:
                 dica_grupo.config(text="Digite o nome do seu grupo. Ele é criado ao salvar.")
                 dica_grupo.grid(row=3, column=1, sticky="w", padx=(12, 0), pady=(0, 6))
         cg.bind("<<ComboboxSelected>>", escolheu_grupo)
+        sugestao_grupo = ttk.Label(topo, text="", style="C.Fraco.TLabel", wraplength=_px(220), justify="left",
+                                   cursor="hand2", foreground=C["prim_txt"])
+
+        def atualizar_sugestao(event=None):
+            """Recomenda um grupo pelo tipo da conta digitada. So aparece com o campo Grupo vazio; um clique aceita,
+            e digitar o grupo por conta propria faz a sugestao sumir. Nada e preenchido sem o usuario aceitar."""
+            try:
+                recomendado = None
+                if not cg.get().strip() and not dica_grupo.grid_info():
+                    recomendado = self._nome_grupo_recomendado(campos["servico"].get())
+                if recomendado:
+                    sugestao_grupo.config(text=f"Sugestão: {recomendado}  (clique para usar)")
+                    sugestao_grupo._valor = recomendado
+                    sugestao_grupo.grid(row=3, column=1, sticky="w", padx=(12, 0), pady=(0, 6))
+                else:
+                    sugestao_grupo.grid_remove()
+            except (tk.TclError, KeyError):
+                pass
+
+        ajustar_grupo_bancario = [None]            # preenchido no fim do formulario (ajustar_bancarios)
+
+        def aceitar_sugestao(event=None):
+            """Usa o grupo recomendado."""
+            valor = getattr(sugestao_grupo, "_valor", "")
+            if valor:
+                cg.delete(0, "end")
+                cg.insert(0, valor)
+                getattr(cg, "_pista_atualizar", lambda: None)()
+                if ajustar_grupo_bancario[0]:
+                    ajustar_grupo_bancario[0]()
+            sugestao_grupo.grid_remove()
+        sugestao_grupo.bind("<Button-1>", aceitar_sugestao)
+        cg.bind("<<ComboboxSelected>>", lambda e: atualizar_sugestao(), add="+")
+        cg.bind("<KeyRelease>", atualizar_sugestao, add="+")
         cg.insert(0, (reg or {}).get("grupo", "") or (self.filtro_grupo.get()
                                                      if self.filtro_grupo.get() not in ("Todos", "(sem grupo)", "⚠ Atenção")
                                                      else ""))
         campos["grupo"] = cg
+        campos["servico"].bind("<KeyRelease>", atualizar_sugestao, add="+")
+        campos["servico"].bind("<FocusOut>", atualizar_sugestao, add="+")
+        _escolher_marca = autocompletar.escolher
+
+        def _escolher_marca_e_sugerir(indice):
+            """Escolher a marca na lista tambem atualiza a recomendacao de grupo."""
+            _escolher_marca(indice)
+            atualizar_sugestao()
+        autocompletar.escolher = _escolher_marca_e_sugerir
+        atualizar_sugestao()
         ttk.Label(topo, text="LOGIN / E-MAIL / USUÁRIO", style="C.Campo.TLabel").grid(
             row=4, column=0, sticky="w")
         ttk.Label(topo, text="PESSOA (PERFIL)", style="C.Campo.TLabel").grid(
@@ -11462,8 +11877,7 @@ class App:
         mostrar = tk.BooleanVar(value=False)
         ttk.Checkbutton(cab_seg, text="Mostrar", variable=mostrar, style="C.Switch.TCheckbutton",
                         command=lambda: alternar()).pack(side="right")
-        linha_adicionar = ttk.Frame(credenciais, style="C.TFrame")
-        linha_adicionar.pack(fill="x", pady=(8, 10))
+        cab_seg.pack_configure(pady=(0, 10))          # o seletor e o botao "+ Adicionar" ficam na linha do titulo
         CAMPOS_EXTRA = (("codigos", "Código de recuperação"), ("pin", "PIN"), ("senha_extra", "Senha extra"),
                         ("chave", "Chave / token"), ("numero_conta", "Número da conta"), ("agencia", "Agência"))
         tem = {k: tk.BooleanVar(value=bool(reg and (reg.get(k) or "").strip())) for k, _ in CAMPOS_EXTRA}
@@ -11476,7 +11890,7 @@ class App:
             "agencia": "Agência",
         }
         selecao_credencial = ttk.Combobox(
-            linha_adicionar, state="readonly", width=24,
+            cab_seg, state="readonly", width=24,
             values=[rótulos_extra[k] for k, _ in CAMPOS_EXTRA if not tem[k].get()],
             style="C.TCombobox")
 
@@ -11500,10 +11914,10 @@ class App:
                 tem[chave].set(True)
                 aplicar_campos()
 
-        botao_adicionar = ttk.Button(linha_adicionar, text="+ Adicionar", style="Acao.TButton",
+        botao_adicionar = ttk.Button(cab_seg, text="+ Adicionar credencial", style="Acao.TButton",
                                      command=adicionar_credencial)
-        botao_adicionar.pack(side="right", padx=(8, 0))
-        selecao_credencial.pack(side="left", fill="x", expand=True)
+        botao_adicionar.pack(side="right", padx=(8, 12))
+        selecao_credencial.pack(side="right")
         grade = ttk.Frame(credenciais, style="S2.TFrame")
         grade.pack(fill="x")
         grade.columnconfigure(0, weight=1, uniform="s")
@@ -11513,10 +11927,14 @@ class App:
                                                                                             # cada campo extra
         dicas_item = PainelForca(credenciais, self, largura=_px(660), pref="C.", compacto=True)
         for i, chave in enumerate(("senha", "senha_extra", "pin", "chave", "numero_conta", "agencia")):
-            col, lin = i % 2, (i // 2) * 3
-            px = (0, 10) if col == 0 else (10, 0)
+            if chave == "senha":                   # Senha Principal: caixa propria, na largura toda (como no modelo)
+                col, lin, vao, px = 0, 0, 2, (0, 0)
+            else:                                   # credenciais extras: abaixo, em 2 colunas
+                j_ = i - 1
+                col, lin, vao = j_ % 2, 3 + (j_ // 2) * 3, 1
+                px = (0, 10) if col == 0 else (10, 0)
             cab_campo = ttk.Frame(grade, style="S2.TFrame")
-            cab_campo.grid(row=lin, column=col, sticky="ew", padx=px)
+            cab_campo.grid(row=lin, column=col, columnspan=vao, sticky="ew", padx=px)
             rot_c = ttk.Label(cab_campo, text=ROTULOS[chave].upper(), style="S2.Campo.TLabel")
             rot_c.pack(side="left")
             grupo_campo = []
@@ -11527,7 +11945,7 @@ class App:
                 grupo_campo.extend((cab_campo, bt_remover))
                 grupos_campo[chave].extend((cab_campo, bt_remover))
             linha = ttk.Frame(grade, style="S2.TFrame")
-            linha.grid(row=lin + 1, column=col, sticky="ew", padx=px, pady=(4, 0))
+            linha.grid(row=lin + 1, column=col, columnspan=vao, sticky="ew", padx=px, pady=(4, 0))
             if chave != "senha":
                 grupos_campo[chave].append(linha)
             caixa, ent = self._linha_secreta(linha, 18, olho=False, pref="S2.")
@@ -11553,7 +11971,7 @@ class App:
                 self._dica(bgr, "Gerar uma senha forte (escolha o tipo e o tamanho)")
                 med = self._medidor(grade, ent, pin=(chave == "pin"), dicas_lbl=dicas_item,
                                     pref="S2.", titulo=ROTULOS[chave])
-                med.grid(row=lin + 2, column=col, sticky="w", padx=px, pady=(6, 12))
+                med.grid(row=lin + 2, column=col, columnspan=vao, sticky="w", padx=px, pady=(6, 12))
                 if chave != "senha":
                     grupos_campo[chave].append(med)
             else:
@@ -11646,8 +12064,8 @@ class App:
                 oculto.pack(anchor="w", pady=(2, 0))
             self._recalcular_dialogo(d)
 
-        ttk.Label(extras_notas, text="NOTAS", style="C.Campo.TLabel").pack(anchor="w", pady=(14, 4))
-        notas = self._texto_multilinha(extras_notas, 3)
+        ttk.Label(extras_notas, text="NOTAS / OBSERVAÇÕES", style="C.Campo.TLabel").pack(anchor="w", pady=(2, 4))
+        notas = self._texto_multilinha(extras_notas, 2)
         notas.pack(fill="x")
         atualizar_pista_notas = self._pista_texto(notas, "Anotações importantes sobre esta conta…")
         if reg:
@@ -11665,8 +12083,10 @@ class App:
             dados["pessoa"] = _limpar_texto(self._valor_pessoa(cp.get())).strip()
             dados["ativo"] = status.get()
             if not dados["servico"]:
-                messagebox.showerror("Erro", "Informe a conta / app.", parent=d)
+                erro_validacao.pack(side="left")
+                campos["servico"].focus_set()
                 return
+            erro_validacao.pack_forget()
             if reg:
                 rid = reg["id"]
 
@@ -11691,6 +12111,7 @@ class App:
         ttk.Separator(rodape).pack(fill="x", pady=(0, 10))
         rod = ttk.Frame(rodape)
         rod.pack(fill="x")
+        erro_validacao = ttk.Label(rod, text="Informe o nome da Conta / App para salvar.", foreground=C["perigo"])
 
         # ---- modo simples x completo (revelação progressiva) ----
         def aplicar_campos():
@@ -11707,7 +12128,7 @@ class App:
                 extras.pack(fill="x")
             self._recalcular_dialogo(d)
 
-        ttk.Button(rod, text="Salvar", command=salvar, style="Primario.TButton",
+        ttk.Button(rod, text="Salvar item", command=salvar, style="Primario.TButton",
                    image=imagem_icone(self.root, "ok", "#ffffff"), compound="left").pack(side="right")
         ttk.Button(rod, text="Cancelar", command=d.destroy).pack(side="right", padx=8)
         campos["servico"].focus_set()
@@ -11747,6 +12168,24 @@ class App:
             passeio_formulario()
         bt_tour.config(command=passeio_com_tudo)
         aplicar_campos()
+
+        def ajustar_bancarios(event=None):
+            """Grupo de banco/financas: mostra Numero da conta e Agencia (como no modelo). Sair do grupo nao apaga nada."""
+            try:
+                nome_g = chave_ordem_alfabetica(cg.get())
+            except tk.TclError:
+                return
+            if "banc" in nome_g or "financ" in nome_g:
+                mudou = False
+                for k_ in ("numero_conta", "agencia"):
+                    if not tem[k_].get():
+                        tem[k_].set(True)
+                        mudou = True
+                if mudou:
+                    aplicar_campos()
+        for seq_ in ("<KeyRelease>", "<<ComboboxSelected>>", "<FocusOut>"):
+            cg.bind(seq_, ajustar_bancarios, add="+")
+        ajustar_grupo_bancario[0] = ajustar_bancarios
         d.bind("<Return>", lambda e: salvar() if e.widget.winfo_class() in ("TEntry", "Entry", "TCombobox") else None)
         d.bind("<Destroy>", lambda e: (self._tour.encerrar() if getattr(self, "_tour", None) and e.widget is d else None), add="+")
 
@@ -11854,6 +12293,41 @@ class App:
         self._ocupado(False)
         self.mostrar_chave_acesso(chave, self.cofre.modo)
 
+    def adicionar_chave_acesso(self, novo_modo):
+        """Cofre 'so senha': adiciona a chave de acesso depois de criado (tela Seguranca adicional)."""
+        if self.cofre is None or self.cofre.modo != MODO_S:
+            return
+        nome = "senha E chave (dois fatores)" if novo_modo == MODO_E else "senha OU chave"
+        if not messagebox.askyesno("Adicionar chave de acesso",
+                                   f"Adicionar uma chave de acesso a este cofre ({nome})?\n\n"
+                                   "Uma chave nova será mostrada UMA vez: guarde-a fora do pendrive. A chave interna "
+                                   "dos dados é renovada e as cópias automáticas antigas são apagadas. Backups seus, "
+                                   "feitos antes, continuam abrindo só com a senha."):
+            return
+        senha = self._confirmar_senha_atual("Adicionar chave de acesso")
+        if not senha:
+            return
+        self._ocupado(True)
+        try:
+            cof = self.cofre
+            chave = self._com_espera(lambda: cof.adicionar_chave_acesso(novo_modo, senha), "Adicionando a chave…")
+        except MemoryError:
+            self._ocupado(False)
+            messagebox.showerror("Memória insuficiente", "Faltou memória livre. Feche outros programas e tente de "
+                                 "novo. O cofre continua como estava.")
+            return
+        except (OSError, ChaveMalFormada, ValueError) as ex:
+            self._ocupado(False)
+            messagebox.showerror("Erro", f"Não foi possível adicionar a chave:\n{texto_erro(ex)}\n\n"
+                                 "O cofre continua como estava.")
+            return
+        self._ocupado(False)
+        self.mostrar_chave_acesso(chave, self.cofre.modo)
+        try:
+            self.tela_principal()            # refaz menus e indicadores (agora existe 'Nova chave de acesso')
+        except tk.TclError:
+            pass
+
     # ---------- importação de planilha ----------
     def modelo_planilha(self):
         """Salva a planilha modelo para importação."""
@@ -11933,10 +12407,10 @@ class App:
         for a in avisos:
             if a.startswith("🛡 OK"):                      # verificação de segurança que PASSOU: linha verde com ✓
                 ttk.Label(fr, text="  " + a[len("🛡 OK"):].strip(), image=imagem_icone(self.root, "ok", CORES["ok"], 14),
-                          compound="left", foreground=CORES["ok"], wraplength=760).pack(anchor="w")
+                          compound="left", foreground=CORES["ok"], wraplength=_px(760)).pack(anchor="w")
                 continue
             ttk.Label(fr, text="  " + a, image=imagem_icone(self.root, "alerta", CORES["alerta"], 14), compound="left",
-                      foreground=CORES["alerta"], wraplength=760).pack(anchor="w")
+                      foreground=CORES["alerta"], wraplength=_px(760)).pack(anchor="w")
 
         mostrar = tk.BooleanVar(value=False)
         tree = ttk.Treeview(fr, columns=("situacao", "grupo", "servico", "login", "senha", "outros", "notas"),
@@ -12119,7 +12593,7 @@ class App:
                 resto = True
             lin = ttk.Frame(tx)
             lin.pack(anchor="w", fill="x")
-            ttk.Label(lin, text=curto, style="Suave.TLabel", wraplength=440, justify="left").pack(side="left")
+            ttk.Label(lin, text=curto, style="Suave.TLabel", wraplength=_px(440), justify="left").pack(side="left")
             if resto:
                 self._ajuda(lin, titulo, subtitulo, CORES["fundo"]).pack(side="left", padx=(4, 0))
         return topo
@@ -12132,6 +12606,7 @@ class App:
         (composição, tempo para quebrar) ficam escondidos até o clique em 'Ver detalhes'."""
         import math
         C = CORES
+        minimo_chars = MIN_SENHA if senha_mestra else 8     # senha mestra: o gerador respeita o mesmo minimo da tela (14)
         d = self._nova_janela("Gerador de senhas", mestre)
         self._modal(d)
         rodape = ttk.Frame(d, padding=(_px(26), _px(10), _px(26), _px(16)))
@@ -12144,6 +12619,8 @@ class App:
         seg.pack(fill="x")
         for chave, texto, ic in (("aleatoria", "Aleatória", "gerar"), ("frase", "Fácil de lembrar", "pessoa"),
                                  ("pin", "PIN", "teclado")):
+            if senha_mestra and chave == "pin":
+                continue                       # um PIN (4 a 12 digitos) nunca chega ao minimo da senha mestra
             ttk.Radiobutton(seg, text=" " + texto, value=chave, variable=tipo, style="S2.Segmento.Toolbutton",
                             image=imagem_icone(self.root, ic, C["suave"], 16), compound="left",
                             command=lambda: montar_opcoes()).pack(side="left", expand=True, fill="x", padx=1)
@@ -12231,11 +12708,13 @@ class App:
                 tamanho.set(n)
                 gerar_depois()
 
-        escala = ttk.Scale(linha_tam, from_=8, to=64, orient="horizontal", variable=tamanho, length=280,
+        # A caixa numerica e empacotada PRIMEIRO (lado direito): assim ela sempre tem o seu espaco e o numero nunca
+        # some; quem encolhe, se a janela for estreita, e a regua.
+        escala = ttk.Scale(linha_tam, from_=minimo_chars, to=64, orient="horizontal", variable=tamanho, length=_px(160),
                            command=do_deslizante)
+        caixa_tam = ttk.Spinbox(linha_tam, from_=minimo_chars, to=64, textvariable=texto_tam, width=5, command=da_caixa)
+        caixa_tam.pack(side="right")
         escala.pack(side="left", padx=(4, 12), fill="x", expand=True)
-        caixa_tam = ttk.Spinbox(linha_tam, from_=8, to=64, textvariable=texto_tam, width=4, command=da_caixa)
-        caixa_tam.pack(side="left")
         caixa_tam.bind("<KeyRelease>", da_caixa)
         caixa_tam.bind("<FocusOut>", lambda e: texto_tam.set(str(tamanho.get())))
         opc = ttk.Frame(cartao)
@@ -12278,7 +12757,7 @@ class App:
             av.pack(fill="x", pady=(12, 0))
             ttk.Label(av, text="  Será a senha mestra: anote em papel antes de usar.",
                       image=imagem_icone(self.root, "alerta", C["alerta"], 16), compound="left",
-                      style="S2.TLabel", foreground=C["alerta"], wraplength=400, justify="left").pack(side="left")
+                      style="S2.TLabel", foreground=C["alerta"], wraplength=_px(400), justify="left").pack(side="left")
             self._ajuda(av, "Senha mestra", "ESTA SERÁ A SENHA MESTRA: decore ou anote em papel AGORA, antes de clicar em "
                         "'Usar esta senha'. Ela não será mostrada de novo e não há como recuperá-la.",
                         C["sup2"]).pack(side="right")
@@ -12290,10 +12769,10 @@ class App:
             t = tipo.get()
             if t == "aleatoria":
                 rot_tam.config(text="CARACTERES")
-                escala.config(from_=8, to=64)
-                caixa_tam.config(from_=8, to=64)
-                tamanho.set(20)
-                texto_tam.set("20")
+                escala.config(from_=minimo_chars, to=64)
+                caixa_tam.config(from_=minimo_chars, to=64)
+                tamanho.set(max(20, minimo_chars))
+                texto_tam.set(str(max(20, minimo_chars)))
                 for texto, var in (("Números", numeros), ("Símbolos", simbolos)):
                     ttk.Checkbutton(opc, text=texto, variable=var, command=gerar,
                                     style="Switch.TCheckbutton").pack(side="left", padx=(0, 24))
@@ -12323,7 +12802,7 @@ class App:
                 n = int(round(float(tamanho.get())))
             except (tk.TclError, ValueError):
                 return
-            lim = {"aleatoria": (8, 64), "frase": (3, 10), "pin": (4, 12)}[t]
+            lim = {"aleatoria": (minimo_chars, 64), "frase": (3, 10), "pin": (4, 12)}[t]
             n = max(lim[0], min(n, lim[1]))
             if t == "aleatoria":
                 s = gerar_senha(n, numeros.get(), simbolos.get())
@@ -12337,20 +12816,23 @@ class App:
                 s = gerar_pin(n)
                 bits = n * math.log2(10)
                 uso = "PIN aleatório."
+            while senha_mestra and len(s) < MIN_SENHA:     # rede de seguranca: nunca entrega senha mestra curta
+                s = gerar_frase(n + 1, maiusc.get(), num_fim.get()) if t == "frase" else gerar_senha(
+                    MIN_SENHA, numeros.get(), simbolos.get())
             atual["s"] = s
             self._pintar(caixa, s, not atual["ver"])
             nota = 4 if bits >= 80 else 3 if bits >= 60 else 2 if bits >= 40 else 1
             if t == "pin":
                 barra_lbl.config(image=self._barra_forca(3, 96))
                 veredito.config(text=f"PIN aleatório de {n} dígitos", foreground=C["ok"])
-                bits_lbl.config(text="")                   # números técnicos: só em "Ver detalhes"
+                bits_lbl.config(text=f"{len(s)} dígitos")  # contagem sempre visível; bits só em "Ver detalhes"
                 detalhes["args"] = ("pin",)
                 desenhar_detalhes()
                 return
             txt, cor = self._veredito(nota)
             barra_lbl.config(image=self._barra_forca(nota, 96))
             veredito.config(text=txt, foreground=cor)
-            bits_lbl.config(text="")                       # os "bits" aparecem só em "Ver detalhes da senha"
+            bits_lbl.config(text=f"{len(s)} caracteres")   # contagem sempre visível; "bits" só em "Ver detalhes"
             detalhes["args"] = ("normal", s, bits, nota, txt, uso)
             desenhar_detalhes()
 
@@ -12801,7 +13283,7 @@ class App:
         caixa_av = ttk.Frame(fr, style="Card2.TFrame", padding=(14, 12))
         caixa_av.pack(fill="x", pady=(0, 14))
         ttk.Label(caixa_av, style="S2.TLabel", text="Anote em PAPEL agora: ele aparece só esta vez.",
-                  foreground=CORES["alerta"], justify="left", wraplength=470).pack(side="left", anchor="w")
+                  foreground=CORES["alerta"], justify="left", wraplength=_px(470)).pack(side="left", anchor="w")
         self._ajuda(caixa_av, "Código de recuperação",
                     "Use este código SOMENTE se perder TODAS as chaves FIDO. Ele substitui a chave FIDO (a senha mestra "
                     "e a chave de acesso continuam sendo exigidas).\n\n"
@@ -12858,7 +13340,7 @@ class App:
                    image=imagem_icone(self.root, "imprimir", CORES["texto"]), compound="left").pack(side="left")
         ttk.Label(fr, text="Impressão bloqueada para senhas; liberada só para esta cópia de emergência "
                   "(pede a senha mestra). Use uma impressora USB sua.", style="Suave.TLabel",
-                  wraplength=470, justify="left").pack(anchor="w", pady=(8, 0), before=bt)
+                  wraplength=_px(470), justify="left").pack(anchor="w", pady=(8, 0), before=bt)
         ttk.Button(bt, text="Já anotei — confirmar", command=confirmar, style="Primario.TButton").pack(side="right")
         ttk.Button(bt, text="Cancelar (não altera o cofre)", command=d.destroy).pack(side="right", padx=8)
         conf.focus_set()
@@ -12896,7 +13378,7 @@ class App:
             topo.pack(fill="x")
             ttk.Label(topo, image=imagem_icone(self.root, "ok" if ativo else "alerta",
                       C["ok"] if ativo else C["fraco"], 16), style="S2.TLabel").pack(side="left", anchor="n")
-            ttk.Label(topo, text=rot, style="S2.TLabel", font="CofreForte", wraplength=380,
+            ttk.Label(topo, text=rot, style="S2.TLabel", font="CofreForte", wraplength=_px(380),
                       justify="left").pack(side="left", padx=(8, 0), fill="x", expand=True)
             ttk.Label(topo, text="Ativo ✓" if ativo else f"+{pt} pontos", style="S2.TLabel",
                       foreground=C["ok"] if ativo else C["fraco"]).pack(side="right")
@@ -12908,12 +13390,16 @@ class App:
                                     self.gerenciar_computadores() if a == "pc" else self.gerenciar_fido()))
                            ).pack(anchor="w", pady=(8, 0))
             elif "chave de acesso" in rot.lower():
-                ttk.Label(lin, style="S2.Fraco.TLabel", justify="left", wraplength=420,
-                          text="Só dá para escolher ESTA camada no momento de CRIAR o cofre: mudar isso agora "
-                               "exigiria recriar o cofre do zero. Se quiser essa proteção, crie um cofre novo "
-                               "com \"Senha E chave\" ou \"Senha OU chave\" e migre os itens para ele (menu … > "
-                               "\"Baixar modelo de planilha\" no cofre atual para exportar, depois \"Importar "
-                               "planilha\" no cofre novo).").pack(anchor="w", pady=(8, 0))
+                ttk.Label(lin, style="S2.Fraco.TLabel", justify="left", wraplength=_px(420),
+                          text="Dá para adicionar agora, sem recriar o cofre e sem perder nada. Uma chave nova "
+                               "aparece uma única vez: guarde-a fora do pendrive.").pack(anchor="w", pady=(8, 0))
+                bt_chave = ttk.Frame(lin, style="Card2.TFrame")
+                bt_chave.pack(anchor="w", pady=(8, 0))
+                ttk.Button(bt_chave, text="Senha E chave (recomendado)…", style="Acao.TButton",
+                           command=lambda: (d.destroy(), self.adicionar_chave_acesso(MODO_E))).pack(side="left")
+                ttk.Button(bt_chave, text="Senha OU chave…", style="Acao.TButton",
+                           command=lambda: (d.destroy(), self.adicionar_chave_acesso(MODO_OU))).pack(
+                               side="left", padx=(8, 0))
         ttk.Button(fr, text="Fechar", command=d.destroy, style="Primario.TButton").pack(anchor="e", pady=(4, 0))
 
     # ---------- chaves FIDO ----------
@@ -12929,7 +13415,7 @@ class App:
                                 "Chaves de segurança físicas (YubiKey, Feitian, Titan...) como proteção extra.")
         linha_estado = ttk.Frame(fr)
         linha_estado.pack(anchor="w", fill="x", pady=(4, 8))
-        estado = ttk.Label(linha_estado, text="", wraplength=500, justify="left")
+        estado = ttk.Label(linha_estado, text="", wraplength=_px(500), justify="left")
         estado.pack(side="left")
         self._ajuda(linha_estado, "Chaves FIDO",
                     "Com FIDO ativo, o cofre só abre com a senha (e a chave de acesso, se o modo exigir) MAIS uma das "
@@ -13082,6 +13568,59 @@ class App:
         ttk.Button(bt, text="Fechar", command=d.destroy).pack(side="right")
         atualizar()
 
+    def _perguntar_mais_computadores(self, parent=None):
+        """Pergunta se há mais computadores a autorizar. SIM libera até MAX_PC; NÃO deixa só 1."""
+        return bool(messagebox.askyesno(
+            "Mais computadores?",
+            "Você tem mais computadores para autorizar a abrir este cofre?\n\n"
+            f"SIM: libera o 2º lugar (podem ser até {MAX_PC} computadores).\n"
+            "NÃO: o cofre fica preso a 1 computador (este). Nenhum outro consegue abri-lo, "
+            "a não ser com o código de recuperação.\n\n"
+            "Você pode mudar essa resposta depois, em Computadores autorizados.", parent=parent or self.root))
+
+    def _autorizar_primeiro_pc_na_criacao(self):
+        """Logo após criar o cofre: autoriza ESTE computador, mostra o código de recuperação e pergunta
+        se haverá mais computadores. Se algo falhar, o cofre continua válido (sem a exigência) e avisa."""
+        if os.environ.get("COFRE_SEM_VERIFICACAO_INICIAL") == "1" or self.cofre is None or self.cofre.pc:
+            return
+        anterior = self.cofre.estado_pc()
+        meta_antes = self.cofre.meta.get("pcs_multiplos")
+
+        def desfazer():
+            self.cofre.restaurar_pc(anterior)
+            if meta_antes is None:
+                self.cofre.meta.pop("pcs_multiplos", None)
+            else:
+                self.cofre.meta["pcs_multiplos"] = meta_antes
+
+        nome = os.environ.get("COMPUTERNAME") or "Computador principal"
+        try:
+            try:
+                codigo = self.cofre.pc_adicionar(nome, local=bool(EH_WINDOWS))
+            except ValueError:
+                self.cofre.restaurar_pc(anterior)
+                codigo = self.cofre.pc_adicionar(nome, local=False)    # sem o reforço do Windows
+            self.cofre.definir_pcs_multiplos(self._perguntar_mais_computadores())
+        except ValueError as ex:
+            desfazer()
+            messagebox.showwarning("Computadores autorizados",
+                                   f"Não foi possível autorizar este computador agora:\n{ex}\n\n"
+                                   "Você pode fazer isso depois em Computadores autorizados.", parent=self.root)
+            return
+        if codigo and not self.mostrar_codigo_recuperacao(codigo):
+            desfazer()
+            messagebox.showinfo("Computadores autorizados", "Cancelado. O cofre ficou sem computador autorizado; "
+                                "ative depois em Computadores autorizados.", parent=self.root)
+            return
+        if not self._salvar():
+            desfazer()
+            return
+        messagebox.showinfo("Computadores autorizados",
+                            f'Este computador ("{nome}") foi autorizado.\n\n' +
+                            (f"Você pode autorizar até {MAX_PC} computadores." if self.cofre.pcs_multiplos()
+                             else "O cofre está preso a 1 computador. Para liberar outros, mude a resposta em "
+                                  "Computadores autorizados."), parent=self.root)
+
     def gerenciar_computadores(self):
         """Janela para autorizar computadores (fator extra: o cofre só abre neles, ou com o código de recuperação)."""
         d = self._nova_janela("Computadores autorizados")
@@ -13092,7 +13631,7 @@ class App:
                                 "Fator extra: além da senha (e da chave FIDO), o cofre exige um computador da lista.")
         linha_estado = ttk.Frame(fr)
         linha_estado.pack(anchor="w", fill="x", pady=(4, 8))
-        estado = ttk.Label(linha_estado, text="", wraplength=500, justify="left")
+        estado = ttk.Label(linha_estado, text="", wraplength=_px(500), justify="left")
         estado.pack(side="left")
         self._ajuda(linha_estado, "Computadores autorizados",
                     "Com este fator ativo, o cofre só abre nos computadores da lista OU com o código de recuperação "
@@ -13137,7 +13676,19 @@ class App:
                     "código de recuperação.\n\nVai aparecer um código de recuperação: GUARDE-O EM PAPEL.\n\nAtivar?",
                     parent=d, perigoso=True):
                 return
-            if not self._confirmar_senha_atual("Autorizar este computador"):
+            if self.cofre.pc and len(self.cofre.pc["maquinas"]) >= self.cofre.limite_pc() == 1:
+                if not messagebox.askyesno("Limitado a 1 computador",
+                                           "O cofre está preso a 1 computador.\n\nQuer liberar mais "
+                                           f"computadores (até {MAX_PC})?", parent=d):
+                    return
+                if not self._confirmar_senha_atual("Liberar mais computadores"):
+                    return
+                self.cofre.definir_pcs_multiplos(True)
+                if not self._salvar():
+                    self.cofre.definir_pcs_multiplos(False)
+                    return
+                atualizar()
+            elif not self._confirmar_senha_atual("Autorizar este computador"):
                 return
             n = len(self.cofre.pc["maquinas"]) if self.cofre.pc else 0
             nome = self._pedir_texto("Nome do computador", "Dê um nome para identificar este computador:",
@@ -13233,6 +13784,30 @@ class App:
         b_rem.pack(side="left", padx=8)
         b_rec = ttk.Button(bt, text="Novo código de recuperação", command=novo_codigo)
         b_rec.pack(side="left")
+        def alternar_multiplos():
+            """Muda a resposta 'tenho mais computadores': SIM libera até MAX_PC, NÃO limita a 1."""
+            novo = not self.cofre.pcs_multiplos()
+            if novo:
+                if not messagebox.askyesno("Mais computadores", f"Liberar até {MAX_PC} computadores neste cofre?",
+                                           parent=d):
+                    return
+            elif not messagebox.askyesno("Limitar a 1 computador", "Limitar o cofre a 1 computador?",
+                                         parent=d, perigoso=True):
+                return
+            if not self._confirmar_senha_atual("Alterar limite de computadores"):
+                return
+            try:
+                self.cofre.definir_pcs_multiplos(novo)
+            except ValueError as ex:
+                messagebox.showerror("Computadores autorizados", str(ex), parent=d)
+                return
+            if not self._salvar():
+                self.cofre.meta["pcs_multiplos"] = not novo
+            b_mult.config(text="Limitar a 1 computador" if self.cofre.pcs_multiplos() else "Liberar mais computadores")
+
+        b_mult = ttk.Button(bt, text="Limitar a 1 computador" if self.cofre.pcs_multiplos() else "Liberar mais computadores",
+                            command=alternar_multiplos)
+        b_mult.pack(side="left", padx=8)
         b_des = ttk.Button(bt, text="Desativar", command=desativar, style="Perigo.TButton")
         b_des.pack(side="left", padx=8)
         ttk.Button(bt, text="Fechar", command=d.destroy).pack(side="right")
@@ -13541,8 +14116,9 @@ def main():
                                      "e tente de novo. Nada foi perdido.")
             else:
                 messagebox.showerror("Algo deu errado", "Essa ação falhou e não foi concluída. Seus dados no "
-                                     "cofre não foram alterados por ela.\n\nUm código do erro (sem senhas, "
-                                     "cifrado) foi guardado: menu ⋯ › Diagnóstico.")
+                                     "cofre não foram alterados por ela.\n\nReferência do erro (sem senhas): "
+                                     f"{diag_referencia(valor, tb)}\n\nO detalhe também ficou guardado, cifrado: "
+                                     "menu ⋯ › Diagnóstico › Copiar relatório.")
         except (AttributeError, OSError, RuntimeError, tk.TclError):
             _aviso_fatal("Algo deu errado", "A ação falhou e não foi possível exibir os detalhes.")
     root.report_callback_exception = erro_interno
@@ -13569,7 +14145,8 @@ if __name__ == "__main__":
         raise
     except BaseException:
         diag_registrar(DIAG_NAO_TRATADO, sys.exc_info()[1], sys.exc_info()[2])
-        _aviso_fatal(_NOME_APP, "O cofre encontrou um erro e fechou.\n\nUm código do erro (sem senhas, "
-                     "cifrado) foi guardado; abra o cofre de novo e veja em ⋯ › Diagnóstico. "
+        _aviso_fatal(_NOME_APP, "O cofre encontrou um erro e fechou.\n\nReferência do erro (sem senhas): "
+                     f"{diag_referencia(sys.exc_info()[1], sys.exc_info()[2])}\n\nO detalhe ficou guardado, cifrado: "
+                     "abra o cofre de novo e veja em ⋯ › Diagnóstico. "
                      "Seus dados no cofre.dat não foram alterados.")
         sys.exit(1)

@@ -161,10 +161,10 @@ py -3.13 "%~dp0limpar_artefatos_testes.py" >nul 2>nul
 cd /d "%~dp0"
 rem junta os resultados individuais numa subpasta separada dentro de testes\resultados\.
 if not exist "%~dp0..\resultados" mkdir "%~dp0..\resultados"
-set "PASTA_COMPLETO=%~dp0..\resultados\resultado completo"
+set "PASTA_COMPLETO=%~dp0..\resultados\resultados completos"
 if not exist "%PASTA_COMPLETO%" mkdir "%PASTA_COMPLETO%" >nul 2>nul
 if not exist "%PASTA_COMPLETO%" (
-  echo ERRO: nao foi possivel criar testes\resultados\resultado completo.
+  echo ERRO: nao foi possivel criar testes\resultados\resultados completos.
   set /a FALHAS+=1
   goto :fim
 )
@@ -191,6 +191,11 @@ echo. >> "%TUDO%"
 echo ====== 7/7 testes de compilacao ====== >> "%TUDO%"
 type "%~dp0..\resultados\resultado_cofre_compilado_windows.txt" >> "%TUDO%" 2>nul
 py -3.13 "%~dp0consolidar_resultados.py" >nul
+rem O consolidar_resultados.py ainda pode gravar na pasta antiga "resultado completo": traz tudo para "resultados completos".
+if exist "%~dp0..\resultados\resultado completo\" (
+  move /y "%~dp0..\resultados\resultado completo\*" "%PASTA_COMPLETO%\" >nul 2>nul
+  rmdir "%~dp0..\resultados\resultado completo" >nul 2>nul
+)
 if errorlevel 1 (
   echo ERRO: nao foi possivel consolidar os resultados desta bateria.
   set /a FALHAS+=1
@@ -198,7 +203,7 @@ if errorlevel 1 (
 py -3.13 -X utf8 "%~dp0reunir_erros_compilacao.py"
 if errorlevel 1 set /a FALHAS+=1
 if not exist "%PASTA_COMPLETO%\RESULTADO COMPLETO.txt" (
-  echo ERRO: nao foi possivel gerar testes\resultados\resultado completo\RESULTADO COMPLETO.txt.
+  echo ERRO: nao foi possivel gerar testes\resultados\resultados completos\RESULTADO COMPLETO.txt.
   set /a FALHAS+=1
 )
 exit /b 0
@@ -213,7 +218,7 @@ if exist "%COFRE_TEST_CACHE_DIR%" (
   rmdir "%~dp0..\CACHE" >nul 2>nul
 )
 echo ============================================================
-echo  Rodada concluida. Arquivos individuais em testes\resultados\ e consolidados em "resultado completo"\.
+echo  Rodada concluida. Arquivos individuais em testes\resultados\ e consolidados em "resultados completos"\.
 if "%FALHAS%"=="0" (
   echo  TUDO PASSOU nas 7 baterias; confira os itens [PULADO] da etapa 7 sem executavel compilado.
 ) else (
@@ -221,8 +226,9 @@ if "%FALHAS%"=="0" (
   echo  nem sempre e exato - o que vale e o conteudo do arquivo^).
 )
 echo.
-echo  Resultado completo (arquivos individuais): testes\resultados\resultado completo\RESULTADO COMPLETO.txt
-echo  Resultado por baterias: testes\resultados\resultado completo\resultado_rodar_todos_windows.txt
+echo  Resultado completo (arquivos individuais): testes\resultados\resultados completos\RESULTADO COMPLETO.txt
+echo  Resultado da compilacao: testes\resultados\resultados completos\RESULTADO COMPLETO DE COMPILACAO.txt
+echo  Resultado por baterias: testes\resultados\resultados completos\resultado_rodar_todos_windows.txt
 echo  Resumo: resumo_testes.md  ^|  Log de depuracao: testes\resultados\log_depuracao.txt
 echo  Erros da bateria: logs_de_compilacao\erros de compilação\TODOS_OS_ERROS.txt
 echo ============================================================
