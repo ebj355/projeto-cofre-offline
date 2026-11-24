@@ -71,6 +71,9 @@ if EH_WINDOWS:
 
 def _aviso_fatal(titulo, texto):
     """Mostra um aviso mesmo sem console (pythonw / .exe) e sem Tkinter."""
+    if os.environ.get("COFRE_TESTE_SEM_JANELA_FATAL") == "1":      # só os testes: não prender a bateria esperando um OK
+        print(f"{titulo}\n{texto}", file=sys.stderr)
+        return
     try:
         if EH_WINDOWS:
             ctypes.windll.user32.MessageBoxW(None, str(texto), str(titulo), 0x10)
@@ -5428,6 +5431,31 @@ def _salvar_preferencia_tema(nome):
         raise
 
 
+def apagar_dados_locais(segredo=False):
+    """Apaga o que o programa guarda FORA do cofre, em %LOCALAPPDATA%\\CofreSenhas: a preferência de aparência
+    (sempre) e, com segredo=True, também o segredo local deste computador (pc_local.bin). Remove a pasta se
+    ela ficar vazia. Nunca levanta erro; devolve os nomes do que foi apagado.
+    segredo=False é o padrão de propósito: outro cofre neste computador pode depender desse segredo."""
+    apagados = []
+    alvos = [_caminho_preferencias()] + glob.glob(glob.escape(os.path.join(os.path.dirname(_caminho_preferencias()),
+                                                                           "preferencias-")) + "*.tmp")
+    if segredo:
+        alvos.append(_arquivo_segredo_local())
+    for alvo in alvos:
+        try:
+            if os.path.isfile(alvo):
+                _destruir_um(alvo)
+                apagados.append(os.path.basename(alvo))
+        except OSError:
+            pass
+    for pasta in {os.path.dirname(a) for a in alvos}:
+        try:
+            os.rmdir(pasta)                 # só remove se estiver vazia
+        except OSError:
+            pass
+    return apagados
+
+
 TONS = ("#6c63ff", "#22a6c9", "#2fbf71", "#e3a03a", "#e0568f", "#9a6bff", "#3d8bfd", "#f07a3c",
         "#20b2a0", "#e05561")
 
@@ -8966,6 +8994,7 @@ class App:
                         try:
                             restam_f = gastar_tentativa_arquivo(self.caminho)
                         except CofreDestruido:
+                            apagar_dados_locais()          # a preferência de cor também não pode sobrar
                             messagebox.showerror("Cofre destruído", "Limite de tentativas atingido. O cofre foi apagado.")
                             self.mostrar_inicio()
                             return
@@ -8995,6 +9024,7 @@ class App:
                 return
             except CofreDestruido:
                 self._ocupado(False)
+                apagar_dados_locais()                      # a preferência de cor também não pode sobrar
                 messagebox.showerror("Cofre destruído",
                                      "Limite de tentativas atingido. O cofre foi apagado.")
                 self.mostrar_inicio()

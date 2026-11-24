@@ -615,6 +615,18 @@ O instalador localiza esta pasta pela raiz do projeto e reaproveita seu conteudo
                     Erro "O apagamento foi impedido; ainda restam arquivos do cofre. Feche o CofreSenhas e rode novamente."
                     return
                 }
+                # O programa também guarda, FORA do pendrive, a preferência de cor e o segredo local deste computador.
+                # "Apagar tudo" tem de levar isso junto, senão o cofre novo herda configurações do antigo.
+                if ($env:LOCALAPPDATA) {
+                    $dadosLocais = Join-Path $env:LOCALAPPDATA 'CofreSenhas'
+                    if (Test-Path -LiteralPath $dadosLocais) {
+                        try {
+                            Remove-Item -LiteralPath $dadosLocais -Recurse -Force -ErrorAction Stop
+                            Ok "configurações deste computador apagadas ($dadosLocais): cor escolhida e segredo local"
+                            Info "Se outro cofre neste computador usa o reforço de 'computador autorizado', ele passa a pedir o código de recuperação."
+                        } catch { Info "aviso: não consegui apagar $dadosLocais (apague essa pasta manualmente)." }
+                    }
+                }
                 Ok "cofre antigo APAGADO: você vai criar um cofre novo, do zero, quando abrir o programa"
             } else { Info "Cancelado: o cofre foi MANTIDO." }
         } else { Info "O cofre atual foi mantido; só o programa será atualizado." }

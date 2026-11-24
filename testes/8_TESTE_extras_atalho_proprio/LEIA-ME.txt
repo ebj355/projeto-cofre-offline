@@ -1,0 +1,24 @@
+PASTA 8 - TESTES EXTRAS (atalho proprio)
+
+Estes testes NAO entram no "2 - TESTAR TUDO". Rode-os por aqui:
+  RODAR ESTA PASTA - testes extras.bat            (dois cliques)
+
+O que tem:
+  teste_gui_integridade_ao_entrar.py   a janela "Verificar integridade do cofre" abre sozinha ao desbloquear,
+                                       so le o arquivo, nao abre quando desligada e avisa de copia danificada.
+  14_COBERTURA_DO_CODIGO.py            quanto do cofre_senhas.py os testes do nucleo executam (lento; so informa).
+
+A pasta pode ficar em qualquer lugar dentro do projeto: o atalho sobe ate achar o cofre_senhas.py.
+O atalho cria um ambiente TEMPORARIO com as bibliotecas do requirements-test-lock.txt (usa a pasta pacotes\ se houver
+wheels nela; senao baixa, sempre conferindo hash) e o apaga no fim. Nada e instalado no seu Python.
+
+Argumentos do .bat:
+  COBERTURA        roda o teste de integridade e a cobertura, sem perguntar
+  SO-INTEGRIDADE   roda so o teste de integridade
+
+Relatorios basicos e individuais: testes\resultados\.
+O consolidado principal fica em testes\resultados\resultado_testes_extras.txt e tambem e copiado para
+testes\resultados\resultados completos\RESULTADO COMPLETO - TESTES EXTRAS.txt.
+
+Atencao: como o Testar Tudo nao chama esta pasta, o teste de integridade ao entrar so roda quando voce o pedir.
+Antes de uma versao final, rode este atalho tambem.
