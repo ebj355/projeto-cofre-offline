@@ -37,7 +37,7 @@ os.environ["LOCALAPPDATA"] = os.path.join(W, "vazio")
 ok(c.info_pc(p) == (True, False), "identidade certa sem o segredo local: NÃO abre")
 v = abre(p, recuperacao=cod); ok(len(v.registros) == 1, "o código de recuperação abre mesmo assim"); v.fechar()
 # autorizar o computador sem reforço (básico) no outro usuário
-em("A", "outro"); v = abre(p, recuperacao=cod); v.pc_adicionar("Casa (outro usuário)", local=False); v.salvar()
+em("A", "outro"); v = abre(p, recuperacao=cod); v.definir_pcs_multiplos(True); v.pc_adicionar("Casa (outro usuário)", local=False); v.salvar()
 ok(v.pc_nivel_deste() == "basico", "autorizado SEM reforço: nível básico"); v.fechar()
 em("A", "outro"); v = abre(p); ok(len(v.registros) == 1, "abre no básico"); v.fechar()
 em("A", "eu"); v = abre(p); ok(v.pc_nivel_deste() == "local", "o usuário reforçado continua abrindo"); v.fechar()

@@ -2,7 +2,7 @@
 @echo off
 rem Define COFRE_EXE. Procura, nesta ordem: variavel COFRE_EXE, argumento (arquivo ou pasta), COFRE_USB_DRIVE,
 rem a PROPRIA pasta deste script (testes\7_TESTE_de_compilacao), a raiz do projeto, a raiz do drive e as pastas
-rem CofreSenhas. Se nao achar e ninguem estiver automatizando (COFRE_AUTO nao definido), PERGUNTA onde esta o
+rem CofreSenhas, a pasta de compilacao do projeto e a raiz de cada unidade D: a Z:. Se nao achar e ninguem estiver automatizando (COFRE_AUTO nao definido), PERGUNTA onde esta o
 rem arquivo: arraste o CofreSenhas.exe para a janela e aperte Enter. Enter sem nada = pular.
 if defined COFRE_PULAR_EXE set "COFRE_EXE="
 if defined COFRE_PULAR_EXE goto :fim
@@ -16,6 +16,10 @@ call :tentar "%~dp0..\..\CofreSenhas"
 call :tentar "%~d0\"
 call :tentar "%CD%"
 call :tentar "%CD%\CofreSenhas"
+rem o .exe recem-compilado fica na pasta de compilacao do projeto (cache permanente)
+call :tentar "%~dp0..\..\CACHE_PROJETO_NAO_MEXER\compilacao"
+rem o .exe instalado no pendrive/disco: procura na raiz de cada letra de unidade existente (D: a Z:)
+for %%D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do if not defined COFRE_EXE if exist "%%D:\CofreSenhas.exe" call :tentar "%%D:\"
 if defined COFRE_EXE goto :fim
 if defined COFRE_AUTO goto :fim
 if defined COFRE_NAO_PERGUNTAR goto :fim

@@ -66,7 +66,7 @@ def novo_no_form():
     ok(any(cb.get() == "Mãe" for cb in combos), "formulário já vem com a pessoa escolhida (Mãe)")
     ents = todos(d, "TEntry"); ents[0].insert(0, "Unimed da mãe")
     _foto(os.path.join(W, "form.png"))
-    [b for b in todos(d, "TButton") if b.cget("text") == "Salvar"][0].invoke()
+    [b for b in todos(d, "TButton") if str(b.cget("text")).startswith("Salvar")][0].invoke()   # hoje o botão é "Salvar item"
 root.after(700, novo_no_form); app.novo()
 t0 = time.time()
 while time.time() - t0 < 1.5: root.update(); time.sleep(0.02)

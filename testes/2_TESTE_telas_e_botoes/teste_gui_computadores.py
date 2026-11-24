@@ -2,6 +2,7 @@
 """Interface (Tk): janela 'Computadores autorizados', ranking com o item do computador e tela de desbloqueio em um
 computador NÃO autorizado (pede o código de recuperação, sem gastar tentativa). Computadores simulados."""
 import os, sys, tempfile, hashlib
+os.environ.setdefault("COFRE_SEM_VERIFICACAO_INICIAL", "1")   # sem a tela de integridade (modal) ao desbloquear
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
 import tkinter as tk
 import cofre_senhas as c
@@ -62,7 +63,8 @@ pts1, _, it1 = c.nivel_protecao(app.cofre.modo, app.cofre.m, app.cofre.fido, app
 ok(pts1 == pts0 + 10 and any(a == "pc" and ativo for _, _, ativo, a in it1), "ranking sobe 10 pontos")
 ok(c.info_pc(P) == (True, True), "arquivo gravado: exige e está autorizado")
 # segundo computador
-em("B"); app.cofre.pc_adicionar("Outro"); root.update()
+em("B"); app.cofre.definir_pcs_multiplos(True)      # regra nova: 1 PC até liberar "mais computadores"
+app.cofre.pc_adicionar("Outro"); root.update()
 d.destroy(); root.update()
 app.gerenciar_computadores(); root.update(); d = topo()
 lista = next(x for x in todos(d) if x.winfo_class() == "Treeview")

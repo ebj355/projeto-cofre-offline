@@ -94,7 +94,7 @@ def adicionar_credencial(d_, nome):
         return False
     seletor.set(nome)
     next(w for w in todos(d_) if w.winfo_class() == "TButton"
-         and str(w.cget("text")) == "+ Adicionar").invoke()
+         and str(w.cget("text")).startswith("+ Adicionar")).invoke()
     d_.update()
     return True
 
@@ -116,18 +116,29 @@ cg = [w for w in todos(nd) if w.winfo_class() == "TCombobox" and w.winfo_ismappe
 ok(len(cg) >= 1 and "＋ Criar novo grupo…" in list(cg[0].cget("values")), "grupo visível, com a opção '＋ Criar novo grupo…'")
 cg[0].set("＋ Criar novo grupo…"); cg[0].event_generate("<<ComboboxSelected>>"); root.update()
 ok(cg[0].get() == "", "criar novo grupo limpa o campo para o usuário escrever o nome que quiser")
-status_bt = next(w for w in todos(nd) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Em uso")
-status_bt.invoke(); root.update()
-ok(str(status_bt.cget("text")) == "Inativa", "estado Em uso/Inativa pode ser alternado")
+ok(not any(w.winfo_class() == "TButton" and str(w.cget("text")) in ("Ativa", "Desativada") and w.winfo_ismapped()
+           for w in todos(nd)), "item NOVO nasce Ativa, sem botão de estado (só a edição permite desativar)")
 servico = next(w for w in todos(nd) if w.winfo_class() == "TEntry" and w.winfo_ismapped())
 servico.insert(0, "Item desativado de teste")
-next(w for w in todos(nd) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Salvar").invoke()
+next(w for w in todos(nd) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Salvar item").invoke()
+root.update()
+salvo = next((r for r in app.cofre.registros if r.get("servico") == "Item desativado de teste"), None)
+ok(salvo is not None and salvo.get("ativo") is not False, "item novo é gravado como Ativa")
+# editar: aqui o botão de estado existe (Ativa <-> Desativada)
+app.dialogo_registro(salvo); root.update(); root.update()
+ed = tops(root)[-1]
+status_bt = next((w for w in todos(ed) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Ativa" and w.winfo_ismapped()), None)
+ok(status_bt is not None, "na edição aparece o botão de estado 'Ativa'")
+if status_bt is not None:
+    status_bt.invoke(); root.update()
+ok(status_bt is not None and str(status_bt.cget("text")) == "Desativada", "estado Ativa/Desativada pode ser alternado")
+next(w for w in todos(ed) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Salvar item").invoke()
 root.update()
 salvo = next((r for r in app.cofre.registros if r.get("servico") == "Item desativado de teste"), None)
 ok(salvo is not None and salvo.get("ativo") is False, "estado desativado é persistido ao salvar")
 if salvo is not None:
     app.tree.selection_set(salvo["id"]); app._montar_detalhe(); root.update()
-ok(any("Inativa" in t for t in textos(app.detalhe)), "estado inativo fica visível nos detalhes do item")
+ok(any("Desativada" in t for t in textos(app.detalhe)), "estado desativado fica visível nos detalhes do item")
 legado = dict(salvo or {}); legado.pop("ativo", None)
 ok(c._item_ativo(legado), "itens antigos sem estado salvo continuam ativos")
 fecha(root)

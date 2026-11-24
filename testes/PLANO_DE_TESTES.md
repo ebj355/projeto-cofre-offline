@@ -60,6 +60,7 @@ Windows. Windows 11 ARM64 pode usar o executável x64 sob emulação; build nati
 | TC21 | Vetores criptográficos publicados | Alta | comparar AES-GCM, ChaCha20-Poly1305, HKDF e Argon2id com vetores publicados e decifrar um cofre real independentemente | `teste_nucleo_vetores_publicados.py` |
 | TC22 | Importação de formatos reais | Alta | ler arquivos fictícios no formato Chrome/Edge, Firefox, Bitwarden, LastPass, 1Password, KeePassXC, Excel/LibreOffice e CSV aleatórios | `teste_nucleo_importacao_formatos_reais.py` |
 | TC23 | Marcas e autocompletar offline | Média | resolver aliases sem sobrescrever marcas existentes, ignorar destinos inválidos e gerar ícones locais sem rede | `teste_autocompletar.py`, `teste_icones.py` |
+| TC24 | Verificação de integridade ao entrar | Alta | desbloquear pela tela: a janela de integridade abre sozinha e mostra o arquivo principal íntegro; o arquivo do cofre não muda (mesmo hash); com `COFRE_SEM_VERIFICACAO_INICIAL=1` ela não abre; cópia `.bak1` danificada mostra DANIFICADA e PROBLEMA sem derrubar o programa | `teste_gui_integridade_ao_entrar.py` (pasta 2; escrito, ainda não executado no Windows) |
 
 ## Rastreabilidade e lacunas
 Todo risco R1–R7 tem mitigação ou teste, mas nem todos têm automação. **Lacunas abertas:** smoke do `.exe`, instalação em

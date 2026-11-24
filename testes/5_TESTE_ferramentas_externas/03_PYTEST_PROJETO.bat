@@ -28,7 +28,7 @@ if errorlevel 1 (
 )
 set "CACHE_PROPRIO="
 if not defined COFRE_TEST_CACHE_DIR (
-  for %%I in ("%~dp0..\CACHE\_cache_pytest_%RANDOM%_%RANDOM%") do set "COFRE_TEST_CACHE_DIR=%%~fI"
+  for %%I in ("%~dp0..\..\CACHE_PROJETO_NAO_MEXER\testes\_cache_pytest_%RANDOM%_%RANDOM%") do set "COFRE_TEST_CACHE_DIR=%%~fI"
   set "CACHE_PROPRIO=1"
 )
 if defined CACHE_PROPRIO (
@@ -60,7 +60,6 @@ if defined CACHE_PROPRIO if exist "%COFRE_TEST_CACHE_DIR%" (
     echo ERRO: nao consegui remover o cache temporario %COFRE_TEST_CACHE_DIR%.>> "%LOG%"
     set "RC=1"
   )
-  rmdir "%~dp0..\CACHE" >nul 2>nul
 )
 echo.>> "%LOG%"
 echo Codigo de saida: %RC%>> "%LOG%"

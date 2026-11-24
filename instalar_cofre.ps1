@@ -14,8 +14,8 @@
 #  No pendrive, NADA do cofre fica no disco do Windows (C:): nem a compilação, nem o programa,
 #  nem os arquivos que o programa descompacta ao abrir.
 #  Reaproveitamento: o ambiente (Python virtual, Zig, ferramentas) é refeito do zero a cada execução, a partir de
-#  arquivos conferidos por hash. Só sobrevive entre execuções a pasta _cb_cache (downloads conferidos por hash e o
-#  resultado parcial da compilação), para a instalação seguinte ser rápida e para uma falha NÃO recomeçar do zero.
+#  arquivos conferidos por hash. Só sobrevive entre execuções a pasta CACHE_PROJETO_NAO_MEXER, na raiz deste projeto
+#  (downloads conferidos por hash, caches do Zig/Nuitka e resultado parcial da compilação).
 #  Pode ser executado com dois cliques no 1 - INSTALAR O COFRE - compila e instala.bat
 # ============================================================================
 
@@ -232,7 +232,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     Write-Host "INSTALADOR DO ARCA — COFRE DE SEGURANÇA" -ForegroundColor Cyan
     Write-Host "Não feche esta janela. A 1ª compilação leva de 5 a 20 minutos; as seguintes são bem mais rápidas." -ForegroundColor Cyan
     Write-Host "Se algo falhar, é só rodar de novo: o que já foi baixado e compilado fica guardado e é aproveitado." -ForegroundColor Cyan
-    Write-Host "A cada 15 segundos a compilação mostra que está viva (tempo, uso do processador)." -ForegroundColor Cyan
+    Write-Host "A cada 5 segundos a compilação mostra que está viva, a fase atual e o tempo restante." -ForegroundColor Cyan
     # MODO TESTE (opt-in, NUNCA ligado por padrão): só existe para testar em máquina virtual/Sandbox descartável,
     # onde quem aperta ENTER e quem "entregou" o arquivo são a MESMA pessoa -- aí as perguntas de segurança (pasta,
     # SIM, SHA-256) não defendem contra ninguém, só atrasam o teste. Numa instalação de verdade (pendrive, PC do
@@ -486,23 +486,26 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     # Compilação dentro do pendrive, numa pasta de nome CURTO na raiz: o compilador C tem arquivos de nome
     # muito comprido, e caminhos longos passam do limite de 260 caracteres do Windows.
     $base = "$raizObra\_cb"
+    function Remover-Pasta-Rapida([string]$pasta) {
+        if (-not (Test-Path -LiteralPath $pasta)) { return }
+        $pai = Split-Path -Parent $pasta
+        $lixo = Join-Path $pai ("_cb_lixo_" + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
+        try { Rename-Item -LiteralPath $pasta -NewName (Split-Path -Leaf $lixo) -ErrorAction Stop } catch { $lixo = $pasta }
+        try {
+            $cmd = Join-Path $env:SystemRoot 'System32\cmd.exe'
+            Start-Process -FilePath $cmd -ArgumentList '/d', '/c', ('rmdir /s /q "{0}"' -f $lixo) -WindowStyle Hidden -ErrorAction SilentlyContinue
+        } catch {}
+    }
     $velha = Join-Path $destino '_compilacao'
     if (Test-Path $velha) { Remove-Item $velha -Recurse -Force -ErrorAction SilentlyContinue }
     # A pasta _cb (ambiente virtual, zig.exe, módulos e cópias dos fontes) é apagada por inteiro e refeita a cada vez:
     # um .exe, zig.exe ou módulo Python plantado ali nunca é executado nem embutido no programa.
-    # O que fica entre execuções está em _cb_cache e só tem o que é conferido por hash (downloads do pip),
+    # O que fica entre execuções está em CACHE_PROJETO_NAO_MEXER e só tem o que é conferido por hash (downloads do pip),
     # o cache do compilador (endereçado pelo conteúdo) e o resultado parcial da compilação.
     if (Test-Path $base) {
-        Info "Apagando a pasta de compilação anterior ($base): nada dela é reaproveitado..."
-        # Achado real (rodada 2026-11-13, Sandbox limpa): logo depois do instalador do Python sair (mesmo após o
-        # UAC ser aceito), o processo dele ainda pode levar alguns segundos para soltar o handle de um arquivo
-        # dentro de _cb (instalador msi/exe filho ainda finalizando, ou antivírus varrendo o Python recém-instalado).
-        # Por isso repete por até ~10s antes de desistir, em vez de falhar na primeira tentativa.
-        for ($t = 0; $t -lt 5 -and (Test-Path $base); $t++) {
-            Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue
-            if (Test-Path $base) { Start-Sleep -Seconds 2 }
-        }
-        if (Test-Path $base) { Erro "Não consegui apagar $base (algum programa ainda está usando, mesmo repetindo por alguns segundos). Feche tudo, reinicie o PC e rode de novo."; return }
+        Info "Preparando uma pasta de compilacao limpa: a antiga sera renomeada agora e removida em segundo plano."
+        Remover-Pasta-Rapida $base
+        if (Test-Path $base) { Erro "Nao consegui liberar $base rapidamente. Feche o programa que esta usando a pasta e rode novamente."; return }
     }
     try { New-Item -ItemType Directory -Path $base -Force -ErrorAction Stop | Out-Null }
     catch { Erro "Não consegui criar $base : $($_.Exception.Message)"; return }
@@ -513,10 +516,41 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     # quem souber mostrar arquivos de sistema ainda os vê, e a defesa de verdade continua sendo o
     # BitLocker do pendrive e a conferência de hash de cada arquivo usado na compilação.
     try { $pasta = Get-Item $base -Force; $pasta.Attributes = $pasta.Attributes -bor [IO.FileAttributes]::Hidden -bor [IO.FileAttributes]::System } catch {}
-    $cache = "$raizObra\_cb_cache"
-    $obra = Join-Path $cache 'obra'
-    foreach ($d in 'pip', 'zig', 'nk', 'obra') { try { New-Item -ItemType Directory -Path (Join-Path $cache $d) -Force -ErrorAction Stop | Out-Null } catch {} }
-    try { $pc = Get-Item $cache -Force; $pc.Attributes = $pc.Attributes -bor [IO.FileAttributes]::Hidden -bor [IO.FileAttributes]::System } catch {}
+    $cache = Join-Path $PSScriptRoot 'CACHE_PROJETO_NAO_MEXER'
+    $obra = Join-Path $cache 'compilacao'
+    foreach ($d in 'pip', 'zig', 'nuitka', 'compilacao', 'testes') { try { New-Item -ItemType Directory -Path (Join-Path $cache $d) -Force -ErrorAction Stop | Out-Null } catch {} }
+    try {
+        Set-Content -LiteralPath (Join-Path $cache 'LEIA-ME - NAO MEXER.txt') -Value @'
+ATENCAO: ESTA PASTA E GERADA PELO INSTALADOR.
+NAO APAGUE, NAO MOVA, NAO RENOMEIE E NAO ALTERE SEUS ARQUIVOS.
+Ela guarda o cache permanente do pip, Zig, Nuitka e da compilacao parcial.
+O instalador localiza esta pasta pela raiz do projeto e reaproveita seu conteudo.
+'@ -Encoding UTF8
+        $pc = Get-Item $cache -Force
+        $pc.Attributes = $pc.Attributes -bor [IO.FileAttributes]::Hidden -bor [IO.FileAttributes]::System
+    } catch {}
+    # Migra cache antigo do _cb_cache da unidade somente uma vez, sem deixar outro cache ativo.
+    $cacheAntigo = "$raizObra\_cb_cache"
+    if ((Test-Path -LiteralPath $cacheAntigo -PathType Container) -and (Get-Item -LiteralPath $cacheAntigo -Force).FullName -ne (Get-Item -LiteralPath $cache -Force).FullName) {
+        foreach ($mig in @(@('pip','pip'), @('zig','zig'), @('nk','nuitka'), @('obra','compilacao'))) {
+            $origemMig = Join-Path $cacheAntigo $mig[0]
+            $destinoMig = Join-Path $cache $mig[1]
+            if (Test-Path -LiteralPath $origemMig) {
+                try { Get-ChildItem -LiteralPath $origemMig -Force -ErrorAction Stop | Copy-Item -Destination $destinoMig -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+            }
+        }
+        foreach ($arquivoMig in @('obra.chave', 'ultima_duracao_s.txt')) {
+            $origemMig = Join-Path $cacheAntigo $arquivoMig
+            if (Test-Path -LiteralPath $origemMig) {
+                try { Copy-Item -LiteralPath $origemMig -Destination (Join-Path $cache $arquivoMig) -Force -ErrorAction SilentlyContinue } catch {}
+            }
+        }
+        $semAssAntiga = Join-Path $cacheAntigo 'sem_assinatura'
+        if (Test-Path -LiteralPath $semAssAntiga -PathType Container) {
+            try { Get-ChildItem -LiteralPath $semAssAntiga -Force -ErrorAction Stop | Copy-Item -Destination (Join-Path $cache 'compilacao') -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+        }
+        try { Remove-Item -LiteralPath $cacheAntigo -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+    }
     function Limpar-Obra { Get-ChildItem -LiteralPath $obra -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }
     $logsDir = Join-Path $destino 'logs'
     $log = Join-Path $base 'log.txt'
@@ -524,7 +558,7 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     $erroNk = Join-Path $base 'nuitka-erros.txt'
     $okFinal = $false
     try {   # tudo daqui até o fim: o 'finally' apaga a pasta de compilação e guarda só o LOG no pendrive
-    $env:NUITKA_CACHE_DIR = Join-Path $cache 'nk'
+    $env:NUITKA_CACHE_DIR = Join-Path $cache 'nuitka'
     $env:ZIG_GLOBAL_CACHE_DIR = Join-Path $cache 'zig'
     $env:ZIG_LOCAL_CACHE_DIR = Join-Path $cache 'zig\l'
     # arquivos temporários da instalação e da compilação também ficam no pendrive
@@ -538,7 +572,10 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     # Apagar exige digitar a palavra APAGAR; qualquer outra resposta mantém o cofre. Nada é apagado sem isso.
     if (Test-Path -LiteralPath $destino) { [void](Revelar-Apoio $destino) }   # arquivos de uma instalação anterior estão ocultos e somente leitura: libera para atualizar
     $arqsCofre = @(Get-ChildItem -LiteralPath $destino -Force -File -ErrorAction SilentlyContinue |
-                   Where-Object { $_.Name -like 'cofre.dat*' -or $_.Name -eq 'avisos_vistos.json' })
+                   Where-Object {
+                       $_.Name -like 'cofre.dat*' -or $_.Name -like '*.key' -or
+                       $_.Name -eq 'avisos_vistos.json' -or $_.Name -eq 'instalacao_detalhada.log'
+                   })
     if ($arqsCofre.Count -gt 0) {
         Write-Host ""
         Write-Host "   Já existe um cofre em $destino ($($arqsCofre.Count) arquivo(s): cofre, cópias de segurança e registro)." -ForegroundColor Yellow
@@ -549,15 +586,33 @@ function Instalar-Cofre([string]$LetraPedida = '') {
             Write-Host "   Isso apaga TODAS as suas senhas guardadas neste cofre. Se tem backup, ótimo; se não tem, pare agora." -ForegroundColor Red
             $confZero = Read-Host "   Para confirmar digite a palavra APAGAR (qualquer outra coisa mantém o cofre)"
             if (Confirmar-PalavraApagar $confZero) {
+                $processosCofre = @(Get-Process -Name 'CofreSenhas' -ErrorAction SilentlyContinue)
+                if ($processosCofre.Count -gt 0) {
+                    Erro "Feche TODAS as janelas do CofreSenhas antes de apagar os dados. O processo ainda está aberto e pode recriar o cofre."
+                    return
+                }
                 $faltou = @()
                 foreach ($arq in $arqsCofre) {
                     try {
-                        if ($arq.Length -gt 0 -and $arq.Length -lt 4MB) { [IO.File]::WriteAllBytes($arq.FullName, (New-Object byte[] ([int]$arq.Length))) }   # sobrescreve com zeros
+                        if ($arq.Length -gt 0 -and $arq.Length -lt 4MB) { [IO.File]::WriteAllBytes($arq.FullName, (New-Object byte[] ([int]$arq.Length))) }
                     } catch {}
                     try { Remove-Item -LiteralPath $arq.FullName -Force -ErrorAction Stop } catch { $faltou += $arq.Name }
                 }
+                foreach ($nomePasta in @('.tmp_cofre', 'cofre.dat.danificado')) {
+                    $pastaApagar = Join-Path $destino $nomePasta
+                    if (Test-Path -LiteralPath $pastaApagar) {
+                        try { Remove-Item -LiteralPath $pastaApagar -Recurse -Force -ErrorAction Stop }
+                        catch { $faltou += $nomePasta }
+                    }
+                }
                 if ($faltou.Count -gt 0) {
-                    Erro "Não consegui apagar: $($faltou -join ', '). Feche o cofre (e o antivírus que estiver lendo o pendrive) e rode de novo."
+                    Erro "Não consegui apagar: $($faltou -join ', '). Feche o cofre e o antivírus que estiver lendo o destino e rode de novo."
+                    return
+                }
+                $sobras = @(Get-ChildItem -LiteralPath $destino -Force -File -ErrorAction SilentlyContinue |
+                             Where-Object { $_.Name -like 'cofre.dat*' -or $_.Name -like '*.key' -or $_.Name -eq 'avisos_vistos.json' })
+                if ($sobras.Count -gt 0) {
+                    Erro "O apagamento foi impedido; ainda restam arquivos do cofre. Feche o CofreSenhas e rode novamente."
                     return
                 }
                 Ok "cofre antigo APAGADO: você vai criar um cofre novo, do zero, quando abrir o programa"
@@ -727,6 +782,9 @@ function Instalar-Cofre([string]$LetraPedida = '') {
     if (-not $osArq) { $osArq = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE } }
     $hostArm = (Test-ArquiteturaArm $osArq)
     function Achar-Python([string]$exigir) {
+        # py.exe escreve 'No suitable Python runtime found' no stderr quando a versão pedida não existe; sem isto o
+        # Windows PowerShell 5.1 mostra isso como erro vermelho (NativeCommandError) mesmo com 2>$null. Vale só nesta função.
+        $ErrorActionPreference = 'SilentlyContinue'
         $cands = @()
         $py = Get-Command py.exe -ErrorAction SilentlyContinue
         if ($py) {
@@ -872,7 +930,7 @@ nuitka==4.3.5 --hash=sha256:ca1dabc274b95efa7a46597f464ec27484b30f32cb89872d14d6
     @'
 ziglang==0.16.0 --hash=sha256:089a16a4eb5a2f45151993342f8fabad24ff1a0723dc146642895c29208a3939 --hash=sha256:e44a5271f7b72f7980017bb615823ed52e765f96b6482d93a2fd338cd53101bf
 '@ | Set-Content -Path $reqZig -Encoding ASCII
-    # --cache-dir: os arquivos baixados ficam em _cb_cache\pip (e continuam sendo conferidos por hash a cada uso).
+    # --cache-dir: os arquivos baixados ficam em CACHE_PROJETO_NAO_MEXER\pip (e continuam sendo conferidos por hash a cada uso).
     $pip = @('-I', '-m', 'pip', 'install', '--progress-bar', 'off', '--disable-pip-version-check', '--isolated', '--require-hashes', '--no-deps',
              '--retries', '5', '--timeout', '60', '--cache-dir', (Join-Path $cache 'pip'))
     function Pip-Tentar([string[]]$resto, [string]$oque) {
@@ -1003,7 +1061,7 @@ print(a)
         '--include-package=openpyxl', '--include-package=defusedxml', '--include-package=PIL',
         '--include-module=fido2.client.windows', '--include-module=fido2.client.win_api', '--include-package-data=fido2',
         '--onefile-no-compression', '--lto=no', '--python-flag=no_docstrings', "--jobs=$jobs",
-        '--onefile-tempdir-spec={TEMP}\CofreSenhas_em_uso_{PID}_{TIME}',
+        '--onefile-tempdir-spec={PROGRAM_BASE}\CofreSenhas_em_uso_{PID}_{TIME}',
         '--noinclude-data-files=tcl/tzdata', '--noinclude-data-files=tcl/msgs', '--noinclude-data-files=tk/msgs',
         ('--output-dir=' + (Q $obra)), '--output-filename=CofreSenhas.exe',
         ('--windows-icon-from-ico=' + (Q $ico)),
@@ -1012,9 +1070,11 @@ print(a)
         (Q $fonteCopia)
     )
     # Compilação incremental: se o Nuitka, o Zig, o Python ou as opções são os mesmos da vez anterior, o que já foi
-    # compilado em _cb_cache\obra é reaproveitado (só o que mudou é recompilado). Se algo mudou, começa limpo.
+    # compilado em CACHE_PROJETO_NAO_MEXER\compilacao é reaproveitado (só o que mudou é recompilado). Se algo mudou, começa limpo.
     $zigVer = (& $zigExe version 2>&1 | Out-String).Trim()
-    $textoOpcoes = (@($args_nk | Where-Object { "$_" -notlike '--jobs=*' }) -join ' ')
+    # A versão do cofre (--file-version/--product-version) muda a cada atualização; fica FORA da chave para não apagar
+    # o cache incremental (CACHE_PROJETO_NAO_MEXER\compilacao) toda vez que só o cofre_senhas.py mudou.
+    $textoOpcoes = (@($args_nk | Where-Object { "$_" -notlike '--jobs=*' -and "$_" -notlike '--file-version=*' -and "$_" -notlike '--product-version=*' }) -join ' ')
     $chaveObra = "$nuitkaVer|zig $zigVer|$versao|$plat|$textoOpcoes"
     $arqChave = Join-Path $cache 'obra.chave'
     $chaveVelha = if (Test-Path -LiteralPath $arqChave) { "$(Get-Content -LiteralPath $arqChave -Raw -ErrorAction SilentlyContinue)".Trim() } else { '' }
@@ -1060,7 +1120,7 @@ print(a)
         } catch { return @() }
     }
     $jobsInicial = $jobs
-    # Estimativa de tempo restante da Etapa 5, guardada em _cb_cache (sobrevive entre instalações) para virar uma
+    # Estimativa de tempo restante da Etapa 5, guardada em CACHE_PROJETO_NAO_MEXER (sobrevive entre instalações) para virar uma
     # contagem REGRESSIVA em vez de só "tempo decorrido" (pedido do usuário 2026-11-13: mostrar quanto falta,
     # não só quanto já passou). Sem histórico (1ª vez), usa 600s (10 min) como chute inicial, dentro da faixa
     # documentada de 5 a 20 minutos. É só uma estimativa: se passar do previsto, a tela avisa e conta para cima.
@@ -1101,15 +1161,26 @@ print(a)
         if ($faltam -gt 5) { "faltam uns {0} min (estimativa)" -f [math]::Ceiling($faltam / 60) }
         else { "já passou da estimativa de $([math]::Round($estimativaS / 60, 1)) min: pode ser a etapa final (mais lenta e muda)" }
     }
+    $faseAtual = 'Preparando o código Python'
+    function Atualizar-Fase([string[]]$linhas) {
+        foreach ($linha in ($linhas | Select-Object -Last 40)) {
+            $txtLinha = "$linha"
+            if ($txtLinha -match 'Onefile|onefile|bootstrap|Keeping (onefile|dist|build)|Postprocessing|Adding 1 icon') { $faseAtual = 'Montando o arquivo único final' }
+            elseif ($txtLinha -match 'linking|link com|Linking') { $faseAtual = 'Linkando o executável final' }
+            elseif ($txtLinha -match 'C compilation|C compiler|Scons|Running C|Backend C') { $faseAtual = 'Compilando o código C com o Zig' }
+            elseif ($txtLinha -match 'Generating source|C backend|data composer|constant value') { $faseAtual = 'Gerando e preparando o código C' }
+            elseif ($txtLinha -match 'Completed Python|Starting Python|Python compilation|optimization') { $faseAtual = 'Otimizando e compilando o código Python' }
+        }
+        return $faseAtual
+    }
     while (-not $proc.WaitForExit(5000)) {
         $tique++
         $decorridoS = $inicioNk.Elapsed.TotalSeconds
         $min = [math]::Floor($inicioNk.Elapsed.TotalMinutes); $seg = $inicioNk.Elapsed.Seconds
+        $novasPulso = @((Novas-Linhas $saidaNk $pos 'o') + (Novas-Linhas $erroNk $pos 'e'))
+        if ($novasPulso.Count -gt 0) { $faseAtual = Atualizar-Fase $novasPulso }
         if ($tique % 3 -ne 0) {
-            # Pulso leve a cada ~5s: só para garantir que a tela NUNCA fique mais de 5s sem nenhuma linha
-            # nova (evita a sensação de travamento). O diagnóstico completo (CPU, saída do Nuitka, detecção
-            # de travamento de verdade) continua vindo a cada ~15s, exatamente como antes, logo abaixo.
-            Write-Host ("   ainda compilando{0} ({1} min {2:00} s decorridos — {3})" -f $giro[$tique % 3], $min, $seg, (Texto-Faltam $decorridoS)) -ForegroundColor DarkGray
+            Write-Host ("   [COMPILANDO{0}] {1} | {2} min {3:00} s | {4}" -f $giro[$tique % 3], $faseAtual, $min, $seg, (Texto-Faltam $decorridoS)) -ForegroundColor DarkGray
             continue
         }
         $c = Cpu-Arvore $proc.Id
@@ -1117,12 +1188,14 @@ print(a)
         if ($c.cpu -gt $melhorCpu) { $melhorCpu = $c.cpu }
         $ultimosPids = $c.pids
         if ($ativo) { $semAtividade = 0 } else { $semAtividade++ }
-        foreach ($linha in @((Novas-Linhas $saidaNk $pos 'o') + (Novas-Linhas $erroNk $pos 'e') | Select-Object -Last 25)) { Write-Host "   | $linha" -ForegroundColor DarkGray }
+        $novasDetalhe = @((Novas-Linhas $saidaNk $pos 'o') + (Novas-Linhas $erroNk $pos 'e'))
+        if ($novasDetalhe.Count -gt 0) { $faseAtual = Atualizar-Fase $novasDetalhe }
+        foreach ($linha in @($novasDetalhe | Select-Object -Last 25)) { Write-Host "   | $linha" -ForegroundColor DarkGray }
         $estado = if ($semAtividade -ge 40) { 'SEM ATIVIDADE HÁ 10 MIN: provável travamento real (veja o antivírus)' }
                   elseif ($semAtividade -ge 8) { "sem atividade há $([math]::Floor($semAtividade / 4)) min (pode ser a etapa final, que fica muda)" }
                   else { 'trabalhando' }
         $corE = if ($semAtividade -ge 40) { 'Red' } elseif ($semAtividade -ge 8) { 'Yellow' } else { 'Green' }
-        Write-Host ("   [vivo] {0} min {1:00} s | CPU do compilador: {2:N0} s | {3} | {4}" -f $min, $seg, $melhorCpu, $estado, (Texto-Faltam $decorridoS)) -ForegroundColor $corE
+        Write-Host ("   [VIVO] Fase: {5} | {0} min {1:00} s | CPU: {2:N0} s | {3} | {4}" -f $min, $seg, $melhorCpu, $estado, (Texto-Faltam $decorridoS), $faseAtual) -ForegroundColor $corE
     }
     foreach ($linha in @((Novas-Linhas $saidaNk $pos 'o') + (Novas-Linhas $erroNk $pos 'e') | Select-Object -Last 60)) { Write-Host "   | $linha" -ForegroundColor DarkGray }
     Info "Nuitka terminou (código $($proc.ExitCode)) em $([math]::Round($inicioNk.Elapsed.TotalMinutes, 1)) min."
@@ -1182,7 +1255,7 @@ print(a)
     # Assinatura digital (OPCIONAL, desligada por padrão). Só roda se a variável de ambiente COFRE_ASSINAR_SHA1 tiver a
     # impressão digital (40 caracteres hex) de um certificado de assinatura de código do SEU repositório de certificados.
     # COFRE_ASSINAR_TS (opcional) = endereço https do servidor de carimbo de tempo (sem ele, nada é enviado pela internet).
-    # O programa sem assinatura fica guardado em _cb_cache\sem_assinatura e volta sozinho se a assinatura falhar.
+    # O programa sem assinatura fica guardado em CACHE_PROJETO_NAO_MEXER\compilacao e volta sozinho se a assinatura falhar.
     # Certificado próprio (autoassinado) NÃO remove o alerta do SmartScreen/Defender: só um certificado de uma
     # autoridade reconhecida muda isso.
     $assinatura = 'nao'
@@ -1240,7 +1313,7 @@ print(a)
     Write-Host "$nomeFinal criado em: $destino" -ForegroundColor Green
     Write-Host "Nada mais fica ao lado dele (sem .bat, sem .sha256): tudo o que é do programa está dentro deste" -ForegroundColor Green
     Write-Host "único arquivo compilado -- não há nada de fora para ser mexido ou copiado." -ForegroundColor Green
-    Write-Host "Ao executar, o Nuitka usa uma pasta temporária do Windows, fora da pasta do EXE; normalmente ela é removida ao fechar." -ForegroundColor Gray
+    Write-Host "Ao executar, o programa se descompacta numa pasta temporária ao lado dele (CofreSenhas_em_uso_...), apagada ao fechar. Nada vai para o %TEMP% do Windows." -ForegroundColor Gray
     Write-Host ""
     Write-Host "CÓDIGO SHA256 DO PROGRAMA (anote em PAPEL -- é a ÚNICA cópia confiável deste número):" -ForegroundColor Yellow
     Write-Host ("  " + ($hash -replace '(.{8})', '$1 ').Trim()) -ForegroundColor Yellow
@@ -1261,13 +1334,13 @@ print(a)
     Write-Host "     O cofre.dat e seus arquivos de apoio ficam ocultos e somente leitura: só o $nomeFinal aparece na pasta."
     if ($modoPc) {
         Write-Host "  2. Se usar chave de acesso, salve o arquivo .key num pendrive à parte e anote a chave em papel."
-        Write-Host "  3. Ao abrir, o programa se descompacta numa pasta temporária AO LADO dele (CofreSenhas_em_uso_...),"
-        Write-Host "     que é apagada sozinha ao fechar."
+        Write-Host "  3. Ao abrir, o programa se descompacta numa pasta temporária ao lado dele (CofreSenhas_em_uso_...),"
+        Write-Host "     que é apagada sozinha ao fechar. Nada vai para o %TEMP% do Windows."
         Write-Host "  4. Ligue o BitLocker no disco do computador e faça backup do cofre.dat num pendrive."
     } else {
         Write-Host "  2. Se usar chave de acesso, salve o arquivo .key em OUTRO pendrive (nunca no disco $($sistema):) e anote a chave em papel."
-        Write-Host "  3. Ao abrir, o programa se descompacta numa pasta temporária AO LADO dele no pendrive"
-        Write-Host "     (CofreSenhas_em_uso_...), que é apagada sozinha ao fechar. Nada vai para o $($sistema):."
+        Write-Host "  3. Ao abrir, o programa se descompacta numa pasta temporária ao lado dele, no pendrive (CofreSenhas_em_uso_...),"
+        Write-Host "     que é apagada sozinha ao fechar. Nada vai para o disco $($sistema): nem para o %TEMP%. O pendrive precisa aceitar gravação."
         Write-Host "  4. Mantenha o BitLocker To Go ligado no pendrive inteiro (programa e cofre)."
     }
     Write-Host "  5. Na PRIMEIRA abertura o Windows pode mostrar 'O Windows protegeu o computador' (SmartScreen): clique em"
@@ -1278,7 +1351,7 @@ print(a)
     } finally {
         $script:CodigoSaida = if ($okFinal) { 0 } else { 1 }     # código de saída do script (o .bat repassa e avisa se der erro)
         # Em QUALQUER saída (sucesso, erro, Ctrl+C): mostra os tempos, guarda só o LOG no pendrive e apaga a pasta
-        # de trabalho (_cb: ambiente, restos). Só o _cb_cache fica. Nada da compilação vai para o C:.
+        # de trabalho (_cb: ambiente, restos). Só o CACHE_PROJETO_NAO_MEXER fica. Nada da compilação vai para o C:
         try { Mostrar-Tempos } catch {}
         try { Stop-Transcript | Out-Null } catch {}
         # Log detalhado e estruturado (uma linha por fato; sem caminhos, sem nome de usuário): útil para auditar e para
@@ -1325,10 +1398,9 @@ print(a)
         } catch {}
         try { Set-Location -LiteralPath $env:USERPROFILE } catch {}
         if ($cache -and (Test-Path -LiteralPath $cache)) {
-            Info "Cache guardado em ${cache}: deixa a próxima instalação bem mais rápida e permite continuar se algo falhar. Para liberar espaço no pendrive, apague essa pasta."
-            if (-not $modoPc) { Info "Essa pasta e a _cb ficam na RAIZ do pendrive (não dentro de $(Split-Path $destino -Leaf)) de propósito: um caminho mais fundo passaria do limite de 260 caracteres do Windows com os nomes compridos que o compilador C usa. Já ficam ocultas (Oculto+Sistema); só aparecem para quem ligar as duas opções de mostrar ocultos/protegidos do Explorer." }
+            Info "Cache permanente em ${cache}: NAO MEXER. Pip, Zig, Nuitka e compilacao parcial ficam nesta pasta da raiz do projeto."
         }
-        Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue
+        Remover-Pasta-Rapida $base
         try { if ($null -ne $modoConsoleOriginal -and $hc) { [void][W.C]::SetConsoleMode($hc, [uint32]$modoConsoleOriginal) } } catch {}   # QuickEdit volta ao que era
         if (Test-Path $base) { Info "aviso: não consegui apagar $base inteira (pode apagar à mão; ela só guarda restos da compilação)." }
     }

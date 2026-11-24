@@ -37,9 +37,9 @@ rotulo_senha = next(w for w in todos(d) if w.winfo_class() == "TLabel"
                      and str(w.cget("text")) == "SENHA")
 ok(str(rotulo_senha.cget("style")) == "S2.Campo.TLabel",
    "rótulos das credenciais usam o fundo do painel")
-status = next(w for w in todos(d) if w.winfo_class() == "TButton"
-              and str(w.cget("text")) == "Em uso")
-ok(status is not None, "estado da conta fica identificado como 'Em uso'")
+status = next((w for w in todos(d) if w.winfo_class() == "TButton"
+               and str(w.cget("text")) in ("Ativa", "Desativada") and w.winfo_ismapped()), None)
+ok(status is None, "item NOVO não mostra botão de estado (nasce Ativa; só a edição permite desativar)")
 vis = lambda: [str(w.cget("text")) for w in todos(d) if w.winfo_class() in ("TLabel",) and w.winfo_ismapped()]
 v = " | ".join(vis())
 ok("CONTA / APP" in v and "LOGIN / E-MAIL / USUÁRIO" in v and "SENHA" in v, "mostra nome, usuário e senha")
@@ -73,6 +73,8 @@ d.destroy(); root.update()
 app.dialogo_registro(regs[0]); root.update(); root.update()
 e = next(w for w in root.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == "Editar item")
 ok("GRUPO" in " | ".join(str(w.cget("text")) for w in todos(e) if w.winfo_class() == "TLabel" and w.winfo_ismapped()), "editar abre o formulário completo")
+ok(any(w.winfo_class() == "TButton" and str(w.cget("text")) == "Ativa" and w.winfo_ismapped() for w in todos(e)),
+   "editar mostra o botão de estado 'Ativa'")
 e.destroy()
 # Enter salva
 d = novo(); ents = [w for w in todos(d) if w.winfo_class() == "TEntry" and w.winfo_ismapped()]

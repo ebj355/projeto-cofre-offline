@@ -7,6 +7,9 @@ def _foto(arq):
     try: _sp.run(["import", "-window", "root", arq], check=False)
     except Exception: pass
 import os, sys, subprocess, time
+# Ao entrar, o programa abre a tela "Verificar integridade do cofre" (modal) ANTES do alerta de tentativas e da barra de
+# status. Este teste não importa o _apoio_gui_novos (que já desliga isso), então desliga aqui.
+os.environ["COFRE_SEM_VERIFICACAO_INICIAL"] = "1"
 sys.path.insert(0, _RAIZ)
 import tkinter as tk, cofre_senhas as c
 from tkinter import messagebox

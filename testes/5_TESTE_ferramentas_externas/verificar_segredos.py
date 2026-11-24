@@ -11,7 +11,7 @@ import tempfile
 
 PROIBIDOS = ["cofre.dat", "*.dat", "*.key", "*.bak", "*.bak[1-5]", "*.diag", "*.pre-v5", "*.lock", "cofre*.xlsx"]
 PULAR = {
-    ".git", "pacotes", "ambiente_virtual_ferramentas (NAO MEXER)", "__pycache__", "resultados", "CACHE", "logs_de_compilacao",
+    ".git", "pacotes", "ambiente_virtual_ferramentas (NAO MEXER)", "__pycache__", "resultados", "CACHE", "CACHE_PROJETO_NAO_MEXER", "logs_de_compilacao",
     ".mypy_cache", ".pytest_cache", ".ruff_cache", "_build",
 }
 
@@ -44,7 +44,7 @@ def main():
         achados.append("falha operacional: git ls-files nao pode ser executado")
     try:
         r = subprocess.run([sys.executable, "-m", "detect_secrets", "scan", "--all-files",
-                            "--exclude-files",                                                         r"(?:^|[/\\])(?:pacotes|ambiente_virtual_ferramentas(?:[^/\\]*)|_venv[^/\\]*|venv[^/\\]*|\.venv|resultados|CACHE|logs_de_compilacao|\.mypy_cache|\.pytest_cache|\.ruff_cache|_build|\.git)(?:[/\\]|$)"],
+                            "--exclude-files",                                                         r"(?:^|[/\\])(?:pacotes|ambiente_virtual_ferramentas(?:[^/\\]*)|_venv[^/\\]*|venv[^/\\]*|\.venv|resultados|CACHE|CACHE_PROJETO_NAO_MEXER|logs_de_compilacao|\.mypy_cache|\.pytest_cache|\.ruff_cache|_build|\.git)(?:[/\\]|$)"],
                            cwd=raiz, capture_output=True, text=True, timeout=600)
         if r.returncode != 0:
             achados.append("falha operacional: detect-secrets scan retornou erro")

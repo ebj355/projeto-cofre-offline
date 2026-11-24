@@ -108,7 +108,8 @@ except ImportError:
     tk = None
 
 if not os.environ.get("PYTHONPYCACHEPREFIX"):
-    _cache_pyc = os.path.join(os.path.dirname(os.path.abspath(__file__)), "testes", "CACHE", "pycache")
+    _raiz_projeto = os.path.dirname(os.path.abspath(__file__))
+    _cache_pyc = os.path.join(_raiz_projeto, "CACHE_PROJETO_NAO_MEXER", "testes", "pycache")
     os.environ["PYTHONPYCACHEPREFIX"] = _cache_pyc
     sys.pycache_prefix = _cache_pyc
 
@@ -530,7 +531,7 @@ def memoria_fisica_livre():
             if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms)):
                 return int(ms.livre_fis)
             return None
-        with open("/proc/meminfo", "r", encoding="ascii") as f:
+        with open("/proc/meminfo", encoding="ascii") as f:
             for linha in f:
                 if linha.startswith("MemAvailable:"):
                     return int(linha.split()[1]) * 1024
@@ -1137,7 +1138,7 @@ def _gravar_atomico(caminho, dados):
     e sobrescreveria o arquivo de destino do link em vez de criar o cofre, e o cofre final acabaria sendo, ele
     mesmo, um link para esse outro lugar (achado real de pentest, corrigido aqui)."""
     _limpar_temporarios_interrompidos(caminho)
-    tmp = "%s.%d.tmp" % (caminho, os.getpid())     # um temporário POR PROCESSO: dois processos nunca trocam o .tmp um do outro
+    tmp = f"{caminho}.{os.getpid()}.tmp"     # um temporário POR PROCESSO: dois processos nunca trocam o .tmp um do outro
     esperado = hashlib.sha256(dados).digest()
     try:
         try:
@@ -2644,7 +2645,7 @@ def aviso_ja_visto(texto, pasta=None):
     """True se este aviso informativo (identificado pelo hash do texto) já foi mostrado antes neste pendrive.
     Qualquer falha de leitura conta como 'não visto': na dúvida, avisa."""
     try:
-        with open(_caminho_avisos(pasta), "r", encoding="utf-8") as f:
+        with open(_caminho_avisos(pasta), encoding="utf-8") as f:
             vistos = json.load(f)
         return hashlib.sha256(str(texto).encode("utf-8")).hexdigest()[:16] in vistos.get("vistos", [])
     except (OSError, ValueError, AttributeError):
@@ -2656,7 +2657,7 @@ def marcar_aviso_visto(texto, pasta=None):
     try:
         caminho = _caminho_avisos(pasta)
         try:
-            with open(caminho, "r", encoding="utf-8") as f:
+            with open(caminho, encoding="utf-8") as f:
                 vistos = list(json.load(f).get("vistos", []))
         except (OSError, ValueError, AttributeError):
             vistos = []
@@ -2689,7 +2690,7 @@ _ATTR_SOMENTE_LEITURA = 0x1
 _ATTR_OCULTO = 0x2
 _ATTR_SISTEMA = 0x4
 _ATTR_DIRETORIO = 0x10
-NOMES_APOIO_FIXOS = (NOME_AVISOS_VISTOS, "instalacao_detalhada.log", "logs", "_cb_cache", NOME_PASTA_TEMP,
+NOMES_APOIO_FIXOS = (NOME_AVISOS_VISTOS, "instalacao_detalhada.log", "logs", NOME_PASTA_TEMP,
                      NOME_MARCADOR_NTFS)
 
 
@@ -2997,7 +2998,7 @@ def hook_energia(root, ao_perigo):
         hwnd = u.GetParent(root.winfo_id()) or root.winfo_id()
         estado = {"antigo": None}
 
-        def proc(h, msg, w, l):
+        def proc(h, msg, w, lp):
             """Procedimento de janela: ao detectar suspensão, bloqueio ou desligamento, chama a rotina de perigo."""
             try:
                 if (msg == 0x218 and w in (0x4, 0x0)) or (msg == 0x2B1 and w in (0x7, 0x2)) \
@@ -3005,7 +3006,7 @@ def hook_energia(root, ao_perigo):
                     ao_perigo()
             except (tk.TclError, OSError, RuntimeError, ValueError, TypeError) as ex:
                 diag_registrar(DIAG_INTERFACE, ex)
-            return u.CallWindowProcW(estado["antigo"], h, msg, w, l)
+            return u.CallWindowProcW(estado["antigo"], h, msg, w, lp)
 
         cb = PROC(proc)
         estado["cb"] = cb
@@ -3203,7 +3204,8 @@ _TRAVA_SALVAR = threading.RLock()
 
 
 class Cofre:
-    """O cofre em memória: cria/abre/salva o arquivo (COFRE05), guarda a chave dos dados (DEK), as formas de desbloqueio (senha, chave, FIDO, recuperação), a contagem de tentativas com autodestruição e as cópias de segurança."""
+    """O cofre em memória: cria/abre/salva o arquivo (COFRE05),
+    guarda a chave dos dados (DEK), as formas de desbloqueio (senha, chave, FIDO, recuperação), a contagem de tentativas com autodestruição e as cópias de segurança."""
     somente_leitura = False       # True no MODO CONSULTA: aberto sem gravar nada (pendrive protegido ou cofre em uso)
     motivo_consulta = "protegido"  # no modo consulta: "protegido" (pendrive sem gravação) ou "em_uso" (outra janela o tem aberto)
     _seq = 0                      # contador de salvamentos deste arquivo (vai dentro dos dados cifrados)
@@ -4128,8 +4130,8 @@ def _detectar_cabecalho(linhas):
 def _blocos_recuperacao(linhas, nome_aba):
     """Aba de códigos de recuperação sem cabeçalho: um nome (ex.: SAMSUNG) seguido dos códigos."""
     regs, atual = [], None
-    for l in linhas:
-        cel = [c for c in l if c]
+    for lnh in linhas:
+        cel = [c for c in lnh if c]
         if not cel:
             continue
         texto_puro = not re.search(r"\d", cel[0]) and len(cel[0]) <= 60
@@ -4154,8 +4156,8 @@ def _linhas_para_registros(linhas, nome_aba="", grupo=""):
     """Converte linhas (listas de valores) em itens do cofre. Nenhuma coluna com dados é perdida:
     colunas sem nome conhecido vão para as Notas."""
     avisos = []
-    linhas = [[_valor_celula(c) for c in l] for l in linhas]
-    linhas = [l for l in linhas if any(l)]
+    linhas = [[_valor_celula(c) for c in lnh] for lnh in linhas]
+    linhas = [lnh for lnh in linhas if any(lnh)]
     if not linhas:
         return [], avisos
     idx, mapa = _detectar_cabecalho(linhas)
@@ -4172,7 +4174,7 @@ def _linhas_para_registros(linhas, nome_aba="", grupo=""):
                 avisos.append(f"{nome_aba}: lida como lista de códigos de recuperação "
                               f"({len(regs)} conta(s)). Confira na prévia.")
             return regs, avisos
-        ncol = max(len(l) for l in linhas)
+        ncol = max(len(lnh) for lnh in linhas)
         ordem = {1: ["servico"], 2: ["servico", "senha"], 3: ["servico", "login", "senha"],
                  4: ["servico", "login", "senha", "senha_extra"]}.get(
                      ncol, ["servico", "login", "senha", "senha_extra"])
@@ -4554,7 +4556,7 @@ def _ler_planilha_arquivo(caminho, selo=None, exigir_selo=False, dados_csv=None)
                     linhas.append(list(linha))
                     if cheias > LIMITE_LINHAS:
                         raise ValueError(f"A aba '{ws.title}' tem mais de {LIMITE_LINHAS} linhas com dados.")
-                if any(l[:len(CABECALHO_MODELO)] == list(CABECALHO_MODELO) for l in linhas[:5] if l):
+                if any(lnh[:len(CABECALHO_MODELO)] == list(CABECALHO_MODELO) for lnh in linhas[:5] if lnh):
                     _segue_modelo_oficial = True            # cabeçalho idêntico ao do modelo gerado pelo cofre
                 regs, av = _linhas_para_registros(linhas, ws.title, ws.title if varias else "")
                 registros += regs
@@ -4606,7 +4608,7 @@ def _ler_planilha_arquivo(caminho, selo=None, exigir_selo=False, dados_csv=None)
                              f"Importação recusada. ({ex})") from None
         if len(linhas) > LIMITE_LINHAS:
             raise ValueError(f"O arquivo tem mais de {LIMITE_LINHAS} linhas.")
-        if any([str(x).strip() for x in l[:len(CABECALHO_MODELO)]] == list(CABECALHO_MODELO) for l in linhas[:5] if l):
+        if any([str(x).strip() for x in lnh[:len(CABECALHO_MODELO)]] == list(CABECALHO_MODELO) for lnh in linhas[:5] if lnh):
             _segue_modelo_oficial = True
         registros, avisos = _linhas_para_registros(linhas)
     elif ext == ".xls":
@@ -4773,7 +4775,7 @@ def criar_modelo_planilha(destino, selo=None):
     varrer_planilha); o que existe é essa ordenação de um clique, sempre disponível, sem precisar destravar nada.
     Isto não muda o selo: _esqueleto_planilha só olha nomes de aba e texto do cabeçalho, nunca proteção/formatação."""
     import openpyxl
-    from datetime import datetime, timezone
+    from datetime import UTC, datetime
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Protection, Side
     from openpyxl.worksheet.datavalidation import DataValidation
     from openpyxl.formatting.rule import FormulaRule
@@ -4796,7 +4798,7 @@ def criar_modelo_planilha(destino, selo=None):
     la = wb.active
     la.title = "Leia-me"
     la.sheet_view.showGridLines = False
-    for col, larg in zip("ABCDE", (4, 30, 52, 30, 4)):
+    for col, larg in zip("ABCDE", (4, 30, 52, 30, 4), strict=False):
         la.column_dimensions[col].width = larg
     la.merge_cells("B1:D1")
     la["B1"] = "Planilha de importação — Arca"
@@ -4947,7 +4949,7 @@ def criar_modelo_planilha(destino, selo=None):
             mono = c.column_letter in COLS_SEGREDO
             c.font = Font(name=FONTE_MONO if mono else FONTE, size=10, italic=True, color=TEXTO_EXEMPLO)
             c.fill = PatternFill("solid", fgColor=CINZA_EXEMPLO)
-    for col, larg in zip("ABCDEFGHIJ", (30, 26, 22, 16, 10, 20, 32, 34, 18, 18)):
+    for col, larg in zip("ABCDEFGHIJ", (30, 26, 22, 16, 10, 20, 32, 34, 18, 18), strict=False):
         ws.column_dimensions[col].width = larg
     ws.auto_filter.ref = f"A1:J{ultima}"                 # filtro/ordenação (estilo BI) sem a faixa zebrada de um Table
     ws.freeze_panes = "B2"
@@ -5024,7 +5026,7 @@ def criar_modelo_planilha(destino, selo=None):
     # ---------------- Selo de autenticidade ----------------
     if selo is not None:
         ident, chave = _chave_mac_planilha(selo)
-        criado = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        criado = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         id_arq = secrets.token_hex(8)
         esq = _esqueleto_planilha(ABAS_DO_MODELO, CABECALHO_COMPLETO)
         mac = _mac_selo(chave, ident, "modelo", criado, id_arq, esq)
@@ -5246,7 +5248,7 @@ CORES = {
     # texto
     "texto": "#e8eaf0",
     "suave": "#9aa2b4",
-    "fraco": "#818aa3",      # contraste >= 4,5:1 sobre os painéis (WCAG AA)
+    "fraco": "#8891a8",      # contraste >= 4,5:1 sobre fundo, painéis, campos e destaques (WCAG AA)
     # acento
     "prim": "#5a51ea",         # texto branco: 5,5:1 (WCAG AA)
     "prim_hover": "#6c63ff",
@@ -5275,7 +5277,7 @@ PALETAS = {
         **CORES_BASE, "fundo": "#111315", "lateral": "#0d0f11", "sup": "#181a1e",
         "sup2": "#1f2228", "sup3": "#252932", "sup4": "#30353d", "campo": "#121417",
         "borda": "#242830", "borda2": "#2c303a", "texto": "#f3f4f6", "suave": "#9ca3af",
-        "fraco": "#6b7280", "prim": "#059669", "prim_hover": "#10b981", "prim_press": "#047857",
+        "fraco": "#8b919e", "prim": "#059669", "prim_hover": "#10b981", "prim_press": "#047857",
         "prim_txt": "#34d399", "prim_fundo": "#102c24", "prim_fg": "#ffffff",
         "ok": "#34d399", "ok_fundo": "#102c24", "alerta": "#f59e0b", "alerta_fundo": "#30230e",
         "perigo": "#f05252", "perigo_fundo": "#301819", "num": "#7dd3fc", "sim": "#f472b6",
@@ -5284,7 +5286,7 @@ PALETAS = {
         **CORES_BASE, "fundo": "#f4f5f7", "lateral": "#eceef2", "sup": "#ffffff",
         "sup2": "#f1f3f5", "sup3": "#e8ebf0", "sup4": "#dfe3e9", "campo": "#f9fafb",
         "borda": "#e2e5ea", "borda2": "#d1d5db", "texto": "#111827", "suave": "#4b5563",
-        "fraco": "#6b7280", "prim": "#1d4ed8", "prim_hover": "#2563eb", "prim_press": "#1e40af",
+        "fraco": "#626875", "prim": "#1d4ed8", "prim_hover": "#2563eb", "prim_press": "#1e40af",
         "prim_txt": "#2563eb", "prim_fundo": "#dbeafe", "prim_fg": "#ffffff",
         "ok": "#15803d", "ok_fundo": "#dcfce7", "alerta": "#b45309", "alerta_fundo": "#fef3c7",
         "perigo": "#b91c1c", "perigo_fundo": "#fee2e2", "num": "#1d4ed8", "sim": "#be185d",
@@ -5293,7 +5295,7 @@ PALETAS = {
         **CORES_BASE, "fundo": "#090a0b", "lateral": "#08090b", "sup": "#0e1013",
         "sup2": "#14171c", "sup3": "#171b22", "sup4": "#22262e", "campo": "#08090b",
         "borda": "#1c2026", "borda2": "#282d37", "texto": "#e5e7eb", "suave": "#94a3b8",
-        "fraco": "#64748b", "prim": "#0ea5e9", "prim_hover": "#38bdf8", "prim_press": "#0284c7",
+        "fraco": "#8391a6", "prim": "#0ea5e9", "prim_hover": "#38bdf8", "prim_press": "#0284c7",
         "prim_txt": "#38bdf8", "prim_fundo": "#102b38", "prim_fg": "#041019",
         "ok": "#34d399", "ok_fundo": "#102c24", "alerta": "#fbbf24", "alerta_fundo": "#30250e",
         "perigo": "#f87171", "perigo_fundo": "#301819", "num": "#38bdf8", "sim": "#f472b6",
@@ -5529,7 +5531,7 @@ class _Tela:
 
     def linha(self, pontos, cor, larg=1.5, alfa=1.0):
         """Linha formada por vários segmentos."""
-        segs = list(zip(pontos, pontos[1:]))
+        segs = list(zip(pontos, pontos[1:], strict=False))
         return self.pintar(lambda x, y: min(_sd_seg(x, y, a[0], a[1], b[0], b[1]) for a, b in segs) - larg / 2,
                            cor, alfa)
 
@@ -6230,7 +6232,7 @@ def _desenhar_icone(nome, cor, tam=16, larg=1.45):
         """Retângulo preenchido do ícone."""
         t.ret(x0 * s, y0 * s, x1 * s, y1 * s, r * s, cor)
 
-    def O(cx, cy, r, w=larg):
+    def A(cx, cy, r, w=larg):
         """Anel do ícone."""
         t.anel(cx * s, cy * s, r * s + w / 2, cor, w)
 
@@ -6239,9 +6241,11 @@ def _desenhar_icone(nome, cor, tam=16, larg=1.45):
         t.circ(cx * s, cy * s, r * s, cor)
 
     if nome == "novo":
-        L((8, 2.8), (8, 13.2)); L((2.8, 8), (13.2, 8))
+        L((8, 2.8), (8, 13.2))
+        L((2.8, 8), (13.2, 8))
     elif nome == "busca":
-        O(7, 7, 4.3); L((10.3, 10.3), (13.6, 13.6))
+        A(7, 7, 4.3)
+        L((10.3, 10.3), (13.6, 13.6))
     elif nome in ("cadeado", "aberto"):
         R(2.8, 7.2, 13.2, 14.2, 2.2)
         arco = _arco(8, 5.6, 3.1, 180, 360)
@@ -6256,19 +6260,30 @@ def _desenhar_icone(nome, cor, tam=16, larg=1.45):
     elif nome in ("ver", "ocultar"):
         cima = _curva((1.6, 8), (8, 1.8), (14.4, 8))
         baixo = _curva((1.6, 8), (8, 14.2), (14.4, 8))
-        L(*cima); L(*baixo); O(8, 8, 1.9)
+        L(*cima)
+        L(*baixo)
+        A(8, 8, 1.9)
         if nome == "ocultar":
             L((2.6, 2.6), (13.4, 13.4))
     elif nome == "editar":
-        L((10.4, 2.6), (13.4, 5.6), (5.6, 13.4), (2.6, 13.4), (2.6, 10.4), (10.4, 2.6)); L((8.8, 4.2), (11.8, 7.2))
+        L((10.4, 2.6), (13.4, 5.6), (5.6, 13.4), (2.6, 13.4), (2.6, 10.4), (10.4, 2.6))
+        L((8.8, 4.2), (11.8, 7.2))
     elif nome == "excluir":
-        L((2.4, 4.4), (13.6, 4.4)); L((6, 4.4), (6.4, 2.6), (9.6, 2.6), (10, 4.4))
-        L((3.9, 4.4), (4.8, 13.4), (11.2, 13.4), (12.1, 4.4)); L((6.6, 7), (6.8, 11)); L((9.4, 7), (9.2, 11))
+        L((2.4, 4.4), (13.6, 4.4))
+        L((6, 4.4), (6.4, 2.6), (9.6, 2.6), (10, 4.4))
+        L((3.9, 4.4), (4.8, 13.4), (11.2, 13.4), (12.1, 4.4))
+        L((6.6, 7), (6.8, 11))
+        L((9.4, 7), (9.2, 11))
     elif nome == "imprimir":
-        L((4.6, 5.8), (4.6, 2.6), (11.4, 2.6), (11.4, 5.8)); R(1.8, 5.8, 14.2, 11.4, 1.8)
-        F(4.2, 9.2, 11.8, 10.6, 0); R(4.6, 9.4, 11.4, 14, 0.8)
+        L((4.6, 5.8), (4.6, 2.6), (11.4, 2.6), (11.4, 5.8))
+        R(1.8, 5.8, 14.2, 11.4, 1.8)
+        F(4.2, 9.2, 11.8, 10.6, 0)
+        R(4.6, 9.4, 11.4, 14, 0.8)
     elif nome == "chave":
-        O(5, 11, 2.7); L((6.9, 9.1), (13.4, 2.6)); L((10.6, 5.4), (12.6, 7.4)); L((12.4, 3.6), (14, 5.2))
+        A(5, 11, 2.7)
+        L((6.9, 9.1), (13.4, 2.6))
+        L((10.6, 5.4), (12.6, 7.4))
+        L((12.4, 3.6), (14, 5.2))
     elif nome == "gerar":
         R(2.4, 2.4, 13.6, 13.6, 3)
         for cx, cy in ((5.6, 5.6), (8, 8), (10.4, 10.4)):
@@ -6284,9 +6299,13 @@ def _desenhar_icone(nome, cor, tam=16, larg=1.45):
     elif nome == "ok":
         L((3, 8.6), (6.5, 12), (13, 4.6), w=larg * 1.15)
     elif nome == "alerta":
-        L((8, 2), (14.4, 13.4), (1.6, 13.4), (8, 2)); L((8, 6.2), (8, 9.4)); P(8, 11.5, 0.95)
+        L((8, 2), (14.4, 13.4), (1.6, 13.4), (8, 2))
+        L((8, 6.2), (8, 9.4))
+        P(8, 11.5, 0.95)
     elif nome == "info":
-        O(8, 8, 6.2); L((8, 7.4), (8, 11.2)); P(8, 5.1, 0.95)
+        A(8, 8, 6.2)
+        L((8, 7.4), (8, 11.2))
+        P(8, 5.1, 0.95)
     elif nome == "grupo":
         L((1.8, 12.6), (1.8, 4.2), (2.6, 3.2), (6, 3.2), (7.6, 4.8), (13.4, 4.8), (14.2, 5.6), (14.2, 12.4),
           (13.4, 13.2), (2.6, 13.2), (1.8, 12.4))
@@ -6294,38 +6313,55 @@ def _desenhar_icone(nome, cor, tam=16, larg=1.45):
         for x0, y0 in ((2.2, 2.2), (8.8, 2.2), (2.2, 8.8), (8.8, 8.8)):
             R(x0, y0, x0 + 5, y0 + 5, 1.4)
     elif nome == "pessoa":
-        O(8, 5.4, 2.6); L(*_curva((2.8, 14), (3.4, 9.2), (8, 9.2)), *_curva((8, 9.2), (12.6, 9.2), (13.2, 14))[1:])
+        A(8, 5.4, 2.6)
+        L(*_curva((2.8, 14), (3.4, 9.2), (8, 9.2)), *_curva((8, 9.2), (12.6, 9.2), (13.2, 14))[1:])
     elif nome == "teclado":
         R(1.4, 3.8, 14.6, 12.2, 2)
         for x in (4.2, 6.7, 9.3, 11.8):
             P(x, 6.6, 0.75)
         L((5, 9.6), (11, 9.6))
     elif nome == "importar":
-        L((8, 2.2), (8, 10)); L((4.8, 6.9), (8, 10), (11.2, 6.9)); L((2.4, 10.4), (2.4, 13.6), (13.6, 13.6), (13.6, 10.4))
+        L((8, 2.2), (8, 10))
+        L((4.8, 6.9), (8, 10), (11.2, 6.9))
+        L((2.4, 10.4), (2.4, 13.6), (13.6, 13.6), (13.6, 10.4))
     elif nome == "exportar":
-        L((8, 10), (8, 2.2)); L((4.8, 5.3), (8, 2.2), (11.2, 5.3)); L((2.4, 10.4), (2.4, 13.6), (13.6, 13.6), (13.6, 10.4))
+        L((8, 10), (8, 2.2))
+        L((4.8, 5.3), (8, 2.2), (11.2, 5.3))
+        L((2.4, 10.4), (2.4, 13.6), (13.6, 13.6), (13.6, 10.4))
     elif nome == "historico":
-        O(8, 8, 6); L((8, 4.6), (8, 8), (10.6, 9.6))
+        A(8, 8, 6)
+        L((8, 4.6), (8, 8), (10.6, 9.6))
     elif nome == "backup":
-        R(2.4, 2.4, 13.6, 13.6, 2); L((5.2, 2.4), (5.2, 5.6), (10.8, 5.6), (10.8, 2.4)); O(8, 9.8, 1.6)
+        R(2.4, 2.4, 13.6, 13.6, 2)
+        L((5.2, 2.4), (5.2, 5.6), (10.8, 5.6), (10.8, 2.4))
+        A(8, 9.8, 1.6)
     elif nome == "fechar":
-        L((3.4, 3.4), (12.6, 12.6)); L((12.6, 3.4), (3.4, 12.6))
+        L((3.4, 3.4), (12.6, 12.6))
+        L((12.6, 3.4), (3.4, 12.6))
     elif nome == "seta":
         L((6, 3.4), (10.6, 8), (6, 12.6))
     elif nome == "seta_baixo":
         L((3.4, 6), (8, 10.6), (12.6, 6))
     elif nome == "tag":
-        L((2.2, 2.2), (8.2, 2.2), (14, 8), (8, 14), (2.2, 8.2), (2.2, 2.2)); P(5.4, 5.4, 1.1)
+        L((2.2, 2.2), (8.2, 2.2), (14, 8), (8, 14), (2.2, 8.2), (2.2, 2.2))
+        P(5.4, 5.4, 1.1)
     elif nome == "config":
-        L((2, 4.5), (14, 4.5)); L((2, 11.5), (14, 11.5)); F(4.2, 2.6, 7.2, 6.4, 1.4); F(8.8, 9.6, 11.8, 13.4, 1.4)
+        L((2, 4.5), (14, 4.5))
+        L((2, 11.5), (14, 11.5))
+        F(4.2, 2.6, 7.2, 6.4, 1.4)
+        F(8.8, 9.6, 11.8, 13.4, 1.4)
     elif nome == "documento":
         L((9.4, 1.8), (3.4, 1.8), (3.4, 14.2), (12.6, 14.2), (12.6, 5), (9.4, 1.8), (9.4, 5), (12.6, 5))
-        L((5.8, 8.4), (10.2, 8.4)); L((5.8, 11), (10.2, 11))
+        L((5.8, 8.4), (10.2, 8.4))
+        L((5.8, 11), (10.2, 11))
     elif nome == "atualizar":
         arco = _arco(8, 8, 5.6, -60, 230)
-        L(*arco); L((12.4, 1.6), (10.8, 3.2), (13.4, 4.6))
+        L(*arco)
+        L((12.4, 1.6), (10.8, 3.2), (13.4, 4.6))
     elif nome == "sair":
-        L((6.4, 2.4), (2.4, 2.4), (2.4, 13.6), (6.4, 13.6)); L((6.4, 8), (14, 8)); L((10.8, 4.8), (14, 8), (10.8, 11.2))
+        L((6.4, 2.4), (2.4, 2.4), (2.4, 13.6), (6.4, 13.6))
+        L((6.4, 8), (14, 8))
+        L((10.8, 4.8), (14, 8), (10.8, 11.2))
     return t
 
 
@@ -6381,7 +6417,7 @@ def brilho_radial(canvas, cx, cy, raio, cor_centro, cor_fundo, passos=48):
     for i in range(passos, 0, -1):
         f = i / passos
         k = (1 - f) ** 2
-        cor = "#%02x%02x%02x" % tuple(int(a[j] + (b[j] - a[j]) * k) for j in range(3))
+        cor = "#{:02x}{:02x}{:02x}".format(*(int(a[j] + (b[j] - a[j]) * k) for j in range(3)))
         r = raio * f
         canvas.create_oval(cx - r, cy - r * 0.62, cx + r, cy + r * 0.62, fill=cor, outline=cor, tags="brilho")
 
@@ -8014,7 +8050,7 @@ class App:
                 estado["maxw"], estado["maxh"] = cw, ch
                 cy = max(ch / 2 + 18, (h - 44) / 2)
                 tela.delete("brilho")
-                brilho_radial(tela, w / 2, cy - ch * 0.42, max(w, h) * 0.85, "#1e1b4b", C["fundo"])
+                brilho_radial(tela, w / 2, cy - ch * 0.42, max(w, h) * 0.85, C["prim_fundo"], C["fundo"])
                 if estado["wh"] != (cw, ch):
                     estado["wh"] = (cw, ch)
                     tela._placa = imagem_nove_fatias(tela, *peca_cartao(C["sup"], C["borda"], 18), cw, ch)
@@ -8864,7 +8900,8 @@ class App:
             hwnd = _hwnd(self.root)
             provedor = None
             if exige_fido and not recuperacao:
-                provedor = lambda creds, salt: fido_obter(hwnd, creds, salt)
+                def provedor(creds, salt):
+                    return fido_obter(hwnd, creds, salt)
                 lbl.config(text="Toque na sua chave FIDO quando ela piscar (e digite o PIN dela se o "
                                 "Windows pedir)...", foreground=C["prim_txt"])
             else:
@@ -9026,7 +9063,10 @@ class App:
                 self.verificar_integridade_cofre(automatica=True)
             self._alerta_invasao()
             if getattr(self, "_msg_abertura", ""):
-                self.status.config(text=self._msg_abertura)
+                try:                       # a verificação/alerta acima abrem janelas: a tela pode ter sido trocada ou bloqueada
+                    self.status.config(text=self._msg_abertura)
+                except tk.TclError:
+                    pass
             self.root.after(700, self._oferecer_passeio)
 
         def abrir(event=None):
@@ -9378,6 +9418,9 @@ class App:
     def _alerta_invasao(self):
         """Avisa, ao abrir, que houve tentativas erradas feitas por outra pessoa desde o último uso."""
         c = self.cofre
+        if c is None:                      # o cofre pode ter sido bloqueado enquanto a janela de integridade estava aberta
+            self._erros_sessao = 0
+            return
         erros_outros = max(0, c.erros_desde_ultima - self._erros_sessao)
         self._erros_sessao = 0
         if c.ultima_abertura:
@@ -9457,7 +9500,7 @@ class App:
         regs_completos = []
         if res:
             regs_completos, n_ruins = res
-            for minuto, cod, err, linha, ver, tipo, func, cham in reversed(regs_completos):
+            for minuto, cod, err, linha, ver, tipo, func, _cham in reversed(regs_completos):
                 q = datetime.datetime.fromtimestamp(minuto * 60).strftime("%d/%m/%Y %H:%M")
                 tree.insert("", "end", values=(q, diag_descrever(cod, err), tipo or "-",
                                                f"{func or '?'} · L{linha} · v{ver}"))
@@ -9556,7 +9599,7 @@ class App:
                 linhas.append(("✖", C["perigo"], "Arquivo principal: " + ("não encontrado" if sit == "ausente" else
                               "NÃO confere" + (f" — {det}" if det else ""))))
             boas = 0
-            for i, (nome, csit, citens, cseq, cdet) in enumerate(r["copias"], 1):
+            for i, (_nome, csit, citens, cseq, cdet) in enumerate(r["copias"], 1):
                 rotulo = f"Cópia automática {i}" + (" (mais nova)" if i == 1 else "")
                 if csit == "ok":
                     boas += 1
@@ -9576,7 +9619,8 @@ class App:
             if r["consulta"]:
                 linhas.append(("!", C["alerta"], "Modo consulta: nada é gravado nesta sessão, então não são criadas cópias novas."))
             if problema:
-                nivel, resumo = "problema", "PROBLEMA encontrado. Não altere nada ainda; veja abaixo e, se preciso, restaure uma cópia ou o backup cifrado externo."
+                nivel, resumo = "problema", "PROBLEMA encontrado. Não altere nada ainda; veja abaixo."
+                linhas.append(("!", C["alerta"], "Se preciso, restaure uma cópia automática ou o backup cifrado externo."))
             elif boas == 0 or r["sobras"] or r["consulta"]:
                 nivel, resumo = "atencao", "Cofre íntegro, mas com ressalvas (veja abaixo)."
                 if boas == 0:
@@ -10196,7 +10240,7 @@ class App:
                                   highlightbackground=CORES["borda2"], padx=4, pady=6, cursor="hand2")
                     b.grid(row=i // 13, column=i % 13, padx=2, pady=2)
                     botoes.append(b)
-            for b, ch in zip(botoes, chars):
+            for b, ch in zip(botoes, chars, strict=False):
                 b.config(text=ch, command=lambda c=ch: digitar(c))
 
         def maiusc():
@@ -11008,7 +11052,8 @@ class App:
         """Passeio guiado da tela principal: cada área é destacada em amarelo, com o que faz e como usar."""
         if getattr(self, "_tour", None) is not None:
             self._tour.encerrar()
-        g = lambda nome: (lambda: getattr(self, nome, None))
+        def g(nome):
+            return lambda: getattr(self, nome, None)
         passos = [
             (None, "Bem-vindo ao seu cofre",
              "Vou mostrar, uma área de cada vez, para que serve cada parte da tela e como usar (cerca de 1 minuto). "
@@ -11877,7 +11922,7 @@ class App:
         mostrar = tk.BooleanVar(value=False)
         ttk.Checkbutton(cab_seg, text="Mostrar", variable=mostrar, style="C.Switch.TCheckbutton",
                         command=lambda: alternar()).pack(side="right")
-        cab_seg.pack_configure(pady=(0, 10))          # o seletor e o botao "+ Adicionar" ficam na linha do titulo
+        cab_seg.pack_configure(pady=(0, 10))          # o seletor e o botao "+ Adicionar" ficam na linha logo abaixo (cab_add)
         CAMPOS_EXTRA = (("codigos", "Código de recuperação"), ("pin", "PIN"), ("senha_extra", "Senha extra"),
                         ("chave", "Chave / token"), ("numero_conta", "Número da conta"), ("agencia", "Agência"))
         tem = {k: tk.BooleanVar(value=bool(reg and (reg.get(k) or "").strip())) for k, _ in CAMPOS_EXTRA}
@@ -11889,8 +11934,13 @@ class App:
             "numero_conta": "Número da conta",
             "agencia": "Agência",
         }
+        # o seletor e o botao ficam numa linha PROPRIA abaixo do titulo: na mesma linha de "CREDENCIAIS SECRETAS" e do
+        # "Mostrar" nao sobra largura e o botao "+ Adicionar credencial" era cortado (63 px de 173 px pedidos)
+        cab_add = ttk.Frame(credenciais, style="C.TFrame")
+        cab_add.pack(fill="x", pady=(0, 10))
+        cab_seg.pack_configure(pady=(0, 4))
         selecao_credencial = ttk.Combobox(
-            cab_seg, state="readonly", width=24,
+            cab_add, state="readonly", width=24,
             values=[rótulos_extra[k] for k, _ in CAMPOS_EXTRA if not tem[k].get()],
             style="C.TCombobox")
 
@@ -11914,9 +11964,9 @@ class App:
                 tem[chave].set(True)
                 aplicar_campos()
 
-        botao_adicionar = ttk.Button(cab_seg, text="+ Adicionar credencial", style="Acao.TButton",
+        botao_adicionar = ttk.Button(cab_add, text="+ Adicionar credencial", style="Acao.TButton",
                                      command=adicionar_credencial)
-        botao_adicionar.pack(side="right", padx=(8, 12))
+        botao_adicionar.pack(side="right", padx=(8, 0))
         selecao_credencial.pack(side="right")
         grade = ttk.Frame(credenciais, style="S2.TFrame")
         grade.pack(fill="x")

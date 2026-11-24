@@ -631,12 +631,12 @@ No fim, o instalador mostra o **SHA-256 do `.exe`** e uma tabela de tempo por et
 
 | Recurso | O que faz |
 |---|---|
-| **Cache que sobrevive** | `_cb_cache\` (oculta, no pendrive) guarda downloads (sempre re-conferidos por hash), caches do Zig e do Nuitka e o que já foi compilado. Se Nuitka, Zig, Python ou as opções mudaram, recomeça limpo. Apague a pasta para liberar espaço. |
+| **Cache que sobrevive** | `CACHE_PROJETO_NAO_MEXER\` fica fixo na raiz do projeto e **não deve ser mexido**. Guarda separadamente pip, Zig, Nuitka e compilação parcial; todos os componentes do instalador consultam essa pasta. Se Nuitka, Zig, Python ou as opções mudaram, recomeça limpo. |
 | **Pasta de build descartável** | `_cb\` é apagada e refeita a cada vez: nenhum `.exe`, `zig.exe` ou módulo plantado ali entra na compilação. |
 | **Retentativas** | Cada `pip install` tenta até 3 vezes; o Nuitka também (a 2ª continua com metade dos processos, a 3ª recomeça). O `.exe` de uma tentativa anterior é apagado antes de cada nova. |
-| **Sinal de vida** | A cada 15 s mostra `[vivo]` com tempo, uso do processador e últimas linhas. Se ficar 10 minutos parado, avisa em vermelho. O QuickEdit do console é desligado (um clique na janela pausava a saída). |
+| **Sinal de vida** | A cada 5 s mostra a fase atual, tempo decorrido e estimativa restante; a cada 15 s também mostra CPU e atividade. Se ficar 10 minutos parado, avisa em vermelho. O QuickEdit do console é desligado (um clique na janela pausava a saída). |
 | **Conferências prévias** | Espaço livre (>3 GB), memória livre (avisa se <2 GB) e velocidade de escrita do pendrive (avisa se <15 MB/s). |
-| **Logs** | `logs_de_compilacao\compilar-*.log` (na raiz do projeto) e, no destino, `logs\instalacao-*.log` e `instalacao_detalhada.log` (resumo estruturado, sem caminhos nem nome de usuário). |
+| **Logs** | `logs_de_compilacao\compilar-*.log` conserva um arquivo individual por execução. `logs_de_compilacao\resultado completo\LOG_COMPLETO_COMPILACAO.log` acumula todas as compilações e `LOG_COMPLETO_ERROS.log` acumula os registros completos das execuções com erro. As baterias de teste preservam esses logs e substituem somente `logs_de_compilacao\erros de compilação\` pelos erros da rodada atual. |
 | **Limpeza em qualquer saída** | `try/finally` apaga `_cb`, restaura o console e grava o log, mesmo com erro ou `Ctrl+C`. |
 | **Ajuste anti-antivírus** | O Nuitka instalado recebe um ajuste que desliga a criação de `scons-debug.bat` (antivírus como o Avast bloqueiam `.bat` e quebravam a compilação). |
 | **Identidade do `.exe`** | Ícone próprio e dados de arquivo (produto, versão), o que também ajuda contra falso positivo. |
@@ -669,7 +669,7 @@ Numa instalação portátil, o **`CofreSenhas.exe`** fica na raiz do pendrive. S
 | `logs\`, `instalacao_detalhada.log` | Registros da instalação (na raiz do pendrive no modo portátil). |
 | `CofreSenhas_em_uso_...`, `.tmp_cofre` | Pasta temporária privada, apagada ao fechar. |
 | `exigir_ntfs.txt` | *(opcional, você cria)* Faz o cofre abrir só em NTFS/ReFS. |
-| `_cb_cache\` | *(só no pendrive de instalação)* Cache do instalador. |
+| `CACHE_PROJETO_NAO_MEXER\` | Cache permanente do projeto: pip, Zig, Nuitka, compilação e caches de testes. Não mexer. |
 
 - O cofre é **portátil**: copiar o programa e o `cofre.dat` para outro PC funciona. A segurança vem da senha e da chave, não do computador (a menos que você ative *Computadores autorizados*).
 - Se o cofre estiver no disco do Windows, a tela de desbloqueio avisa. Salvar backup, modelo de planilha ou a chave de acesso no disco do Windows pede confirmação.
@@ -749,7 +749,7 @@ Os números **1 a 6** abaixo são a ordem de execução do BAT, não o prefixo d
 | Pasta | O que testa |
 |---|---|
 | `testes/1_TESTE_motor_do_cofre/` | O **motor**, sem janelas: criptografia e vetores de teste, formato, backup, migração de versões antigas, corrupção forçada, falha e queda de energia em cada `fsync`/`os.replace`, concorrência entre processos, permissões de gravação, esquema hostil de itens, importação e fuzzing de planilhas, qualidade da aleatoriedade, vazamento de memória, soak de 1.000 ciclos, cofre com 5.000 itens, ida e volta com texto aleatório e bits virados. Inclui `teste_propriedades_hypothesis.py` quando Hypothesis está disponível. |
-| `testes/2_TESTE_telas_e_botoes/` | A **interface**: abre janelas e clica de verdade. Criar, editar, copiar, pessoas, dados bancários, importação, FIDO, alerta de tentativas, bloqueio por inatividade, teclado virtual, captura de tela, acessibilidade por teclado, janelas que aparecem prontas, nada cortado em 3 tamanhos, fluidez, cliques aleatórios ("macaco"), resiliência e soak. |
+| `testes/2_TESTE_telas_e_botoes/` | A **interface**: abre janelas e clica de verdade. Criar, editar, copiar, pessoas, dados bancários, importação, FIDO, alerta de tentativas, bloqueio por inatividade, teclado virtual, captura de tela, acessibilidade por teclado, janelas que aparecem prontas, nada cortado em 3 tamanhos, verificação de integridade que abre sozinha ao desbloquear (`teste_gui_integridade_ao_entrar.py`), fluidez, cliques aleatórios ("macaco"), resiliência e soak. |
 | `testes/3_TESTE_ataques_simulados/` | **Ataques simulados** (pentest): injeção, SSRF, força bruta/spraying, DoS, forense de memória, bypass de contador/autodestruição, engenharia reversa, fuzzing adversarial/Unicode, SAST (`bandit`), dependências (`pip-audit`), canal lateral de tempo, exfiltração pela rede, link simbólico, superfície do instalador e resíduos em disco. Relatório em `testes/3_TESTE_ataques_simulados/relatorio_pentest.md`. |
 | `testes/4_TESTE_so_no_windows/` | O que só vale no **Windows real**: sintaxe e funções do instalador (Pester), atributos de arquivo, ACL, SMBIOS × PowerShell, DPAPI, computador autorizado de ponta a ponta, blindagens/DLLs, WebAuthn e Windows Sandbox limpo. |
 | `testes/5_TESTE_ferramentas_externas/` | Ferramentas independentes do executável compilado: Bandit, pip-audit, Nmap local, PSScriptAnalyzer, busca de segredos, qualidade extra, SBOM, Hypothesis e verificação de integridade do repositório. O pytest é opcional no menu e repete as baterias 1 e 2. |
@@ -785,7 +785,7 @@ python testes\6_TESTE_ferramentas_dos_testes\rodar_todos.py --filtro fido -v
 python testes\6_TESTE_ferramentas_dos_testes\rodar_todos.py --so nucleo --filtro propriedades_hypothesis -v
 ```
 
-Para a ponte opcional do pytest, use `testes\5_TESTE_ferramentas_externas\03_PYTEST_PROJETO.bat`; ela mantém os caches em `testes\CACHE\` e os limpa ao terminar. Cada `teste_*.py` vira um caso; ausência de Hypothesis aparece como `SKIPPED`. No Linux sem tela, a interface roda dentro do `xvfb-run`.
+Para a ponte opcional do pytest, use `testes\5_TESTE_ferramentas_externas\03_PYTEST_PROJETO.bat`; ela mantém os caches temporários em `CACHE_PROJETO_NAO_MEXER\testes\` e os limpa ao terminar. Cada `teste_*.py` vira um caso; ausência de Hypothesis aparece como `SKIPPED`. No Linux sem tela, a interface roda dentro do `xvfb-run`.
 
 ### 14.4 Relatórios, depuração e boas maneiras
 
@@ -795,7 +795,7 @@ Para a ponte opcional do pytest, use `testes\5_TESTE_ferramentas_externas\03_PYT
 - **Bateria nova substitui a antiga:** `limpar_resultados.py` apaga os resultados anteriores antes de começar, para nunca misturar "ontem" com "hoje". No fim, `limpar_artefatos_testes.py` apaga pastas temporárias órfãs.
 - **Respeito ao seu PC:** por padrão, os testes rodam em prioridade baixa, esperam haver RAM livre e fazem pausa entre si. Para uma rodada autorizada em prioridade alta, defina `COFRE_TEST_HIGH_PRIORITY=1`; as janelas GUI continuam no segundo plano.
 - **Manifestos de teste:** `requirements-test-direct.in` guarda as dependências diretas com versões exatas (`==`); `requirements-test-lock.txt` é o lock gerado, com dependências transitivas e hashes, usado por `pip --require-hashes`. São duas etapas intencionais do mesmo fluxo, não cópias redundantes. Depois de alterar o arquivo de dependências diretas, regenere o lock com o comando em `testes\5_TESTE_ferramentas_externas\LEIA-ME.txt` e atualize `pacotes\` com `3 - BAIXAR PACOTES`.
-- **Ambiente e caches:** `testes\ambiente_virtual_ferramentas (NAO MEXER)` é um ambiente virtual persistente, ignorado pelo Git; não renomeie, mova ou apague: os atalhos dependem desse caminho. As baterias usam caches temporários em `testes\CACHE\<execução>` e os removem ao terminar; execuções diretas do programa ou Ruff também direcionam seus caches para subpastas de `testes\CACHE\`. Assim, não são criados `.hypothesis` nem `.ruff_cache` na raiz. Relatórios em `testes\resultados\` são mantidos.
+- **Ambiente e caches:** `testes\ambiente_virtual_ferramentas (NAO MEXER)` é um ambiente virtual persistente, ignorado pelo Git; não renomeie, mova ou apague: os atalhos dependem desse caminho. Todos os caches ficam em `CACHE_PROJETO_NAO_MEXER\` e não devem ser mexidos. Os caches temporários das baterias são retirados ao terminar. Relatórios em `testes\resultados\` são mantidos.
 - **Ferramentas de teste:** o lock fixa versões exatas. Dependências de runtime e ferramentas são instaladas em ambiente virtual local a partir de `pacotes\`, sem acesso à rede. O pentest instala somente as bibliotecas essenciais do programa; ferramentas opcionais ausentes são puladas, sem impedir os demais testes. Pester também é carregado do pacote local. O Nmap vem como instalador local, mas requer instalação manual e pode solicitar privilégios/Npcap; sem ele, o teste registra `PULADO`. Relatórios ficam diretamente em `testes\resultados\`. Nmap verifica apenas `127.0.0.1`.
 - **Testes do executável:** pefile e Defender só podem analisar um `CofreSenhas.exe` compilado; o teste de rede exige que esse executável esteja aberto. Baixar dependências não cria nem abre o programa; cada relatório individual explica o pré-requisito ausente.
 - **Hypothesis:** `teste_propriedades_hypothesis.py` verifica ida e volta de cofres com dados gerados e entradas CSV hostis. O executor tenta instalá-lo do wheelhouse do núcleo quando disponível; se faltar, mostra `PULADO` com código 9, sem contar como aprovado nem como falha. Uma falha real do teste retorna código diferente e reprova a bateria. O atalho 12 permite rodá-lo isoladamente.
@@ -840,7 +840,7 @@ projeto-cofre-offline/
 ├── requirements.txt         # runtime + compilação
 ├── requirements-test-direct.in    # entradas diretas fixadas; fonte para gerar o lock de testes
 ├── requirements-test-lock.txt  # lock de teste completo, com dependências transitivas e hashes
-├── ruff.toml              # mantém o cache Ruff em testes/CACHE
+├── ruff.toml              # mantém os caches em CACHE_PROJETO_NAO_MEXER
 ├── .gitignore
 ├── LICENSE                # licença de uso pessoal e estudo
 ├── SECURITY.md            # escopo de proteção e contato para relatos privados
@@ -864,13 +864,23 @@ projeto-cofre-offline/
 │   ├── 5_TESTE_ferramentas_externas/      # ferramentas gerais (sem depender do exe compilado)
 │   ├── 6_TESTE_ferramentas_dos_testes/    # executores, relatórios, cobertura (não são testes)
 │   ├── 7_TESTE_de_compilacao/             # verificações opcionais do executável compilado
-│   ├── CACHE/                             # caches temporários durante os testes; removida ao terminar
+│   ├── CACHE/                             # pasta antiga; não deve receber novos caches
 │   └── resultados/                  # (não versionada) tudo que os testes geram
 │
 ├── ferramentas_windows_opcionais/   # extras que cuidam do seu PC (não do cofre)
 │
 ├── pacotes/               # wheelhouse local; binários ignorados pelo Git
-└── logs_de_compilacao/    # (não versionada) um log por instalação
+├── CACHE_PROJETO_NAO_MEXER/ # (não versionada) cache único e permanente; NÃO MEXER
+│   ├── pip/
+│   ├── zig/
+│   ├── nuitka/
+│   ├── compilacao/
+│   └── testes/
+└── logs_de_compilacao/
+    ├── compilar-*.log
+    └── resultado completo/
+        ├── LOG_COMPLETO_COMPILACAO.log
+        └── LOG_COMPLETO_ERROS.log
 ```
 
 Este README é o único guia de entrada na raiz e explica os atalhos, arquivos e pastas para quem não é programador. Os manuais especializados em `documentacao/` e os guias em `testes/` continuam disponíveis para consulta detalhada. Cada pasta de testes tem um `INDICE.md` que explica **cada arquivo**; depois de criar, renomear ou apagar algo em `testes/`, atualize os índices com `python testes\6_TESTE_ferramentas_dos_testes\gerar_indices.py`.
@@ -916,7 +926,7 @@ Quem vai ler ou manter a implementação pode começar pelo [guia técnico do c�
 
 ## 18. Cuidados ao publicar no Git
 
-O `.gitignore` já impede o envio de `cofre.dat` e qualquer `*.dat`, `*.danificado`, `*.pre-v5`, `*.tmp`, cópias `*.bak1`–`*.bak5`, `*.lock`, `*.diag`, `.tmp_cofre/`, arquivos de chave `*.key`, planilhas `*.xlsx`/`*.xlsm`/`*.csv`, o `CofreSenhas.exe`, as pastas de compilação (`_cb/`, `_cb_cache/`), os binários de `pacotes/`, logs, `testes/resultados/` e os relatórios salvos pelos scripts do Windows. `pacotes/LEIA-ME.txt` e `pacotes/SHA256.txt` ficam versionáveis.
+O `.gitignore` já impede o envio de `cofre.dat` e qualquer `*.dat`, `*.danificado`, `*.pre-v5`, `*.tmp`, cópias `*.bak1`–`*.bak5`, `*.lock`, `*.diag`, `.tmp_cofre/`, arquivos de chave `*.key`, planilhas `*.xlsx`/`*.xlsm`/`*.csv`, o `CofreSenhas.exe`, as pastas de compilação (`_cb/`, `_cb_cache/`, `CACHE_PROJETO_NAO_MEXER/`), os binários de `pacotes/`, logs, `testes/resultados/` e os relatórios salvos pelos scripts do Windows. `pacotes/LEIA-ME.txt` e `pacotes/SHA256.txt` ficam versionáveis.
 
 Mesmo assim:
 
@@ -935,8 +945,8 @@ Mesmo assim:
 | *"A execução de scripts foi desabilitada neste sistema"* | Use o `1 - INSTALAR O COFRE...bat` (ele já usa `-ExecutionPolicy Bypass` só naquela execução). Se uma política de grupo (GPO) impedir até isso, instale em outro computador. |
 | O instalador recusa o hash dos 16 caracteres | Nunca avance. Confira se `cofre_senhas.py` e `icones_marcas.py` são os que você baixou e se digitou o hash combinado informado por quem forneceu o projeto. Arquivos diferentes = abortar. |
 | A compilação falhou ou foi interrompida | É só **rodar de novo**: o que já foi baixado e compilado fica no cache e é aproveitado. Veja `logs_de_compilacao\` e o `instalacao_detalhada.log` do destino. |
-| A tela parece parada na compilação | A etapa "Onefile Payload" costuma ficar muda alguns minutos. O instalador mostra `[vivo]` a cada 15 s; só considere travado se avisar em vermelho (10 min sem atividade). |
-| "Pouco espaço" na instalação | São necessários mais de 3 GB livres no destino. Apague a pasta `_cb_cache` se precisar liberar espaço. |
+| A tela parece parada na compilação | A etapa "Onefile Payload" costuma ficar muda alguns minutos. O instalador mostra a fase, `[COMPILANDO...]` a cada 5 s e `[VIVO]` a cada 15 s; só considere travado se avisar em vermelho (10 min sem atividade). |
+| "Pouco espaço" na instalação | São necessários mais de 3 GB livres no destino. Não apague o cache: `CACHE_PROJETO_NAO_MEXER` é permanente e fixo na raiz do projeto. |
 | O antivírus bloqueou o `.exe` ou o instalador | Libere só o `CofreSenhas.exe` (nunca pastas inteiras) ou envie como falso positivo. Se o bloqueio for total, reinstale e confira o SHA-256. |
 | "Editor desconhecido" ao abrir | Esperado (programa sem assinatura paga). Veja a [seção 10.6](#106-aviso-editor-desconhecido-do-windows-smartscreen). |
 | "O contador de tentativas está danificado ou zerado" | Pode ser duas janelas abrindo juntas. Feche a outra, aguarde e tente de novo. **Nada foi apagado.** Se persistir, o programa oferece restaurar a cópia. |

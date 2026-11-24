@@ -6,7 +6,7 @@ import shutil
 import sys
 import tempfile
 
-RAIZ_CACHE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "CACHE"))
+RAIZ_CACHE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "CACHE_PROJETO_NAO_MEXER", "testes"))
 
 
 def preparar_cache_temporario(prefixo):

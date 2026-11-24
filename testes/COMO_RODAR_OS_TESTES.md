@@ -29,7 +29,7 @@ No Linux sem tela, a interface roda dentro do `xvfb-run`. No Windows, as janelas
 No Windows, `COFRE_TEST_HIGH_PRIORITY=1` executa os subprocessos do `rodar_todos.py` em prioridade alta; por padrão eles continuam em prioridade baixa. Isso não ativa nem traz as janelas GUI para frente.
 Linhas `Traceback` em testes marcados `ok` são ruído do modo `-W error` (avisos de recurso), não falha.
 
-Os caches transitórios de Python, Hypothesis (incluindo os dados globais), Ruff, mypy, pytest e os arquivos temporários das baterias ficam em `testes\CACHE\<execução>` e são removidos ao fim. Execuções diretas do programa direcionam bytecode a `testes\CACHE\pycache`, e Ruff usa `testes\CACHE\ruff`. Assim, não são criados `.hypothesis` ou `.ruff_cache` na raiz. Execuções simultâneas da bateria usam subpastas próprias; os resultados em `testes\resultados\` são mantidos.
+Os caches transitórios de Python, Hypothesis (incluindo os dados globais), Ruff, mypy, pytest e os arquivos temporários das baterias ficam em `CACHE_PROJETO_NAO_MEXER\testes\` e são removidos ao fim quando forem temporários. Essa pasta única da raiz do projeto não deve ser mexida manualmente. Os resultados em `testes\resultados\` são mantidos.
 
 ## Pastas
 
@@ -114,7 +114,7 @@ A bateria 5 do Testar Tudo roda as ferramentas 01, 02, 04, 05, 08–10, 12 e 13.
 - `teste_planilha_selo.py`: modelo selado e **importação estrita** (só o que o cofre gerou); `teste_nivel_protecao.py`: ranking de proteção; `teste_backup_chave.py`: backup exige a chave de acesso.
 - `2_TESTE_telas_e_botoes/teste_gui_teclado_virtual.py`: teclado virtual sem recriar teclas (sem piscar), com contagem e Esc; `2_TESTE_telas_e_botoes/teste_gui_ajustes_ui.py`: senhas sempre ocultas até o olho e painel de nível de proteção.
 - `teste_autodestruicao.py`: autodestruição sem resíduos em disco/memória e contagem de tentativas em todas as combinações de fatores; `2_TESTE_telas_e_botoes/teste_gui_tentativas_config.py`: setas numéricas, tentativas dentro do cofre e tela inicial limpa.
-- `teste_patch_bypass.py`: remendo do programa não abre o cofre; `2_TESTE_telas_e_botoes/teste_gui_abertura.py`: abertura rápida e carga sob demanda; `2_TESTE_telas_e_botoes/teste_gui_recorte.py`: nada cortado em 3 tamanhos de janela.
+- `teste_patch_bypass.py`: remendo do programa não abre o cofre; `2_TESTE_telas_e_botoes/teste_gui_abertura.py`: abertura rápida e carga sob demanda; `2_TESTE_telas_e_botoes/teste_gui_recorte.py`: nada cortado em 3 tamanhos de janela; `2_TESTE_telas_e_botoes/teste_gui_integridade_ao_entrar.py`: a janela "Verificar integridade do cofre" abre sozinha ao desbloquear (com `COFRE_SEM_VERIFICACAO_INICIAL` removida de propósito), só lê o arquivo, não abre quando desligada e avisa de cópia danificada.
 - `teste_ocultar_apoio.py`: arquivos de apoio ocultos/somente leitura (Windows simulado): lista exata, .bat e arquivos do usuário intocados, revelar/ocultar idempotentes.
 
 - `teste_pc_segredo_local.py` — reforço DPAPI do computador autorizado (simulado).

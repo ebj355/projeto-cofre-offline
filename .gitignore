@@ -5,6 +5,7 @@ __pycache__/
 # Gerado pelo instalador em cada compilação (pasta temporária de build, apagada e refeita sempre)
 _cb/
 _cb_cache/
+CACHE_PROJETO_NAO_MEXER/
 
 # O programa compilado: cada máquina gera o seu; nunca distribua pelo repositório sem revisar antes.
 # Não existe mais nenhum .sha256/.bat ao lado dele (removido de propósito: ver MODELO_DE_AMEACAS.md, adendo 20).

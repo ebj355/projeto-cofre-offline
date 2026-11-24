@@ -3,6 +3,10 @@
 apagam, alternam maiúsculas, mostram a contagem sem revelar a senha, fecham com Esc e respondem rápido.
 Roda no Windows ou no Linux (xvfb-run -a)."""
 import os, sys, time, tempfile
+# Este teste envia TECLAS de verdade (Esc). Elas só chegam ao campo se a janela puder ter o foco do teclado, e o
+# modo "segundo plano" dos testes (COFRE_GUI_TESTS_BACKGROUND=1, janelas WS_EX_NOACTIVATE) impede isso. Por isso este
+# teste desliga o modo segundo plano: enquanto roda (cerca de 6 s) as janelas dele podem tomar o foco.
+os.environ["COFRE_GUI_TESTS_BACKGROUND"] = "0"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
 import tkinter as tk
 from tkinter import ttk, messagebox

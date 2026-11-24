@@ -35,9 +35,9 @@ if not defined COFRE_TEST_MINIMIZADO (
 cd /d "%~dp0"
 set "PASTA_LOGS_COMPILACAO=%~dp0..\..\logs_de_compilacao"
 set "PASTA_ERROS_COMPILACAO=%PASTA_LOGS_COMPILACAO%\erros de compilação"
-if exist "%PASTA_LOGS_COMPILACAO%" rmdir /s /q "%PASTA_LOGS_COMPILACAO%" >nul 2>nul
-if exist "%PASTA_LOGS_COMPILACAO%" (
-  echo ERRO: nao foi possivel limpar logs_de_compilacao da rodada anterior.
+if exist "%PASTA_ERROS_COMPILACAO%" rmdir /s /q "%PASTA_ERROS_COMPILACAO%" >nul 2>nul
+if exist "%PASTA_ERROS_COMPILACAO%" (
+  echo ERRO: nao foi possivel limpar os erros de compilacao da rodada anterior.
   exit /b 1
 )
 mkdir "%PASTA_ERROS_COMPILACAO%" >nul 2>nul
@@ -45,7 +45,7 @@ if not exist "%PASTA_ERROS_COMPILACAO%" (
   echo ERRO: nao foi possivel criar logs_de_compilacao\erros de compilação.
   exit /b 1
 )
-for %%I in ("%~dp0..\CACHE\_cache_bateria_%RANDOM%_%RANDOM%") do set "COFRE_TEST_CACHE_DIR=%%~fI"
+for %%I in ("%~dp0..\..\CACHE_PROJETO_NAO_MEXER\testes\_cache_bateria_%RANDOM%_%RANDOM%") do set "COFRE_TEST_CACHE_DIR=%%~fI"
 if exist "%COFRE_TEST_CACHE_DIR%" (
   echo ERRO: o caminho de cache temporario ja existe; nao vou apagar conteudo preexistente.
   exit /b 1
@@ -215,7 +215,6 @@ if exist "%COFRE_TEST_CACHE_DIR%" (
     echo ERRO: nao consegui remover o cache temporario %COFRE_TEST_CACHE_DIR%.
     set /a FALHAS+=1
   )
-  rmdir "%~dp0..\CACHE" >nul 2>nul
 )
 echo ============================================================
 echo  Rodada concluida. Arquivos individuais em testes\resultados\ e consolidados em "resultados completos"\.

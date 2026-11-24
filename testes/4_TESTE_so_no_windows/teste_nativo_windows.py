@@ -48,7 +48,8 @@ def atributos(base, rotulo):
     cofre = os.path.join(pasta, "cofre.dat")
     for n in ("cofre.dat", "cofre.dat.bak1", "cofre.dat.lock", "CofreSenhas.sha256"):
         open(os.path.join(pasta, n), "wb").write(b"x")
-    open(os.path.join(pasta, "Abrir_Cofre.bat"), "w").write("@echo off\n")
+    open(os.path.join(pasta, "CofreSenhas.exe"), "wb").write(b"MZ")      # o programa: tem de continuar SEMPRE visivel
+    open(os.path.join(pasta, "outro.bat"), "w").write("@echo off\n")      # nenhum .bat e escondido
     os.makedirs(os.path.join(pasta, "logs"), exist_ok=True)
     n = c.ocultar_apoio(cofre, executavel=os.path.join(pasta, "CofreSenhas.exe"))
     ver(f"[{rotulo}] ocultar_apoio marcou os arquivos de apoio", n >= 4, f"{n} itens")
@@ -57,8 +58,10 @@ def atributos(base, rotulo):
     cod, saida = sh(["attrib", os.path.join(pasta, "cofre.dat")])
     linha = saida.strip().split("\\")[0].replace(" ", "")
     ver(f"[{rotulo}] o comando attrib do Windows confirma (S, H, R)", all(x in linha for x in "SHR"), linha)
-    b = c._ler_atributos(os.path.join(pasta, "Abrir_Cofre.bat"))
-    ver(f"[{rotulo}] Abrir_Cofre.bat continua visível", b is not None and (b & 0x6) == 0, hex(b or 0))
+    b = c._ler_atributos(os.path.join(pasta, "CofreSenhas.exe"))
+    ver(f"[{rotulo}] CofreSenhas.exe continua visível (sem Oculto/Sistema)", b is not None and (b & 0x6) == 0, hex(b or 0))
+    b = c._ler_atributos(os.path.join(pasta, "outro.bat"))
+    ver(f"[{rotulo}] um .bat solto na pasta continua visível", b is not None and (b & 0x6) == 0, hex(b or 0))
     try:
         open(os.path.join(pasta, "cofre.dat"), "ab").write(b"y"); gravou = True
     except OSError: gravou = False

@@ -61,7 +61,12 @@ try: abre(p, recuperacao=c.nova_chave_acesso()[1]); res = "abriu"
 except c.SenhaIncorreta: res = "errada"
 ok(res == "errada" and c.tentativas_restantes(p) == r2 - 1, "código de recuperação errado gasta 1 tentativa")
 # 5) autorizar B estando no B (aberto com o código); A continua abrindo
-v = abre(p, recuperacao=cod); ok(v.pc_adicionar("Notebook") is None and len(v.pc["maquinas"]) == 2, "segundo computador autorizado (sem novo código)")
+v = abre(p, recuperacao=cod)
+try: v.pc_adicionar("Notebook"); res = "ok"
+except ValueError: res = "limitado"
+ok(res == "limitado", "regra nova: com 1 computador, o 2º é recusado até responder SIM a 'tem mais computadores?'")
+v.definir_pcs_multiplos(True)
+ok(v.pc_adicionar("Notebook") is None and len(v.pc["maquinas"]) == 2, "segundo computador autorizado (sem novo código)")
 try: v.pc_adicionar("de novo"); res = "ok"
 except ValueError: res = "dup"
 ok(res == "dup", "o mesmo computador não entra duas vezes"); v.salvar(); v.fechar()
@@ -122,7 +127,7 @@ for off, nome in ((hl + 1, "flag"), (hl + 2 + 5, "n/sal"), (hl + 40 + 80, "wrap"
 v = abre(r); G = v._G; ok(G is not None and any(G), "fator em memória enquanto aberto"); v.fechar()
 ok(v._G is None, "fator descartado ao fechar")
 # 11) limite
-em("A"); s2 = nova("s"); v = abre(s2)
+em("A"); s2 = nova("s"); v = abre(s2); v.definir_pcs_multiplos(True)      # sem isto o limite é 1
 n = 0
 for i in range(c.MAX_PC + 2):
     em("PC%d" % i)

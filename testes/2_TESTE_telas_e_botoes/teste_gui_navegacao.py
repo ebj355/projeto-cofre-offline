@@ -7,6 +7,10 @@ def _foto(arq):
     try: _sp.run(["import", "-window", "root", arq], check=False)
     except Exception: pass
 import os, sys, subprocess, time, traceback, faulthandler
+# Este teste envia TECLAS de verdade (Ctrl+A, Backspace, Delete, Ctrl+C). Elas só chegam ao campo se a janela puder ter o foco do teclado, e o
+# modo "segundo plano" dos testes (COFRE_GUI_TESTS_BACKGROUND=1, janelas WS_EX_NOACTIVATE) impede isso. Por isso este
+# teste desliga o modo segundo plano: enquanto roda (cerca de 25 s) as janelas dele podem tomar o foco.
+os.environ["COFRE_GUI_TESTS_BACKGROUND"] = "0"
 faulthandler.dump_traceback_later(100, exit=True)
 sys.path.insert(0, _RAIZ)
 import tkinter as tk

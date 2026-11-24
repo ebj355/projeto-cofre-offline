@@ -33,7 +33,7 @@ for n in ("cofre.dat.bak1", "cofre.dat.bak2", "cofre.dat.diag", "cofre.dat.lock"
     # atuais do instalador não criam mais esse arquivo. Abrir_Cofre.bat simula um .bat qualquer (de uma versão
     # antiga, ou um script próprio do usuário): nenhum .bat é escondido, por segurança.
     toca(n)
-toca("logs/"); toca("_cb_cache/"); toca("pasta_do_usuario/")
+toca("logs/"); toca("pasta_do_usuario/")
 exe = os.path.join(W, "CofreSenhas.exe")
 
 # --- Windows de mentira: atributos em dicionário
@@ -53,7 +53,7 @@ try:
     esperado = sorted(["cofre.dat", "cofre.dat.bak1", "cofre.dat.bak2", "cofre.dat.diag", "cofre.dat.lock",
                        "cofre.dat.gravar.lock",
                        "cofre.dat.danificado", "CofreSenhas.sha256", "avisos_vistos.json",
-                       "instalacao_detalhada.log", "logs", "_cb_cache"])
+                       "instalacao_detalhada.log", "logs"])
     ok(nomes() == esperado, f"lista de apoio exata ({len(esperado)} itens)")
     ok("CofreSenhas.exe" not in nomes(), "o PRÓPRIO PROGRAMA (.exe) nunca é escondido -- é a única coisa que deve continuar visível")
     ok("Abrir_Cofre.bat" not in nomes() and "script_proprio_do_usuario.bat" not in nomes(), "nenhum .bat é escondido")
@@ -61,8 +61,8 @@ try:
     n = c.ocultar_apoio(cofre, exe)
     ok(n == len(esperado), f"ocultar_apoio marcou {n}")
     H, S, R = 2, 4, 1
-    ok(all(ler(os.path.join(W, a)) & (H | S | R) == (H | S | R) for a in esperado if a not in ("logs", "_cb_cache")), "arquivos: Oculto+Sistema+Somente leitura")
-    ok(all(ler(os.path.join(W, a)) & (H | S) == (H | S) and not ler(os.path.join(W, a)) & R for a in ("logs", "_cb_cache")), "pastas: Oculto+Sistema (sem Somente leitura)")
+    ok(all(ler(os.path.join(W, a)) & (H | S | R) == (H | S | R) for a in esperado if a not in ("logs",)), "arquivos: Oculto+Sistema+Somente leitura")
+    ok(all(ler(os.path.join(W, a)) & (H | S) == (H | S) and not ler(os.path.join(W, a)) & R for a in ("logs",)), "pastas: Oculto+Sistema (sem Somente leitura)")
     ok(all(not ler(os.path.join(W, a)) & H for a in ("CofreSenhas.exe", "Abrir_Cofre.bat", "minhas_fotos.jpg", "README.md", "pasta_do_usuario")), "o resto (inclusive o próprio .exe) continua visível")
     atr[os.path.join(W, "cofre.dat")] |= 0x20 | 0x100                       # outro atributo qualquer
     c.ocultar_apoio(cofre, exe)                                              # idempotente
