@@ -61,6 +61,7 @@ Windows. Windows 11 ARM64 pode usar o executável x64 sob emulação; build nati
 | TC22 | Importação de formatos reais | Alta | ler arquivos fictícios no formato Chrome/Edge, Firefox, Bitwarden, LastPass, 1Password, KeePassXC, Excel/LibreOffice e CSV aleatórios | `teste_nucleo_importacao_formatos_reais.py` |
 | TC23 | Marcas e autocompletar offline | Média | resolver aliases sem sobrescrever marcas existentes, ignorar destinos inválidos e gerar ícones locais sem rede | `teste_autocompletar.py`, `teste_icones.py` |
 | TC24 | Verificação de integridade ao entrar | Alta | desbloquear pela tela: a janela de integridade abre sozinha e mostra o arquivo principal íntegro; o arquivo do cofre não muda (mesmo hash); com `COFRE_SEM_VERIFICACAO_INICIAL=1` ela não abre; cópia `.bak1` danificada mostra DANIFICADA e PROBLEMA sem derrubar o programa | `teste_gui_integridade_ao_entrar.py` (pasta 8, atalho próprio, não incluído no Testar Tudo; escrito, ainda não executado no Windows) |
+| TC25 | Teste visual bruto: travadas, glitch de tela e erros ao escolher opções | Alta | varrer a geometria (texto cortado, controle fora da janela ou sobreposto) em todos os temas e 4 tamanhos de janela; apertar todas as opções da tela e de cada diálogo medindo o congelamento; tempestade de trocas seguidas; fotografar a janela (sem usar a tela) e procurar quadro em branco, pisca A-B-A, desenho instável, fantasma ao voltar de tema e resíduo ao redimensionar; reprovar com qualquer exceção, caixa de erro, vazamento de widgets ou janela solta | `teste_gui_visual_brutal.py` (pasta 8, atalho próprio, fora do Testar Tudo; validado no Linux/Xvfb, ainda não executado no Windows) |
 
 ## Rastreabilidade e lacunas
 Todo risco R1–R7 tem mitigação ou teste, mas nem todos têm automação. **Lacunas abertas:** smoke do `.exe`, instalação em
@@ -123,3 +124,14 @@ verificado; a segunda é demorada e ainda não foi implementada.
 Nova bateria completa no Windows 11 Pro 10.0.26300 / Python 3.13.9 AMD64: 2.541 verificações OK, 6 `[PULADO]` (pefile, Defender, conexões do processo e smoke visual, porque os scripts não localizaram o `.exe`, que já estava em `7_TESTE_de_compilacao`; corrigido no `_achar_exe.bat`) e 2 relatórios com falha/interrupção. Núcleo 60/60, pentest 18/18, nativo 39/39 e Pester do instalador 17/17 (TC19). PSScriptAnalyzer passou sem alertas. Continuam em aberto: a qualidade extra (`[ALERTA]`), as sondas `python -X dev` (`-1073741819`) e a validação do `.exe`. A medida "abrir+fechar Novo item" reprovou com 541 ms; o limite do teste de desempenho passou de 500 para 650 ms (margem sobre o pior valor observado, ainda sensível a regressões reais). Resultado: No-Go até compilar o `.exe`, repetir a bateria e revisar os achados.
 
 O smoke visual, que achou o `.exe`, reprovou em duas verificações do modo de teste em segundo plano (`WS_EX_NOACTIVATE` e foco). O `revelar_janela` passou a reaplicar esse modo depois que o Tk mostra a janela (só com `COFRE_GUI_TESTS_BACKGROUND=1`); falta recompilar e repetir para confirmar.
+
+## Acréscimos de 2026-11-24
+Novo `8_TESTE_extras_atalho_proprio/teste_gui_visual_brutal.py` (TC25). Limites: congelamento acima de 700 ms reprova
+(`COFRE_VISUAL_LIMITE_MS`), acima de 250 ms gera `[ALERTA]`; a tempestade usa 400 ações aleatórias por padrão
+(`COFRE_VISUAL_TEMPESTADE`) e imprime a semente do sorteio para repetir a rodada (`COFRE_VISUAL_SEMENTE`). Só neste
+processo de teste a proteção contra captura de tela é desligada, para a janela poder ser fotografada; o cofre real e o
+`.exe` não mudam. Se a foto não for possível (captura bloqueada, sem Pillow), só os testes de imagem ficam `[PULADO]`.
+Primeira rodada (Linux/Xvfb): 0 exceções, 0 travadas e 0 quadros piscando; falhas de geometria registradas abaixo.
+Achados abertos: (1) barra lateral: o contador à direita do nome é empacotado depois do nome e é espremido quando o
+nome é longo (`BarraLateral._desenhar`, `ln.pack(side="right")` deve vir antes de `ltxt.pack(...)`); (2) na janela no
+tamanho mínimo o botão "Novo item" e os rótulos de seção da barra lateral ficam cortados.
