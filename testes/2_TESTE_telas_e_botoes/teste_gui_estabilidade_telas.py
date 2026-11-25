@@ -26,6 +26,8 @@ import tempfile
 import time
 import traceback
 
+sys.dont_write_bytecode = True                  # nao deixa __pycache__ na raiz do projeto (nem na pasta do teste)
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"     # vale tambem para qualquer subprocesso
 os.environ.setdefault("COFRE_GUI_TESTS_BACKGROUND", "1")
 os.environ.setdefault("COFRE_SEM_VERIFICACAO_INICIAL", "1")
 os.environ.setdefault("COFRE_TESTE_SEM_JANELA_FATAL", "1")
