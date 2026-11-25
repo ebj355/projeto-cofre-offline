@@ -333,6 +333,18 @@ def principal():
             f.preencher(servico="Com Extras", pin="1111", senha_extra="extra-xyz")
             # 'x' de um campo extra
             xs = [w for w in A.todos(f.janela) if w.winfo_class() == "TButton" and A.texto_de(w) == "×" and w.winfo_ismapped()]
+            # diagnostico: se faltar botao, mostra TODOS os botoes com texto parecido com 'x' e se estao mapeados,
+            # para separar "o botao nao existe" de "existe mas nao esta visivel" de "o texto mudou"
+            if len(xs) < 5:
+                suspeitos = []
+                for w in A.todos(f.janela):
+                    if w.winfo_class() == "TButton":
+                        t = A.texto_de(w)
+                        if t is not None and (len(str(t)) <= 2) and str(t).strip():
+                            suspeitos.append((repr(t), "mapeado" if w.winfo_ismapped() else "NAO mapeado",
+                                              "pai mapeado" if w.master.winfo_ismapped() else "pai NAO mapeado",
+                                              w.winfo_manager() or "sem gerenciador"))
+                print("  (diagnostico) botoes de texto curto na janela:", suspeitos, flush=True)
             rel.verifica(len(xs) >= 5, "cada credencial extra tem seu botao 'x'", str(len(xs)))
             antes = set(ids_atuais(app))
             f.v["tem"] = None

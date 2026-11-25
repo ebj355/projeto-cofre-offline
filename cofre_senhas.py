@@ -2248,12 +2248,15 @@ def relatorio_forca(senha):
 
 _CACHE_FORCA = {}
 _CACHE_FORCA_MAX = 1000          # teto de itens: ao passar disso descarta o mais antigo (FIFO)
+_CHAVE_CACHE_FORCA = secrets.token_bytes(32)   # chave aleatória DESTA execução: a chave do cache é um HMAC, não um hash puro da senha
 
 
 def _forca_em_cache(senha):
-    """avaliar_forca com cache. A chave é o SHA-256 da senha (a senha em si não fica guardada); o cache
-    é esvaziado ao bloquear o cofre."""
-    k = hashlib.sha256(senha.encode("utf-8", "surrogatepass")).digest()
+    """avaliar_forca com cache. A chave é um HMAC-SHA256 da senha com uma chave aleatória desta execução
+    (a senha em si não fica guardada, e o valor guardado não serve para testar palpites de senha fora do
+    processo); o cache é esvaziado ao bloquear o cofre."""
+    import hmac
+    k = hmac.new(_CHAVE_CACHE_FORCA, senha.encode("utf-8", "surrogatepass"), hashlib.sha256).digest()
     r = _CACHE_FORCA.get(k)
     if r is None:
         while len(_CACHE_FORCA) >= _CACHE_FORCA_MAX:
@@ -7030,6 +7033,20 @@ class BarraLateral(tk.Frame if tk else object):
             ltxt = tk.Label(linha, text=e["texto"], bg=C["lateral"], fg=e.get("cor_txt") or C["lateral_txt"],
                             font="CofreTexto", anchor="w")
             ltxt.pack(side="left", fill="x", expand=True)
+            texto_cheio = e["texto"]
+
+            def _ajustar_texto(_ev=None, lbl=ltxt, t=texto_cheio):
+                """Corta o nome com '…' para caber na largura que o rótulo tem agora (o corte por nº de caracteres
+                feito por quem monta a lista não conhece a largura real: nomes com letras largas ficavam cortados)."""
+                try:
+                    larg = lbl.winfo_width()
+                    if larg > 8:
+                        novo_txt = _cortar(t, tkfont.nametofont(lbl.cget("font")), larg - 4)
+                        if novo_txt != str(lbl.cget("text")):
+                            lbl.configure(text=novo_txt)
+                except tk.TclError:
+                    pass
+            ltxt.bind("<Configure>", _ajustar_texto, add="+")
             ln = tk.Label(linha, text=str(e.get("n", "")), bg=C["lateral"],
                           fg=e.get("cor_n") or C["fraco"], font="CofrePequeno", padx=10)
             ln.pack(side="right")
@@ -7081,8 +7098,9 @@ class BarraLateral(tk.Frame if tk else object):
             for w in it["partes"]:
                 w.configure(bg=fundo)
             it["barra"].configure(bg=C["prim"] if sel else fundo)
-            it["texto"].configure(fg=C["texto"] if sel else it["cor_txt"],
-                                  font="CofreForte" if sel else "CofreTexto")
+            # A fonte NÃO muda ao selecionar (negrito é mais largo e empurrava o texto/vizinhos): o destaque vem da
+            # cor, do fundo e da barrinha lateral.
+            it["texto"].configure(fg=C["texto"] if sel else it["cor_txt"])
             e = it["ent"]
             if not e.get("cor"):
                 cor = e.get("cor_icone") or (C["prim_txt"] if sel else C["suave"])
@@ -8063,7 +8081,7 @@ class App:
         tela.create_text(0, 0, text="Criptografado e só neste computador",
                          fill=C["fraco"], font="CofrePequeno", tags="rodape")
         PAD = _px(24)
-        estado = {"wh": None, "maxw": 0, "maxh": 0}
+        estado = {"wh": None, "maxw": 0, "maxh": 0, "topo": None, "janela": None, "travado": False, "agendado": False}
 
         def redesenhar(event=None):
             """Recentraliza o conteúdo quando a janela muda de tamanho."""
@@ -8076,7 +8094,20 @@ class App:
                 cw = max(conteudo.winfo_reqwidth() + 2 * PAD, estado["maxw"])
                 ch = max(conteudo.winfo_reqheight() + 2 * PAD, estado["maxh"])
                 estado["maxw"], estado["maxh"] = cw, ch
-                cy = max(ch / 2 + 18, (h - 44) / 2)
+                # TOPO ANCORADO: a posição do cartão é decidida ao montar a tela (ou quando a JANELA muda de tamanho).
+                # Se depois o conteúdo ficar mais alto (outra opção escolhida, campo que aparece), o cartão cresce
+                # só PARA BAIXO: o que já estava na tela não sobe nem "pula" (antes o cartão crescia pelos dois
+                # lados, por ser centralizado, e tudo se deslocava na primeira troca de opção).
+                if estado["topo"] is None or estado["janela"] != (w, h) or not estado["travado"]:
+                    estado["janela"] = (w, h)
+                    estado["topo"] = max(18, (h - 44 - ch) / 2)
+                if not estado["agendado"]:
+                    # Na abertura o conteúdo ainda termina de ser medido (quebras de linha, ícones): por ~0,4 s o
+                    # cartão se centraliza livremente; depois disso o topo fica TRAVADO (só a janela mudar o recalcula).
+                    estado["agendado"] = True
+                    tela.after(400, lambda: estado.__setitem__("travado", True))
+                topo_cartao = min(estado["topo"], max(18, h - 44 - ch))      # só sobe se faltar espaço embaixo
+                cy = topo_cartao + ch / 2
                 tela.delete("brilho")
                 brilho_radial(tela, w / 2, cy - ch * 0.42, max(w, h) * 0.85, C["prim_fundo"], C["fundo"])
                 if estado["wh"] != (cw, ch):
@@ -8829,14 +8860,16 @@ class App:
         cx2, e_chave = self._linha_secreta(bloco_chave, 36, "C.", placeholder="Chave de acesso")
         cx2.pack(fill="x", pady=(2, 0))
 
+        folga = {"senha": 0, "chave": 0}     # espaço extra embaixo do bloco mais baixo: os dois ficam da MESMA altura
+
         def mostrar_campos():
             """Mostra só os campos exigidos pelo modo do cofre."""
             bloco_senha.pack_forget()
             bloco_chave.pack_forget()
             if dois_fatores or modo.get() == "senha":
-                bloco_senha.pack(fill="x")
+                bloco_senha.pack(fill="x", pady=(0, folga["senha"]))
             if dois_fatores or modo.get() == "chave":
-                bloco_chave.pack(fill="x", pady=(12 if dois_fatores else 0, 0))
+                bloco_chave.pack(fill="x", pady=(12 if dois_fatores else 0, folga["chave"]))
 
         def trocar_modo():
             """Alterna entre senha, chave e recuperação, limpando os campos."""
@@ -8871,6 +8904,18 @@ class App:
             lbl.config(text="Chave carregada ✓", foreground=C["ok"])
 
         bt_arq.config(command=carregar_arquivo)
+        if not dois_fatores and not so_senha:
+            # Mede os DOIS blocos antes de a tela aparecer e iguala as alturas: trocar entre "Senha mestra" e
+            # "Chave de acesso" não muda mais a altura do cartão (antes ele crescia na primeira troca e a tela pulava).
+            alturas = {}
+            for modo_med in ("senha", "chave"):
+                modo.set(modo_med)
+                mostrar_campos()
+                form.update_idletasks()
+                alturas[modo_med] = form.winfo_reqheight()
+            modo.set("senha")
+            maior = max(alturas.values())
+            folga["senha"], folga["chave"] = maior - alturas["senha"], maior - alturas["chave"]
         mostrar_campos()
 
         usar_rec = tk.BooleanVar(value=False)
@@ -9878,7 +9923,10 @@ class App:
                 """Atualiza a contagem regressiva do aviso e bloqueia ao chegar a zero."""
                 if self._janela_av_bloq is not j or self.cofre is None:
                     return
-                rot.config(text=f"Bloqueando em {restante['s']} s — clique ou mexa no teclado para continuar")
+                try:
+                    rot.config(text=f"Bloqueando em {restante['s']} s — clique ou mexa no teclado para continuar")
+                except tk.TclError:          # a janelinha foi destruída com o timer ainda agendado
+                    return
                 restante["s"] -= 1
                 if restante["s"] >= 0:
                     self._timer_av_bloq = self.root.after(1000, tique)
@@ -10019,8 +10067,11 @@ class App:
                 largura = max(largura, estado["lmax"])
                 altura = max(altura, estado["amax"])
                 estado["lmax"], estado["amax"] = largura, altura
+                d._tam_corpo = (largura, altura)      # tamanho DECIDIDO: _centralizar usa este (a janela ainda pode estar escondida)
                 corpo_altura = max(1, altura - reserva)
-                rolagem = h > corpo_altura
+                # A barra de rolagem, uma vez que apareceu, FICA (mesmo que depois o conteúdo caiba): aparecer e sumir a
+                # cada troca de opção estreitava e alargava o conteúdo em ~12 px, e a tela "tremia".
+                rolagem = h > corpo_altura or estado["rolagem"]
                 if rolagem != estado["rolagem"]:
                     if rolagem:
                         barra.pack(side="right", fill="y")
@@ -10039,6 +10090,8 @@ class App:
                 if not estado["pos"]:
                     estado["pos"] = True
                     d.after_idle(lambda: self._centralizar(d))
+                elif d.winfo_viewable():
+                    self._manter_no_lugar(d)      # cresceu com o diálogo aberto: só se mexe se passar da borda da tela
             except tk.TclError:
                 pass
 
@@ -10084,8 +10137,10 @@ class App:
             visivel = d.winfo_viewable()
             if visivel:
                 w, h = d.winfo_width(), d.winfo_height()
-            else:                          # ainda escondida: o tamanho "real" é o pedido pelo conteúdo
-                w, h = d.winfo_reqwidth(), d.winfo_reqheight()
+            else:                          # ainda escondida: vale o tamanho já DECIDIDO pelo corpo (se houver)
+                w, h = getattr(d, "_tam_corpo", None) or (d.winfo_reqwidth(), d.winfo_reqheight())
+                # (usar só winfo_req* aqui jogava fora a largura mínima decidida: o diálogo abria estreito e, na
+                # primeira mudança de conteúdo, saltava para a largura certa e mudava de posição)
             sw, sh = d.winfo_screenwidth(), d.winfo_screenheight()
             r = self.root
             x = r.winfo_rootx() + (r.winfo_width() - w) // 2
@@ -10096,13 +10151,35 @@ class App:
         except tk.TclError:
             pass
 
+    def _manter_no_lugar(self, d):
+        """Diálogo JÁ VISÍVEL que mudou de tamanho: fica onde está (cresce para baixo/direita) e só sobe/volta o
+        mínimo se passar da borda da tela. Recentralizar a cada mudança fazia a janela andar a cada clique."""
+        try:
+            d.update_idletasks()
+            w, h = d.winfo_width(), d.winfo_height()
+            x, y = d.winfo_x(), d.winfo_y()
+            sw, sh = d.winfo_screenwidth(), d.winfo_screenheight()
+            nx = max(0, min(x, sw - w))
+            ny = max(0, min(y, sh - h - _px(48)))
+            if (nx, ny) != (x, y):
+                d.geometry(f"+{nx}+{ny}")
+        except tk.TclError:
+            pass
+
     def _recalcular_dialogo(self, d):
-        """Ajusta o tamanho e a posição do diálogo depois que seu conteúdo muda."""
+        """Ajusta o tamanho do diálogo depois que seu conteúdo muda (a posição só se mexe se faltar espaço na tela)."""
         d.update_idletasks()
         preparar = getattr(d, "_preparar_corpo", None)
         if callable(preparar):
             preparar()
-        self._centralizar(d)
+        try:
+            visivel = d.winfo_viewable()
+        except tk.TclError:
+            return
+        if visivel:
+            self._manter_no_lugar(d)
+        else:
+            self._centralizar(d)
 
     @staticmethod
     def _bloquear_copia(widget):

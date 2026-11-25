@@ -276,7 +276,7 @@ def _cor_da_marca(nome, chave):
     if chave:
         return MARCAS[chave][0], MARCAS[chave][1]
     chave_hash = normalizar(nome)
-    digest = hashlib.md5(chave_hash.encode("utf-8")).digest()
+    digest = hashlib.md5(chave_hash.encode("utf-8"), usedforsecurity=False).digest()  # só escolhe a cor do ícone; nada de segurança
     return "#{:02X}{:02X}{:02X}".format(*digest[:3]), (str(nome or "").strip()[:1].upper() or "?")
 
 

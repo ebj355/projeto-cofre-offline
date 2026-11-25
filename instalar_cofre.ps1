@@ -3,7 +3,7 @@
 #  INSTALADOR AUTOMÁTICO DO ARCA — COFRE DE SEGURANÇA
 #  Faz tudo sozinho:
 #   1. confere cofre_senhas.py e icones_marcas.py ao lado deste instalador (SHA-256 combinado digitado por você)
-#   2. instala o Python 3.13 se não houver (winget ou python.org, com assinatura e SHA-256 conferidos)
+#   2. instala o Python 3.13 se não houver (python.org, com assinatura e SHA-256 conferidos; winget só como alternativa)
 #   3. instala as bibliotecas em versões FIXAS e com hash (pip --require-hashes)
 #   4. compila o CofreSenhas.exe (código nativo) DENTRO DO PENDRIVE, a partir de uma pasta limpa
 #   5. deixa o .exe no destino escolhido e mostra o SHA-256; ao detectar a instalação antiga em
@@ -844,20 +844,7 @@ O instalador localiza esta pasta pela raiz do projeto e reaproveita seu conteudo
             $python = Achar-Preferido
         }
         if (-not $python) {
-            Info "Python 3.13 não encontrado. Instalando (pode aparecer um pedido de permissão do Windows)..."
-            $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-            if ($winget) {
-                # Tempo limite de 5 min: o winget pode ficar esperando uma janela de permissão (UAC) escondida atrás desta
-                Info "Se aparecer (ou piscar na barra de tarefas) um pedido de permissão do Windows, aceite. Esperando até 5 minutos..."
-                try {
-                    $pw = Start-Process -FilePath $winget.Source -ArgumentList 'install', '-e', '--id', 'Python.Python.3.13', '--scope', 'user', '--silent', '--accept-package-agreements', '--accept-source-agreements' -PassThru -NoNewWindow
-                    if (-not $pw.WaitForExit(300000)) {
-                        try { $pw.Kill() } catch {}
-                        Info "O winget não terminou em 5 minutos (provável janela de permissão escondida). Seguindo para o download direto."
-                    }
-                } catch { Info "winget indisponível: $($_.Exception.Message)" }
-            }
-            $python = Achar-Preferido
+            Info "Python 3.13 não encontrado. Baixando o instalador oficial do python.org (SHA-256 e assinatura conferidos)..."
             if (-not $python) {
                 Info "Baixando o instalador oficial em python.org..."
                 # 3.13.17: última versão 3.13 com instalador para Windows (as seguintes só têm código-fonte)
@@ -868,18 +855,36 @@ O instalador localiza esta pasta pela raiz do projeto e reaproveita seu conteudo
                     try { Invoke-WebRequest -Uri $url -OutFile $inst -UseBasicParsing -TimeoutSec 300; $baixou = $true }
                     catch { Info "Download do Python falhou (tentativa $t de 3): $($_.Exception.Message)"; if ($t -lt 3) { Start-Sleep -Seconds (5 * $t) } }
                 }
-                if (-not $baixou) { Erro "Não consegui baixar o Python depois de 3 tentativas. Verifique a internet e rode de novo."; return }
-                $shaBaixado = (Get-FileHash -LiteralPath $inst -Algorithm SHA256).Hash
-                $sig = Get-AuthenticodeSignature -LiteralPath $inst
-                if ($shaBaixado -ne $shaPython.ToUpper() -or $sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+                if (-not $baixou) { Info "Não consegui baixar o Python depois de 3 tentativas. Vou tentar o winget como alternativa." }
+                if ($baixou) {
+                    $shaBaixado = (Get-FileHash -LiteralPath $inst -Algorithm SHA256).Hash
+                    $sig = Get-AuthenticodeSignature -LiteralPath $inst
+                    if ($shaBaixado -ne $shaPython.ToUpper() -or $sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+                        Remove-Item $inst -Force -ErrorAction SilentlyContinue
+                        Erro "O instalador baixado NÃO confere (SHA-256 ou assinatura da Python Software Foundation). Instalação cancelada por segurança."
+                        return
+                    }
+                    Ok "instalador do Python: SHA-256 e assinatura oficial verificados"
+                    $pi = Start-Process -FilePath $inst -ArgumentList '/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_tcltk=1', 'Include_launcher=1', 'Include_pip=1', 'Include_test=0' -PassThru
+                    if (-not $pi.WaitForExit(600000)) { try { $pi.Kill() } catch {}; Info "A instalação do Python passou de 10 minutos e foi interrompida." }
                     Remove-Item $inst -Force -ErrorAction SilentlyContinue
-                    Erro "O instalador baixado NÃO confere (SHA-256 ou assinatura da Python Software Foundation). Instalação cancelada por segurança."
-                    return
+                    $python = Achar-Preferido
                 }
-                Ok "instalador do Python: SHA-256 e assinatura oficial verificados"
-                $pi = Start-Process -FilePath $inst -ArgumentList '/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_tcltk=1', 'Include_launcher=1', 'Include_pip=1', 'Include_test=0' -PassThru
-                if (-not $pi.WaitForExit(600000)) { try { $pi.Kill() } catch {}; Info "A instalação do Python passou de 10 minutos e foi interrompida." }
-                Remove-Item $inst -Force -ErrorAction SilentlyContinue
+            }
+            if (-not $python) {
+                # Alternativa: o winget NAO passa pela conferência de SHA-256/assinatura deste script (usa a do próprio winget).
+                $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+                if ($winget) {
+                    # Tempo limite de 5 min: o winget pode ficar esperando uma janela de permissão (UAC) escondida atrás desta
+                    Info "Se aparecer (ou piscar na barra de tarefas) um pedido de permissão do Windows, aceite. Esperando até 5 minutos..."
+                    try {
+                        $pw = Start-Process -FilePath $winget.Source -ArgumentList 'install', '-e', '--id', 'Python.Python.3.13', '--scope', 'user', '--silent', '--accept-package-agreements', '--accept-source-agreements' -PassThru -NoNewWindow
+                        if (-not $pw.WaitForExit(300000)) {
+                            try { $pw.Kill() } catch {}
+                            Info "O winget não terminou em 5 minutos (provável janela de permissão escondida). Seguindo para o download direto."
+                        }
+                    } catch { Info "winget indisponível: $($_.Exception.Message)" }
+                }
                 $python = Achar-Preferido
             }
         }

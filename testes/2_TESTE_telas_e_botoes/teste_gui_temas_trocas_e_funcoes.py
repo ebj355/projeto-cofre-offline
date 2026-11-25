@@ -99,7 +99,7 @@ def aplicar_pela_tela(app, nome, esperar=True):
     antes = set(A.toplevels(root))
     app.dialogo_aparencia()
     import time
-    fim = time.time() + 4.0                  # a janela abre com atraso em maquina ocupada: espera em vez de 0,25 s fixos
+    fim = time.time() + 10.0                 # a janela abre com atraso em maquina ocupada: espera em vez de 0,25 s fixos
     novos = []
     while not novos and time.time() < fim:
         A.bombear(root, 0.1)
@@ -191,6 +191,18 @@ def sondar_leve(app, erros, msgs, rotulo, outros, nome):
             for j in janelas:
                 acumulador.extend(A.varrer_cores_antigas(cs, j, velhas_para(nome, outros)))
         titulos, erro = A.chamar_e_fechar(app, funcao, 0.7, durante=inspecionar)
+        if erro is None and titulo not in titulos:
+            # Maquina lenta (antivirus injetado, 1a abertura do tema): a janela pode abrir depois de 0,7 s. Fecha o que
+            # tiver sobrado e tenta UMA vez esperando bem mais, antes de reprovar. Se ainda assim nao abrir, e defeito real.
+            for sobra in list(A.toplevels(root)):
+                try:
+                    sobra.destroy()
+                except tk.TclError:
+                    pass
+            achados_cor.clear()
+            titulos, erro = A.chamar_e_fechar(app, funcao, 3.5, durante=inspecionar)
+            if titulo in titulos:
+                rel.aviso(f"{rotulo}: '{nome_acao}' so abriu na 2a tentativa (>0,7 s): maquina lenta")
         rel.verifica(erro is None and titulo in titulos, f"{rotulo}: '{nome_acao}' abre o formulario '{titulo}'",
                      f"titulos={titulos} erro={erro!r}")
         rel.verifica(not achados_cor, f"{rotulo}: formulario '{titulo}' sem cores de outro tema", "; ".join(achados_cor))
@@ -214,13 +226,19 @@ def sondar_completo(app, erros, msgs, rotulo, outros, nome):
             rel.verifica(b.winfo_ismapped() and b.winfo_width() > 8 and b.winfo_height() > 8,
                          f"{rotulo}: botao {nome_btn[5:]} esta visivel e com tamanho")
     # menu "..." aberto: mostra todos os itens e esta no tema
+    import time
     m = app._menu_mais.abrir(app._btn_mais)
-    A.bombear(root, 0.3)
-    rotulos_menu = [it for it in app._menu_mais.itens if isinstance(it, tuple)]
+    limite_menu = time.time() + 4.0            # o menu pode demorar para desenhar em maquina ocupada: espera, nao chuta
+    while True:
+        A.bombear(root, 0.3)
+        rotulos_menu = [it for it in app._menu_mais.itens if isinstance(it, tuple)]
+        texto_menu = " | ".join(A.todos_os_textos(m))
+        faltam = [r for r, _, _ in rotulos_menu if r not in texto_menu]
+        if not faltam or time.time() > limite_menu:
+            break
     achados = A.varrer_cores_antigas(cs, m, velhas_para(nome, outros))
-    texto_menu = " | ".join(A.todos_os_textos(m))
-    faltam = [r for r, _, _ in rotulos_menu if r not in texto_menu]
-    rel.verifica(not faltam, f"{rotulo}: o menu '...' mostra os {len(rotulos_menu)} itens", str(faltam))
+    rel.verifica(not faltam, f"{rotulo}: o menu '...' mostra os {len(rotulos_menu)} itens",
+                 f"faltam {len(faltam)} de {len(rotulos_menu)}: {faltam}")
     rel.verifica(not achados, f"{rotulo}: menu '...' sem cores de outro tema", "; ".join(achados))
     try:
         m.destroy()
