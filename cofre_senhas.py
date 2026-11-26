@@ -2780,6 +2780,24 @@ def ocultar_apoio(caminho_cofre, executavel=None, so_cofre=False):
     return n
 
 
+def ocultar_apoio_sessao(caminho_cofre, executavel=None):
+    """Durante a sessão: esconde (Oculto+Sistema, SEM somente-leitura) tudo que o programa não regrava e que não é a
+    família do cofre (essa tem o seu próprio ciclo, ver apoio_liberado): pasta de registros, pasta temporária e
+    instalacao_detalhada.log. O avisos_vistos.json fica de fora: o programa o regrava e o Windows não deixa
+    sobrescrever arquivo oculto. O somente-leitura só entra ao sair (ocultar_apoio). Retorna quantos foram marcados."""
+    n = 0
+    familia = set(_familia_do_cofre(caminho_cofre, executavel))
+    for arq in arquivos_de_apoio(caminho_cofre, executavel):
+        if arq in familia or os.path.basename(arq) == NOME_AVISOS_VISTOS:
+            continue
+        atual = _ler_atributos(arq)
+        if atual is None:
+            continue
+        if _gravar_atributos(arq, atual | _ATTR_OCULTO | _ATTR_SISTEMA):
+            n += 1
+    return n
+
+
 def revelar_apoio(caminho_cofre, executavel=None, so_cofre=False):
     """Desfaz ocultar_apoio (precisa ser feito antes de gravar: arquivo oculto/somente leitura não se sobrescreve).
     so_cofre=True libera apenas a família do cofre. Retorna quantos foram liberados."""
@@ -2806,6 +2824,7 @@ def apoio_ativar(caminho_cofre, executavel=None):
     with _APOIO_TRAVA:
         _APOIO.update(caminho=caminho_cofre, exe=executavel, prof=0)
     ocultar_apoio(caminho_cofre, executavel, so_cofre=True)
+    ocultar_apoio_sessao(caminho_cofre, executavel)
 
 
 @contextlib.contextmanager
@@ -2882,6 +2901,10 @@ def isolar_temporarios(base=None):
         os.makedirs(pasta, mode=0o700, exist_ok=True)
         if not os.access(pasta, os.W_OK):
             raise OSError("pasta temporária sem escrita")
+        if ocultacao_ativa():                        # a pasta é recriada a cada abertura: esconde logo que nasce
+            atual = _ler_atributos(pasta)
+            if atual is not None:
+                _gravar_atributos(pasta, atual | _ATTR_OCULTO | _ATTR_SISTEMA)
     except OSError:
         _TEMP_PRIVADO["pasta"] = None
         return None

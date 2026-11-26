@@ -12,9 +12,10 @@ permissions:
   pull-requests: read
 
 jobs:
-  test:
-    runs-on: windows-latest
-    timeout-minutes: 60
+  # A acao do gitleaks baixa um .tar.gz que nao existe para Windows (404), entao a varredura roda em Linux.
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,6 +24,14 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
