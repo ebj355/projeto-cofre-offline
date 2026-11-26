@@ -7,10 +7,7 @@ distribuído como `CofreSenhas.exe` compilado num pendrive com BitLocker.
 **Lacunas conhecidas (aceitas, ver MODELO_DE_AMEACAS.md):** malware/keylogger no PC; FAT/exFAT sem ACL; sem Authenticode;
 janela TOCTOU entre conferir e abrir o .exe; texto não-ASCII e cópias do Tcl/Tk/pagefile na memória; smoke test automático
 do executável, máquina limpa, pendrive físico, memória baixa, mutação, Atheris e SmartScreen ainda não foram validados.
-A bateria completa registrada em 2026-11-20 teve 2.344 verificações OK e 9 relatórios com falha/interrupção (pefile e
-Defender sem `.exe` compilado; conexões do processo sem o executável aberto); PSScriptAnalyzer e qualidade extra geraram
-alertas que impedem declarar Go até serem revisados. Houve validações focadas posteriores, mas
-a bateria completa não foi repetida depois delas. Não há evidência registrada de execução no Windows Sandbox.
+A bateria completa mais recente (2026-11-21) teve 2.541 verificações OK, 6 `[PULADO]` (o `.exe` não foi localizado) e 2 relatórios com falha/interrupção; a de 2026-11-20 teve 2.344 OK e 9 falhas/interrupções. O resultado segue No-Go (ver "Acréscimos de 2026-11-21" e a matriz do COMO_RODAR_OS_TESTES.md). A versão atual do programa (2026.11.22.2) é posterior a essa bateria. Não há evidência registrada de execução no Windows Sandbox.
 O ambiente e o status de validação do Windows devem seguir a matriz única em `COMO_RODAR_OS_TESTES.md` (seção
 "Status do Windows e versões"), sem inferir aprovação da bateria completa apenas pela disponibilidade do host.
 **Riscos de produto:** (R1) perder o acesso aos dados; (R2) corrupção ao salvar; (R3) vazar segredo (arquivo, memória,
@@ -55,13 +52,13 @@ Windows. Windows 11 ARM64 pode usar o executável x64 sob emulação; build nati
 | TC16 | Desempenho | Média | abrir 3000 itens ≈ 0,5 s; salvar ≈ 0,02 s; Argon2 "alto" ≈ 0,5 s | medido (não-gate) |
 | TC17 | Ida e volta e entrada CSV arbitrária | Média | Hypothesis gera textos/itens para criar, salvar e reabrir; bytes hostis no CSV não podem gerar exceção não tratada | `teste_propriedades_hypothesis.py` (opcional; `[PULADO]` se Hypothesis indisponível) |
 | TC18 | Backup externo e restauração | Alta | criar um cofre descartável, salvar backup cifrado em outro dispositivo, simular perda do original e restaurar/abrir o backup | ensaio manual pendente |
-| TC19 | Instalação legada | Alta | detectar `<destino>\CofreSenhas`; oferecer atualização no local ou manter a pasta antiga; remoção exige `APAGAR` e preserva cofre, backups e chaves | Pester (`instalador.Tests.ps1`, auxiliares; 14/14 em execução focada) |
+| TC19 | Instalação legada | Alta | detectar `<destino>\CofreSenhas`; oferecer atualização no local ou manter a pasta antiga; remoção exige `APAGAR` e preserva cofre, backups e chaves | Pester (`instalador.Tests.ps1`, auxiliares; 17/17 na bateria de 2026-11-21) |
 | TC20 | Relógio e fuso horário | Alta | alterar hora/fuso em cenários controlados; backup, sequência e bloqueios devem continuar corretos | `teste_nucleo_relogio_e_fuso.py` |
 | TC21 | Vetores criptográficos publicados | Alta | comparar AES-GCM, ChaCha20-Poly1305, HKDF e Argon2id com vetores publicados e decifrar um cofre real independentemente | `teste_nucleo_vetores_publicados.py` |
 | TC22 | Importação de formatos reais | Alta | ler arquivos fictícios no formato Chrome/Edge, Firefox, Bitwarden, LastPass, 1Password, KeePassXC, Excel/LibreOffice e CSV aleatórios | `teste_nucleo_importacao_formatos_reais.py` |
 | TC23 | Marcas e autocompletar offline | Média | resolver aliases sem sobrescrever marcas existentes, ignorar destinos inválidos e gerar ícones locais sem rede | `teste_autocompletar.py`, `teste_icones.py` |
-| TC24 | Verificação de integridade ao entrar | Alta | desbloquear pela tela: a janela de integridade abre sozinha e mostra o arquivo principal íntegro; o arquivo do cofre não muda (mesmo hash); com `COFRE_SEM_VERIFICACAO_INICIAL=1` ela não abre; cópia `.bak1` danificada mostra DANIFICADA e PROBLEMA sem derrubar o programa | `teste_gui_integridade_ao_entrar.py` (pasta 8, atalho próprio, não incluído no Testar Tudo; escrito, ainda não executado no Windows) |
-| TC25 | Teste visual bruto: travadas, glitch de tela e erros ao escolher opções | Alta | varrer a geometria (texto cortado, controle fora da janela ou sobreposto) em todos os temas e 4 tamanhos de janela; apertar todas as opções da tela e de cada diálogo medindo o congelamento; tempestade de trocas seguidas; fotografar a janela (sem usar a tela) e procurar quadro em branco, pisca A-B-A, desenho instável, fantasma ao voltar de tema e resíduo ao redimensionar; reprovar com qualquer exceção, caixa de erro, vazamento de widgets ou janela solta | `teste_gui_visual_brutal.py` (pasta 8, atalho próprio, fora do Testar Tudo; validado no Linux/Xvfb, ainda não executado no Windows) |
+| TC24 | Verificação de integridade ao entrar | Alta | desbloquear pela tela: a janela de integridade abre sozinha e mostra o arquivo principal íntegro; o arquivo do cofre não muda (mesmo hash); com `COFRE_SEM_VERIFICACAO_INICIAL=1` ela não abre; cópia `.bak1` danificada mostra DANIFICADA e PROBLEMA sem derrubar o programa | `teste_gui_integridade_ao_entrar.py` (pasta 8, atalho próprio; o Testar Tudo a roda por último; ainda não executada no Windows) |
+| TC25 | Teste visual bruto: travadas, glitch de tela e erros ao escolher opções | Alta | varrer a geometria (texto cortado, controle fora da janela ou sobreposto) em todos os temas e 4 tamanhos de janela; apertar todas as opções da tela e de cada diálogo medindo o congelamento; tempestade de trocas seguidas; fotografar a janela (sem usar a tela) e procurar quadro em branco, pisca A-B-A, desenho instável, fantasma ao voltar de tema e resíduo ao redimensionar; reprovar com qualquer exceção, caixa de erro, vazamento de widgets ou janela solta | `teste_gui_visual_brutal.py` (pasta 8, atalho próprio; o Testar Tudo a roda por último; validado no Linux/Xvfb, ainda não executado no Windows) |
 | TC26 | Estabilidade visual: a tela não pode pular ao escolher uma opção | Alta | apertar cada opção de desbloqueio (senha/chave), criar cofre, gerador, Novo item e Aparência, e escolher itens/grupos na tela principal; medir a geometria de todos os widgets antes e em 5 instantes depois; reprovar se algo acima do clique se mover, se a janela principal mudar, ou se um diálogo mudar de largura, andar na tela ou encolher | `teste_gui_estabilidade_telas.py` (pasta 2, roda no Testar Tudo; validado no Linux/Xvfb, ainda não executado no Windows) |
 
 ## Rastreabilidade e lacunas
@@ -95,8 +92,7 @@ aberto. Verificações físicas de FIDO2, pendrive e Windows Sandbox também dep
 programa, renomeie o arquivo de teste original e restaure a cópia pelo fluxo documentado. Confirme que abre e que os
 registros estão íntegros. Nunca faça o ensaio com o cofre real nem provoque erros de senha no cofre de produção.
 
-**TC19 é um teste auxiliar, não um ensaio destrutivo:** o Pester chama funções isoladas e usa caminhos temporários; a
-execução focada de 2026-11-20 passou 14/14. A escolha interativa entre atualizar, manter ou remover a instalação antiga
+**TC19 é um teste auxiliar, não um ensaio destrutivo:** o Pester chama funções isoladas e usa caminhos temporários; a bateria de 2026-11-21 passou 17/17 (a execução focada de 2026-11-20: 14/14). A escolha interativa entre atualizar, manter ou remover a instalação antiga
 e uma compilação/instalação ponta a ponta ainda precisam de validação separada.
 
 ## Acréscimos de 2026-11-16
@@ -133,6 +129,12 @@ Novo `8_TESTE_extras_atalho_proprio/teste_gui_visual_brutal.py` (TC25). Limites:
 processo de teste a proteção contra captura de tela é desligada, para a janela poder ser fotografada; o cofre real e o
 `.exe` não mudam. Se a foto não for possível (captura bloqueada, sem Pillow), só os testes de imagem ficam `[PULADO]`.
 Primeira rodada (Linux/Xvfb): 0 exceções, 0 travadas e 0 quadros piscando; falhas de geometria registradas abaixo.
-Achados abertos: (1) barra lateral: o contador à direita do nome é empacotado depois do nome e é espremido quando o
-nome é longo (`BarraLateral._desenhar`, `ln.pack(side="right")` deve vir antes de `ltxt.pack(...)`); (2) na janela no
-tamanho mínimo o botão "Novo item" e os rótulos de seção da barra lateral ficam cortados.
+Achados: (1) barra lateral (contador à direita espremido por nomes longos): corrigido em `BarraLateral._desenhar`, que agora empacota o contador antes do nome; falta repetir o teste para confirmar; (2) aberto: na janela no tamanho mínimo o botão "Novo item" e os rótulos de seção da barra lateral ficam cortados.
+
+## Acréscimos de 2026-11-26
+- O `2 - TESTAR TUDO` agora tem 8 baterias: pergunta no início se testa o `.exe` compilado e roda a bateria 8 (testes extras, TC24 e TC25) depois das baterias 1 a 7. A cobertura de código dentro da 8 é opcional e só informativa. Resultado da 8: `resultado_testes_extras.txt`, na pasta `resultado` dela, com cópia em `testes/resultados/resultados completos/`.
+- Decisão em aberto: TC24 a TC26 ainda não constam entre os testes obrigatórios para Go; definir se passam a constar depois da primeira execução no Windows.
+- Mudança de comportamento sem teste dedicado registrado (lacuna aberta, **TC27**): ao criar o cofre, o computador atual é autorizado, o código de recuperação é mostrado e o programa pergunta se há mais computadores. Esperado: cancelar o código ou falhar a gravação desfaz a autorização e o cofre continua válido; responder NÃO limita a 1 computador.
+- O registro de diagnóstico passou a ter 157 bytes por registro (inclui tipo do erro e nomes de funções) e guarda os 100 mais recentes ao passar de 200; qualquer teste ou texto que ainda espere 77 bytes ou "só números" deve ser revisado.
+- `ruff.toml` hoje só define a pasta de cache; confirmar na próxima rodada da qualidade extra se achados de estilo reaparecem.
+- Sondas `python -X dev`: o diagnóstico de 2026-11-24 (ver `COMO_RODAR_OS_TESTES.md`) aponta o ambiente (Avast), não o cofre; falta confirmar com os escudos desativados e com o Python 3.13.17.

@@ -38,7 +38,7 @@ rotulo_senha = next(w for w in todos(d) if w.winfo_class() == "TLabel"
 ok(str(rotulo_senha.cget("style")) == "S2.Campo.TLabel",
    "rótulos das credenciais usam o fundo do painel")
 status = next((w for w in todos(d) if w.winfo_class() == "TButton"
-               and str(w.cget("text")) in ("Ativa", "Desativada") and w.winfo_ismapped()), None)
+               and str(w.cget("text")) in ("Status: Ativa", "Status: Desativada") and w.winfo_ismapped()), None)
 ok(status is None, "item NOVO não mostra botão de estado (nasce Ativa; só a edição permite desativar)")
 vis = lambda: [str(w.cget("text")) for w in todos(d) if w.winfo_class() in ("TLabel",) and w.winfo_ismapped()]
 v = " | ".join(vis())
@@ -62,9 +62,10 @@ ok(len(regs) == 1 and regs[0]["servico"] == "Banco Azul" and regs[0]["login"] ==
    "salvou nome, usuário e senha")
 ok(not erros, "sem erro ao salvar")
 d = novo()
-seletor = next(w for w in todos(d) if w.winfo_class() == "TCombobox" and "PIN numérico" in w.cget("values"))
-seletor.set("PIN numérico")
-achar(d, "+ Adicionar").invoke(); root.update()
+chip_pin = achar(d, "＋ PIN")
+ok(chip_pin is not None and chip_pin.winfo_ismapped(), "botão '＋ PIN' visível: um clique adiciona a credencial")
+chip_pin.invoke(); root.update()
+ok(not achar(d, "＋ PIN").winfo_ismapped(), "depois de adicionado, o botão '＋ PIN' some da faixa")
 v = " | ".join(vis())
 ok("PIN" in v, "adicionar a credencial mostra PIN")
 ok("NOTAS" in v, "notas continuam visíveis sem caixa adicional")
@@ -73,30 +74,27 @@ d.destroy(); root.update()
 app.dialogo_registro(regs[0]); root.update(); root.update()
 e = next(w for w in root.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == "Editar item")
 ok("GRUPO" in " | ".join(str(w.cget("text")) for w in todos(e) if w.winfo_class() == "TLabel" and w.winfo_ismapped()), "editar abre o formulário completo")
-ok(any(w.winfo_class() == "TButton" and str(w.cget("text")) == "Ativa" and w.winfo_ismapped() for w in todos(e)),
-   "editar mostra o botão de estado 'Ativa'")
+ok(any(w.winfo_class() == "TButton" and str(w.cget("text")) == "Status: Ativa" and w.winfo_ismapped() for w in todos(e)),
+   "editar mostra o botão de estado 'Status: Ativa'")
 e.destroy()
-# Enter salva
-def _enter_pelo_tcl(w):
-    """Executa o bind de <Return> do formulario, com o campo 'w' como alvo, sem depender de a tecla chegar pelo
-    sistema de janelas. No Windows os testes rodam com a janela em SEGUNDO PLANO (COFRE_GUI_TESTS_BACKGROUND=1,
-    WS_EX_NOACTIVATE de proposito: o teste nao pode roubar o foco de quem esta usando o PC) e o Tk descarta teclas
-    sinteticas (event_generate) quando o aplicativo nao tem o foco do teclado. O que o teste quer provar e a ligacao
-    Enter -> salvar, entao, se a tecla real nao for entregue, roda-se o mesmo script que o Tk executaria."""
+# Enter NAO salva (so passa ao proximo campo); Ctrl+S salva
+def _disparar(w, sequencia, keysym="Return", keycode="13"):
+    """Executa o bind do formulario para 'sequencia', com o campo 'w' como alvo, sem depender de a tecla chegar pelo
+    sistema de janelas (janela de teste sem foco do teclado descarta teclas sinteticas)."""
     topo = w.winfo_toplevel()
-    script = topo.bind("<Return>")
+    script = topo.bind(sequencia)
     if not script:
         return False
-    valores = {"#": "0", "b": "0", "f": "0", "h": "0", "k": "13", "s": "0", "t": "0", "w": "0", "x": "0", "y": "0",
-               "A": "{}", "E": "0", "K": "Return", "N": "65293", "W": str(w), "T": "2", "X": "0", "Y": "0", "D": "0"}
+    valores = {"#": "0", "b": "0", "f": "0", "h": "0", "k": keycode, "s": "0", "t": "0", "w": "0", "x": "0", "y": "0",
+               "A": "{}", "E": "0", "K": keysym, "N": "65293", "W": str(w), "T": "2", "X": "0", "Y": "0", "D": "0"}
     topo.tk.eval(re.sub(r"%([#bfhkstwxyAEKNWTXYD])", lambda m: valores[m.group(1)], script))
     return True
 d = novo(); ents = [w for w in todos(d) if w.winfo_class() == "TEntry" and w.winfo_ismapped()]
-ents[0].insert(0, "Loja X"); ents[0].focus_force(); root.update(); ents[0].event_generate("<Return>"); root.update()
-salvou = lambda: any(r["servico"] == "Loja X" for r in app.cofre.registros)
-if not salvou():
-    print("  [info]   a tecla Enter sintetica nao foi entregue (janela sem foco do teclado); executando o bind de <Return>")
-    _enter_pelo_tcl(ents[0]); root.update()
-ok(salvou(), "Enter no campo salva o item")
+ents[0].insert(0, "Loja X"); ents[1].insert(0, "loja@x.com"); ents[2].insert(0, c.gerar_senha(20, True, True)); root.update()
+_disparar(ents[0], "<Return>"); root.update()
+ok(not any(r["servico"] == "Loja X" for r in app.cofre.registros), "Enter no campo NÃO salva o item")
+ok(d.winfo_exists(), "Enter no campo não fecha o formulário")
+_disparar(ents[0], "<Control-s>", "s", "83"); root.update()
+ok(any(r["servico"] == "Loja X" for r in app.cofre.registros), "Ctrl+S salva o item")
 print("PASSOU" if all(f) else "FALHOU", sum(f), "/", len(f))
 root.destroy(); sys.exit(0 if all(f) else 1)

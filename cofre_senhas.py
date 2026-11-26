@@ -8318,6 +8318,26 @@ class App:
         atualizar()
         return atualizar
 
+    @staticmethod
+    def _forcar_maiusculas(entrada):
+        """Campos de chave de acesso/código de recuperação: as letras viram MAIÚSCULAS enquanto se digita ou cola
+        (o alfabeto dessas chaves é A-Z e 2-7), sem mexer na posição do cursor."""
+        def converter(event=None):
+            """Converte o texto do campo para maiúsculas, se preciso."""
+            try:
+                atual = entrada.get()
+                alto = atual.upper()
+                if atual != alto:
+                    posicao = entrada.index("insert")
+                    entrada.delete(0, "end")
+                    entrada.insert(0, alto)
+                    entrada.icursor(posicao)
+            except tk.TclError:
+                pass
+        for evento in ("<KeyRelease>", "<<Paste>>", "<FocusOut>"):
+            entrada.bind(evento, converter, add="+")
+        return converter
+
     def _pista_texto(self, entrada, texto):
         """Dica visual para caixa multilinha, sem virar parte do texto salvo."""
         rotulo = tk.Label(entrada, text=texto, bg=CORES["campo"], fg=CORES["fraco"],
@@ -8417,14 +8437,24 @@ class App:
     MOSTRAR_SENHA_MS = 30000
 
     def _botao_olho(self, pai, e, pref=""):
-        """Olho que mostra o que está sendo digitado. Volta a esconder sozinho depois de 30 s
-        (e o campo continua sem permitir copiar)."""
+        """Olho que mostra o que está sendo digitado. Volta a esconder sozinho depois de 30 s SEM mexer no campo:
+        cada tecla digitada reinicia a contagem (quem está digitando não perde o texto de vista). O campo continua
+        sem permitir copiar."""
         estado = {"timer": None}
         b = ttk.Button(pai, text="👁", image=imagem_icone(self.root, "ver", CORES["suave"], 18), compound="image",
                        style=pref + "Quadrado.TButton", takefocus=0)
 
+        def cancelar():
+            """Cancela a reocultação agendada."""
+            if estado["timer"] is not None:
+                try:
+                    b.after_cancel(estado["timer"])
+                except (AttributeError, tk.TclError, ValueError):
+                    pass
+                estado["timer"] = None
+
         def esconder():
-            """Volta a ocultar o campo depois de alguns segundos."""
+            """Volta a ocultar o campo."""
             estado["timer"] = None
             try:
                 e.config(show="•")
@@ -8432,26 +8462,39 @@ class App:
             except tk.TclError:
                 pass
 
+        def agendar():
+            """(Re)agenda a reocultação para daqui a MOSTRAR_SENHA_MS."""
+            cancelar()
+            try:
+                estado["timer"] = b.after(self.MOSTRAR_SENHA_MS, esconder)
+            except tk.TclError:
+                estado["timer"] = None
+
         def alternar():
-            """Mostra ou oculta o texto do campo (mostra por pouco tempo)."""
+            """Mostra ou oculta o texto do campo."""
             try:
                 if e.cget("show"):
                     e.config(show="")
                     b.config(image=imagem_icone(self.root, "ocultar", CORES["prim_txt"], 18))
-                    if estado["timer"]:
-                        b.after_cancel(estado["timer"])
-                    estado["timer"] = self._depois_do_widget(b, self.MOSTRAR_SENHA_MS, esconder)
+                    agendar()
                 else:
-                    if estado["timer"]:
-                        b.after_cancel(estado["timer"])
+                    cancelar()
                     esconder()
                 e.focus_set()
                 e.icursor("end")
             except tk.TclError:
                 pass
 
+        def digitou(event=None):
+            """Enquanto o campo está à mostra, cada tecla reinicia a contagem."""
+            if estado["timer"] is not None:
+                agendar()
+
         b.config(command=alternar)
-        self._dica(b, "Mostrar ou ocultar o que você digitou.\nVolta a esconder sozinho em 30 segundos.")
+        e.bind("<KeyPress>", digitou, add="+")
+        b.bind("<Destroy>", lambda ev: cancelar() if ev.widget is b else None, add="+")
+        self._dica(b, "Mostrar ou ocultar o que você digitou.\nVolta a esconder sozinho depois de 30 segundos "
+                      "sem você mexer no campo.")
         return b
 
     def _rotulo_campo(self, pai, texto, pref="C."):
@@ -8884,6 +8927,7 @@ class App:
         bt_arq.pack(side="right")
         cx2, e_chave = self._linha_secreta(bloco_chave, 36, "C.", placeholder="Chave de acesso")
         cx2.pack(fill="x", pady=(2, 0))
+        self._forcar_maiusculas(e_chave)             # a chave só tem A-Z e 2-7: letras minúsculas viram maiúsculas
 
         folga = {"senha": 0, "chave": 0}     # espaço extra embaixo do bloco mais baixo: os dois ficam da MESMA altura
 
@@ -10084,9 +10128,19 @@ class App:
                 sw, sh = d.winfo_screenwidth(), d.winfo_screenheight()
                 if rodape is not None:
                     w = max(w, rodape.winfo_reqwidth())
-                largura = min(max(w, _px(860)), max(_px(640), sw - _px(48)))
+                teto_l, teto_a = max(_px(640), sw - _px(48)), max(_px(420), sh - _px(64))
+                if getattr(d, "_limitar_a_janela_principal", False):
+                    # o diálogo nunca passa do tamanho da tela principal do cofre (sobra rolagem, não janela gigante)
+                    try:
+                        rw, rh = self.root.winfo_width(), self.root.winfo_height()
+                        if rw > _px(300) and rh > _px(300):
+                            teto_l = min(teto_l, max(_px(560), rw - _px(32)))
+                            teto_a = min(teto_a, max(_px(380), rh - _px(40)))
+                    except tk.TclError:
+                        pass
+                largura = min(max(w, getattr(d, "_largura_padrao", None) or _px(860)), teto_l)
                 piso = getattr(d, "_altura_padrao", None) or _px(520)
-                altura = min(max(h + reserva, piso), max(_px(420), sh - _px(64)))
+                altura = min(max(h + reserva, piso), teto_a)
                 # O dialogo so CRESCE (nunca encolhe) enquanto aberto: abrir/fechar "detalhes" ou trocar de opcao
                 # nao faz a janela ficar mudando de tamanho e de posicao.
                 largura = max(largura, estado["lmax"])
@@ -11257,7 +11311,7 @@ class App:
                             "para dentro ou escolha o grupo ao editar a conta.\n"
                             "• Botão 'A → Z' sobre a lista: troca para Z → A.\n\n"
                             "CÓDIGOS DE RECUPERAÇÃO\n"
-                            "Ao editar a conta, ligue 'Mostrar' e use 'Colar vários códigos' (um por linha). Na tela da "
+                            "No formulário, clique em '＋ Códigos de recuperação' e use 'Colar vários códigos' (um por linha). Na tela da "
                             "conta, cada código tem o seu botão Copiar.\n\n"
                             "IMPORTAR\n"
                             "Menu ⋯ > Importar planilha. O cofre faz uma varredura de segurança do arquivo antes.\n\n"
@@ -11884,7 +11938,9 @@ class App:
 
     def dialogo_registro(self, reg, senha_inicial=None):
         """Formulário de um item (novo ou edição): campos, gerador de senha, grupo, pessoa e proteção; limpa o texto digitado antes de gravar.
-        'senha_inicial' (só em item novo): senha já preenchida, vinda do botão "Usar em um novo item" do gerador."""
+        'senha_inicial' (só em item novo): senha já preenchida, vinda do botão "Usar em um novo item" do gerador.
+        Regras de segurança do usuário: Enter NUNCA salva (só o botão ou Ctrl+S / Ctrl+Enter); fechar, Cancelar e Esc
+        pedem confirmação quando há dados digitados; remover uma credencial preenchida pede confirmação."""
         C = CORES
         if self.cofre is None:             # o cofre acabou de bloquear: não abre formulário sobre um cofre fechado
             return None
@@ -11893,7 +11949,9 @@ class App:
         rodape = ttk.Frame(d, padding=(_px(26), _px(8), _px(26), _px(16)))
         rodape.pack(side="bottom", fill="x")          # Salvar/Cancelar ficam SEMPRE visíveis (fora da rolagem)
         fr = self._corpo_dialogo(d, (20, 16, 20, 10), rodape=rodape)
-        d._altura_padrao = _px(760)               # tamanho PADRAO fixo: nao muda quando as credenciais extras ficam ocultas
+        d._altura_padrao = _px(380)               # a altura acompanha o conteúdo (sem espaço vazio)...
+        d._largura_padrao = _px(780)
+        d._limitar_a_janela_principal = True      # ...e nunca passa do tamanho da tela principal do cofre
         campos = {}
         self._cabecalho_dialogo(
             fr, "editar" if reg else "novo", "Editar item" if reg else "Novo item",
@@ -11904,7 +11962,7 @@ class App:
         estilo_status = ttk.Style(d)
         estilo_status.configure("StatusAtiva.TButton", foreground=C["ok"], padding=(_px(10), _px(5)))
         estilo_status.configure("StatusInativa.TButton", foreground=C["fraco"], padding=(_px(10), _px(5)))
-        estilo_status.configure("AjudaItem.TButton", foreground=C["fraco"], padding=(_px(2), _px(2)))
+        estilo_status.configure("AjudaItem.TButton", foreground=C["prim_txt"], padding=(_px(8), _px(4)))
         bt_status = ttk.Button(linha_acoes, style="StatusAtiva.TButton")
         if reg:                                   # item NOVO nasce "em uso" sem botao; so a edicao permite marcar inativa
             bt_status.pack(side="right", padx=(8, 0))
@@ -11912,26 +11970,32 @@ class App:
         def atualizar_status():
             """Atualiza a etiqueta de estado sem alterar os demais dados do item."""
             ativa = status.get()
-            bt_status.configure(text="Ativa" if ativa else "Desativada",
+            bt_status.configure(text="Status: Ativa" if ativa else "Status: Desativada",
                                 style="StatusAtiva.TButton" if ativa else "StatusInativa.TButton")
 
         bt_status.configure(command=lambda: (status.set(not status.get()), atualizar_status()))
-        self._dica(bt_status, "Indica se você ainda usa esta conta. Marcar como desativada só muda o rótulo: "
-                              "não apaga a senha nem bloqueia o acesso; o item continua salvo e pode ser reativado.")
+        self._dica(bt_status, "O texto mostra o estado ATUAL desta conta; clique para alternar. Marcar como "
+                              "desativada só muda o rótulo: não apaga a senha nem bloqueia o acesso; o item "
+                              "continua salvo e pode ser reativado.")
         atualizar_status()
-        bt_tour = ttk.Button(linha_acoes, text="?", style="AjudaItem.TButton")
+        bt_tour = ttk.Button(linha_acoes, text="?  Ajuda", style="AjudaItem.TButton")
         bt_tour.pack(side="right")
         self._dica(bt_tour, "Como preencher: um passeio guiado explicando cada campo do formulário.")
+        ttk.Label(linha_acoes, text="Ctrl+S salva   ·   Esc cancela   ·   Ctrl+G gera a senha",
+                  style="Fraco.TLabel").pack(side="left")
 
-        # Conta / grupo / login
+        # ---------- Identificação e organização ----------
         topo = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
         topo.pack(fill="x")
         topo.columnconfigure(0, weight=3)
         topo.columnconfigure(1, weight=2)
         ttk.Label(topo, text="IDENTIFICAÇÃO E ORGANIZAÇÃO", style="C.Campo.TLabel").grid(
             row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
-        ttk.Label(topo, text=ROTULOS["servico"].upper() + " *", style="C.Campo.TLabel").grid(
-            row=1, column=0, sticky="w")
+        rot_servico = ttk.Frame(topo, style="C.TFrame")
+        rot_servico.grid(row=1, column=0, sticky="ew")
+        ttk.Label(rot_servico, text=ROTULOS["servico"].upper() + " *", style="C.Campo.TLabel").pack(side="left")
+        erro_servico = ttk.Label(rot_servico, text="", style="C.TLabel", foreground=C["perigo"])
+        erro_servico.pack(side="left", padx=(10, 0))          # erro junto do campo: texto + ícone, não só cor
         ttk.Label(topo, text="GRUPO / CATEGORIA", style="C.Campo.TLabel").grid(
             row=1, column=1, sticky="w", padx=(12, 0))
         linha_servico = ttk.Frame(topo, style="C.TFrame")
@@ -11951,64 +12015,93 @@ class App:
         cg = ttk.Combobox(topo, width=20, values=[NOVO_GRUPO] + list(self._grupos_sugeridos()),
                           style="C.TCombobox")
         cg.grid(row=2, column=1, sticky="ew", padx=(12, 0), pady=(4, 12))
-        dica_grupo = ttk.Label(topo, text="", style="C.Fraco.TLabel", wraplength=_px(220), justify="left")
+        nota_grupo = ttk.Label(topo, text="", style="C.Fraco.TLabel", wraplength=_px(240), justify="left")
+
+        def mostrar_nota_grupo(texto):
+            """Frase curta embaixo do Grupo (grupo automático, criar grupo novo)."""
+            try:
+                if texto:
+                    nota_grupo.config(text=texto)
+                    nota_grupo.grid(row=3, column=1, sticky="w", padx=(12, 0), pady=(0, 6))
+                else:
+                    nota_grupo.grid_remove()
+            except tk.TclError:
+                pass
+
+        ajustar_grupo_bancario = [None]            # preenchido no fim do formulario (ajustar_bancarios)
+        # Grupo AUTOMÁTICO: ao reconhecer a conta (Instagram → Redes sociais) o campo Grupo já é preenchido. Vale só
+        # enquanto o usuário não escolher/digitar outro grupo por conta própria, e nunca ao EDITAR um item existente.
+        auto = {"valor": None, "manual": bool(reg)}
+
+        def aplicar_grupo_automatico(event=None):
+            """Preenche (ou desfaz) o grupo recomendado pelo nome da conta, sem sobrescrever escolha do usuário."""
+            try:
+                atual = cg.get().strip()
+                if auto["valor"] is not None and atual != auto["valor"]:
+                    auto["valor"], auto["manual"] = None, True      # o usuário trocou o grupo: a escolha dele vale
+                if atual and auto["valor"] is None:
+                    auto["manual"] = True
+                if auto["manual"]:
+                    return
+                recomendado = self._nome_grupo_recomendado(campos["servico"].get())
+                if recomendado:
+                    if atual != recomendado:
+                        cg.delete(0, "end")
+                        cg.insert(0, recomendado)
+                        getattr(cg, "_pista_atualizar", lambda: None)()
+                        if ajustar_grupo_bancario[0]:
+                            ajustar_grupo_bancario[0]()
+                    auto["valor"] = recomendado
+                    mostrar_nota_grupo("✓ Grupo escolhido pelo nome da conta. Pode trocar.")
+                elif auto["valor"] is not None:                     # o nome mudou para algo não reconhecido
+                    cg.delete(0, "end")
+                    getattr(cg, "_pista_atualizar", lambda: None)()
+                    auto["valor"] = None
+                    mostrar_nota_grupo("")
+            except (tk.TclError, KeyError):
+                pass
+
+        _TECLAS_SEM_EDICAO = ("Tab", "ISO_Left_Tab", "Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L",
+                              "Alt_R", "Return", "Escape", "Left", "Right", "Home", "End")
+
+        def grupo_mexido_pelo_usuario(event=None):
+            """Digitou ou escolheu o grupo por conta própria: o preenchimento automático sai da frente."""
+            if event is not None and getattr(event, "keysym", "") in _TECLAS_SEM_EDICAO:
+                return
+            atual = cg.get().strip()
+            if auto["valor"] is not None and atual == auto["valor"]:
+                return
+            auto["valor"], auto["manual"] = None, True
+            if not cg.get().startswith("＋"):
+                mostrar_nota_grupo("")
 
         def escolheu_grupo(event=None):
             """Ao escolher '＋ Criar novo grupo…': limpa o campo e deixa digitar o nome que quiser."""
             if cg.get() == NOVO_GRUPO:
                 cg.set("")
                 cg.focus_set()
-                dica_grupo.config(text="Digite o nome do seu grupo. Ele é criado ao salvar.")
-                dica_grupo.grid(row=3, column=1, sticky="w", padx=(12, 0), pady=(0, 6))
+                auto["valor"], auto["manual"] = None, True
+                mostrar_nota_grupo("Digite o nome do seu grupo. Ele é criado ao salvar.")
+            else:
+                grupo_mexido_pelo_usuario()
+            if ajustar_grupo_bancario[0]:
+                ajustar_grupo_bancario[0]()
         cg.bind("<<ComboboxSelected>>", escolheu_grupo)
-        sugestao_grupo = ttk.Label(topo, text="", style="C.Fraco.TLabel", wraplength=_px(220), justify="left",
-                                   cursor="hand2", foreground=C["prim_txt"])
-
-        def atualizar_sugestao(event=None):
-            """Recomenda um grupo pelo tipo da conta digitada. So aparece com o campo Grupo vazio; um clique aceita,
-            e digitar o grupo por conta propria faz a sugestao sumir. Nada e preenchido sem o usuario aceitar."""
-            try:
-                recomendado = None
-                if not cg.get().strip() and not dica_grupo.grid_info():
-                    recomendado = self._nome_grupo_recomendado(campos["servico"].get())
-                if recomendado:
-                    sugestao_grupo.config(text=f"Sugestão: {recomendado}  (clique para usar)")
-                    sugestao_grupo._valor = recomendado
-                    sugestao_grupo.grid(row=3, column=1, sticky="w", padx=(12, 0), pady=(0, 6))
-                else:
-                    sugestao_grupo.grid_remove()
-            except (tk.TclError, KeyError):
-                pass
-
-        ajustar_grupo_bancario = [None]            # preenchido no fim do formulario (ajustar_bancarios)
-
-        def aceitar_sugestao(event=None):
-            """Usa o grupo recomendado."""
-            valor = getattr(sugestao_grupo, "_valor", "")
-            if valor:
-                cg.delete(0, "end")
-                cg.insert(0, valor)
-                getattr(cg, "_pista_atualizar", lambda: None)()
-                if ajustar_grupo_bancario[0]:
-                    ajustar_grupo_bancario[0]()
-            sugestao_grupo.grid_remove()
-        sugestao_grupo.bind("<Button-1>", aceitar_sugestao)
-        cg.bind("<<ComboboxSelected>>", lambda e: atualizar_sugestao(), add="+")
-        cg.bind("<KeyRelease>", atualizar_sugestao, add="+")
+        cg.bind("<KeyRelease>", grupo_mexido_pelo_usuario, add="+")
         cg.insert(0, (reg or {}).get("grupo", "") or (self.filtro_grupo.get()
                                                      if self.filtro_grupo.get() not in ("Todos", "(sem grupo)", "⚠ Atenção")
                                                      else ""))
         campos["grupo"] = cg
-        campos["servico"].bind("<KeyRelease>", atualizar_sugestao, add="+")
-        campos["servico"].bind("<FocusOut>", atualizar_sugestao, add="+")
+        auto["manual"] = bool(reg) or bool(cg.get().strip())
+        campos["servico"].bind("<KeyRelease>", aplicar_grupo_automatico, add="+")
+        campos["servico"].bind("<FocusOut>", aplicar_grupo_automatico, add="+")
         _escolher_marca = autocompletar.escolher
 
         def _escolher_marca_e_sugerir(indice):
-            """Escolher a marca na lista tambem atualiza a recomendacao de grupo."""
+            """Escolher a marca na lista também define o grupo recomendado."""
             _escolher_marca(indice)
-            atualizar_sugestao()
+            aplicar_grupo_automatico()
         autocompletar.escolher = _escolher_marca_e_sugerir
-        atualizar_sugestao()
         ttk.Label(topo, text="LOGIN / E-MAIL / USUÁRIO", style="C.Campo.TLabel").grid(
             row=4, column=0, sticky="w")
         ttk.Label(topo, text="PESSOA (PERFIL)", style="C.Campo.TLabel").grid(
@@ -12018,8 +12111,7 @@ class App:
         campos["login"] = ent
         self._pista_entrada(ent, "Ex.: usuario@exemplo.com")
         NOVO_PESSOA = "＋ Criar novo perfil…"       # mesma ideia do grupo: 1ª opção da lista deixa claro que dá
-                                                     # para criar um perfil novo (reclamação real do usuário: a
-                                                     # lista de sugestões parecia fechada, sem jeito de adicionar)
+                                                     # para criar um perfil novo
         cp = ttk.Combobox(topo, width=20, values=[NOVO_PESSOA] + [self._nome_pessoa(x) for x in self._pessoas()],
                           style="C.TCombobox")
         cp.grid(row=5, column=1, sticky="ew", padx=(12, 0), pady=(4, 0))
@@ -12044,21 +12136,14 @@ class App:
             autocompletar.atualizar_previsualizacao()
             for chave in ("servico", "login"):
                 getattr(campos[chave], "_pista_atualizar", lambda: None)()
+        aplicar_grupo_automatico()
 
-        # Credenciais secretas
+        # ---------- Senha e credenciais (cada campo secreto tem o PRÓPRIO olho; não existe "Mostrar" geral) ----------
         credenciais = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
         credenciais.pack(fill="x", pady=(12, 0))
-        cab_seg = ttk.Frame(credenciais, style="C.TFrame")
-        cab_seg.pack(fill="x")
-        ttk.Label(cab_seg, text="CREDENCIAIS SECRETAS", style="C.Campo.TLabel").pack(side="left")
-        mostrar = tk.BooleanVar(value=False)
-        ttk.Checkbutton(cab_seg, text="Mostrar", variable=mostrar, style="C.Switch.TCheckbutton",
-                        command=lambda: alternar()).pack(side="right")
-        cab_seg.pack_configure(pady=(0, 10))          # o seletor e o botao "+ Adicionar" ficam na linha logo abaixo (cab_add)
-        CAMPOS_EXTRA = (("codigos", "Código de recuperação"), ("pin", "PIN"), ("senha_extra", "Senha extra"),
-                        ("chave", "Chave / token"), ("numero_conta", "Número da conta"), ("agencia", "Agência"))
-        tem = {k: tk.BooleanVar(value=bool(reg and (reg.get(k) or "").strip())) for k, _ in CAMPOS_EXTRA}
-        rótulos_extra = {
+        ttk.Label(credenciais, text="SENHA", style="C.Campo.TLabel").pack(anchor="w", pady=(0, 6))
+        ORDEM_EXTRA = ("senha_extra", "pin", "chave", "numero_conta", "agencia", "codigos")
+        rotulos_extra = {
             "codigos": "Códigos de recuperação",
             "senha_extra": "Senha extra",
             "pin": "PIN numérico",
@@ -12066,124 +12151,164 @@ class App:
             "numero_conta": "Número da conta",
             "agencia": "Agência",
         }
-        # o seletor e o botao ficam numa linha PROPRIA abaixo do titulo: na mesma linha de "CREDENCIAIS SECRETAS" e do
-        # "Mostrar" nao sobra largura e o botao "+ Adicionar credencial" era cortado (63 px de 173 px pedidos)
-        cab_add = ttk.Frame(credenciais, style="C.TFrame")
-        cab_add.pack(fill="x", pady=(0, 10))
-        cab_seg.pack_configure(pady=(0, 4))
-        selecao_credencial = ttk.Combobox(
-            cab_add, state="readonly", width=24,
-            values=[rótulos_extra[k] for k, _ in CAMPOS_EXTRA if not tem[k].get()],
-            style="C.TCombobox")
-
-        def atualizar_seletor_credenciais():
-            """Lista apenas as credenciais ainda não adicionadas ao formulário."""
-            opcoes = [rótulos_extra[k] for k, _ in CAMPOS_EXTRA if not tem[k].get()]
-            selecao_credencial.configure(values=opcoes)
-            if opcoes:
-                if selecao_credencial.get() not in opcoes:
-                    selecao_credencial.set(opcoes[0])
-                botao_adicionar.configure(state="normal")
-            else:
-                selecao_credencial.set("Todas adicionadas")
-                botao_adicionar.configure(state="disabled")
-
-        def adicionar_credencial():
-            """Inclui no formulário a credencial selecionada."""
-            escolhida = selecao_credencial.get()
-            chave = next((k for k, rot in rótulos_extra.items() if rot == escolhida), None)
-            if chave is not None:
-                tem[chave].set(True)
-                aplicar_campos()
-
-        botao_adicionar = ttk.Button(cab_add, text="+ Adicionar credencial", style="Acao.TButton",
-                                     command=adicionar_credencial)
-        botao_adicionar.pack(side="right", padx=(8, 0))
-        selecao_credencial.pack(side="right")
-        grade = ttk.Frame(credenciais, style="S2.TFrame")
-        grade.pack(fill="x")
-        grade.columnconfigure(0, weight=1, uniform="s")
-        grade.columnconfigure(1, weight=1, uniform="s")
+        nomes_botao = {"senha_extra": "Senha extra", "pin": "PIN", "chave": "Chave / token",
+                       "numero_conta": "Nº da conta", "agencia": "Agência", "codigos": "Códigos de recuperação"}
         secretos = []
-        grupos_campo = {k: [] for k in ("pin", "senha_extra", "chave", "numero_conta", "agencia")}   # widgets de
-                                                                                            # cada campo extra
+        blocos = {}
+        ativos = []                                   # credenciais extras visíveis, NA ORDEM em que foram adicionadas
         dicas_item = PainelForca(credenciais, self, largura=_px(660), pref="C.", compacto=True)
-        for i, chave in enumerate(("senha", "senha_extra", "pin", "chave", "numero_conta", "agencia")):
-            if chave == "senha":                   # Senha Principal: caixa propria, na largura toda (como no modelo)
-                col, lin, vao, px = 0, 0, 2, (0, 0)
-            else:                                   # credenciais extras: abaixo, em 2 colunas
-                j_ = i - 1
-                col, lin, vao = j_ % 2, 3 + (j_ // 2) * 3, 1
-                px = (0, 10) if col == 0 else (10, 0)
-            cab_campo = ttk.Frame(grade, style="S2.TFrame")
-            cab_campo.grid(row=lin, column=col, columnspan=vao, sticky="ew", padx=px)
-            rot_c = ttk.Label(cab_campo, text=ROTULOS[chave].upper(), style="S2.Campo.TLabel")
-            rot_c.pack(side="left")
-            grupo_campo = []
-            if chave != "senha":
-                # o "x" tira o campo do formulario E apaga o que foi digitado nele (senao o valor escondido seria gravado)
-                bt_remover = ttk.Button(cab_campo, text="×", style="Icone.TButton", width=2,
-                                        command=lambda k=chave: (campos[k].delete(0, "end"), tem[k].set(False),
-                                                                 aplicar_campos()))
+
+        def criar_bloco_secreto(chave):
+            """Um campo secreto completo: rótulo, olho, teclado virtual, (Gerar), (Copiar) e medidor de força."""
+            principal = chave == "senha"
+            bloco = ttk.Frame(credenciais if principal else area_extras, style="S2.TFrame")
+            cab_campo = ttk.Frame(bloco, style="S2.TFrame")
+            cab_campo.pack(fill="x")
+            ttk.Label(cab_campo, text=(rotulos_extra.get(chave) or ROTULOS[chave]).upper(),
+                      style="S2.Campo.TLabel").pack(side="left")
+            if not principal:
+                bt_remover = ttk.Button(cab_campo, text="✕ Remover", style="Icone.TButton",
+                                        command=lambda k=chave: remover_credencial(k))
                 bt_remover.pack(side="right")
-                # so o quadro (cab_campo) entra no grupo mostrar/esconder: ele e gerenciado por grid, o "x" por pack
-                # (chamar grid()/grid_remove() num filho de pack dentro de um quadro com pack tirava o "x" da tela)
-                grupo_campo.append(cab_campo)
-                grupos_campo[chave].append(cab_campo)
-            linha = ttk.Frame(grade, style="S2.TFrame")
-            linha.grid(row=lin + 1, column=col, columnspan=vao, sticky="ew", padx=px, pady=(4, 0))
-            if chave != "senha":
-                grupos_campo[chave].append(linha)
-            caixa, ent = self._linha_secreta(linha, 18, olho=False, pref="S2.")
+                self._dica(bt_remover, "Tira este campo do formulário. Se houver algo digitado, o cofre pergunta antes.")
+            linha = ttk.Frame(bloco, style="S2.TFrame")
+            linha.pack(fill="x", pady=(4, 0))
+            caixa, ent_ = self._linha_secreta(linha, 30, olho=True, pref="S2.")
             caixa.pack(side="left", fill="x", expand=True)
             if reg:
-                ent.insert(0, reg.get(chave, ""))
-                getattr(ent, "_pista_atualizar", lambda: None)()
-            campos[chave] = ent
-            secretos.append(ent)
+                ent_.insert(0, reg.get(chave, ""))
+                getattr(ent_, "_pista_atualizar", lambda: None)()
+            campos[chave] = ent_
+            secretos.append(ent_)
             if reg:          # item novo: copiar o que acabou de digitar não serve; só a edição tem "Copiar"
                 bcp = ttk.Button(linha, text="Copiar", style="Quadrado.TButton", takefocus=0,
                                  image=imagem_icone(self.root, "copiar", C["texto"], 18), compound="image")
-                bcp.config(command=lambda e=ent, b=bcp, n=ROTULOS[chave]: self._copiar_campo(e, b, n))
+                bcp.config(command=lambda e=ent_, b=bcp, n=ROTULOS[chave]: self._copiar_campo(e, b, n))
                 bcp.pack(side="right", fill="y", padx=(6, 0))
                 self._dica(bcp, f"Copiar {ROTULOS[chave].lower()} (a área de transferência é limpa em "
                                 f"{self.LIMPAR_CLIPBOARD_MS // 1000} s)")
             if chave in ("senha", "senha_extra", "pin"):
                 modo_g = "pin" if chave == "pin" else "aleatoria"
-                bgr = ttk.Button(linha, text="Gerar…", style="Quadrado.TButton",
+                bgr = ttk.Button(linha, text="Gerar…", style="Quadrado.TButton", takefocus=0,
                                  image=imagem_icone(self.root, "gerar", C["texto"], 18), compound="image",
-                                 command=lambda e=ent, m=modo_g: self.dialogo_gerador(e, m, d))
+                                 command=lambda e=ent_, m=modo_g: self.dialogo_gerador(e, m, d))
                 bgr.pack(side="left", fill="y", padx=(6, 0))
-                self._dica(bgr, "Gerar uma senha forte (escolha o tipo e o tamanho)")
-                med = self._medidor(grade, ent, pin=(chave == "pin"), dicas_lbl=dicas_item,
-                                    pref="S2.", titulo=ROTULOS[chave])
-                med.grid(row=lin + 2, column=col, columnspan=vao, sticky="w", padx=px, pady=(6, 12))
-                if chave != "senha":
-                    grupos_campo[chave].append(med)
-            else:
-                ttk.Frame(grade, style="S2.TFrame", height=8).grid(row=lin + 2, column=col)
+                self._dica(bgr, "Gerar uma senha forte (escolha o tipo e o tamanho). Atalho: Ctrl+G"
+                           if chave == "senha" else "Gerar um valor forte (escolha o tipo e o tamanho)")
+                med = self._medidor(bloco, ent_, pin=(chave == "pin"),
+                                    dicas_lbl=dicas_item if chave == "senha" else None,     # um painel de dicas SÓ da Senha
+                                    pref="S2.", titulo=rotulos_extra.get(chave) or ROTULOS[chave])
+                med.pack(anchor="w", pady=(6, 0))
+            blocos[chave] = bloco
+            return bloco
+
+        criar_bloco_secreto("senha").pack(fill="x")
         dicas_item.pack(fill="x", pady=(6, 0))
         if senha_inicial and not reg:
             campos["senha"].insert(0, senha_inicial)
             getattr(campos["senha"], "_pista_atualizar", lambda: None)()
-        for _k in ("senha", "senha_extra", "pin"):
-            campos[_k].event_generate("<<AtualizarJa>>")      # painéis de força já prontos no 1º quadro
+        campos["senha"].event_generate("<<AtualizarJa>>")      # painel de força já pronto no 1º quadro
 
-        extras = ttk.Frame(credenciais, style="S2.TFrame", padding=(_px(2), _px(8), _px(2), 0))
-        ttk.Label(extras, text=ROTULOS["codigos"].upper(), style="S2.Campo.TLabel").pack(anchor="w", pady=(4, 4))
-        extras_notas = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
-        extras_notas.pack(fill="x", pady=(12, 0))
-        fc = ttk.Frame(extras, style="S2.TFrame")
-        fc.pack(fill="x")
-        codigos = self._texto_multilinha(fc, 8, mono=True)
+        # barra de UM clique para acrescentar credenciais
+        barra_add = ttk.Frame(credenciais, style="S2.TFrame")
+        barra_add.pack(fill="x", pady=(14, 0))
+        for col_ in range(3):
+            barra_add.columnconfigure(col_, weight=1, uniform="chip")
+        ttk.Label(barra_add, text="ADICIONAR AO ITEM", style="S2.Campo.TLabel").grid(
+            row=0, column=0, columnspan=3, sticky="w")
+        chips = {}
+        for chave in ORDEM_EXTRA:
+            chips[chave] = ttk.Button(barra_add, text="＋ " + nomes_botao[chave], style="Pequeno.TButton",
+                                      command=lambda k=chave: adicionar_credencial(k))
+        dica_banco = ttk.Label(barra_add, style="S2.Fraco.TLabel", wraplength=_px(620), justify="left",
+                               text="Conta de banco? Use “Nº da conta” e “Agência” para guardar os dados bancários "
+                                    "(ficam protegidos pela senha mestra).")
+        # criada DEPOIS da senha e da barra: o Tab segue a ordem de criação (Senha → botões → campos extras → Notas)
+        area_extras = ttk.Frame(credenciais, style="S2.TFrame")
+        area_extras.pack(fill="x")
+
+        # códigos de recuperação: caixa multilinha com olho PRÓPRIO (independente de qualquer outro campo)
+        bloco_cod = ttk.Frame(area_extras, style="S2.TFrame")
+        cab_cod = ttk.Frame(bloco_cod, style="S2.TFrame")
+        cab_cod.pack(fill="x")
+        ttk.Label(cab_cod, text=ROTULOS["codigos"].upper(), style="S2.Campo.TLabel").pack(side="left")
+        bt_rem_cod = ttk.Button(cab_cod, text="✕ Remover", style="Icone.TButton",
+                                command=lambda: remover_credencial("codigos"))
+        bt_rem_cod.pack(side="right")
+        bt_olho_cod = ttk.Button(cab_cod, style="S2.Quadrado.TButton", takefocus=0,
+                                 image=imagem_icone(self.root, "ver", C["suave"], 18), compound="image")
+        bt_olho_cod.pack(side="right", padx=(0, 6))
+        self._dica(bt_olho_cod, "Mostrar ou ocultar os códigos.\nVolta a esconder sozinho depois de 30 segundos "
+                                "sem você mexer.")
+        fc = ttk.Frame(bloco_cod, style="S2.TFrame")
+        fc.pack(fill="x", pady=(4, 0))
+        codigos = self._texto_multilinha(fc, 6, mono=True)
         atualizar_pista_codigos = self._pista_texto(codigos, "Um código de recuperação por linha")
         barra_cod = ttk.Frame(fc, style="S2.TFrame")
         cont_cod = ttk.Label(barra_cod, text="", style="S2.Fraco.TLabel")
+        oculto = ttk.Label(fc, text="", style="S2.Fraco.TLabel")
+        estado_cod = {"visivel": True, "timer": None}
+
+        def quantos_codigos():
+            """Quantos códigos há na caixa (um por linha)."""
+            return len([x for x in codigos.get("1.0", "end").splitlines() if x.strip()])
 
         def contar_codigos(event=None):
             """Mostra quantos códigos há na caixa (um por linha)."""
-            n = len([x for x in codigos.get("1.0", "end").splitlines() if x.strip()])
-            cont_cod.config(text=f"{n} código(s)  —  um por linha")
+            cont_cod.config(text=f"{quantos_codigos()} código(s)  —  um por linha")
+
+        def cancelar_timer_cod():
+            """Cancela o agendamento de reocultação dos códigos."""
+            if estado_cod["timer"] is not None:
+                try:
+                    d.after_cancel(estado_cod["timer"])
+                except (tk.TclError, ValueError):
+                    pass
+                estado_cod["timer"] = None
+
+        def reiniciar_timer_cod(event=None):
+            """Reagenda a reocultação: quem está digitando não perde a caixa de vista (conta 30 s sem mexer)."""
+            cancelar_timer_cod()
+            if not estado_cod["visivel"] or not codigos.get("1.0", "end").strip():
+                return
+            try:
+                estado_cod["timer"] = d.after(self.MOSTRAR_SENHA_MS, lambda: mostrar_codigos(False))
+            except tk.TclError:
+                estado_cod["timer"] = None
+
+        def mostrar_codigos(ver, recalcular=True):
+            """Mostra a caixa de códigos ou troca por um aviso mascarado (sem relação com outros campos)."""
+            estado_cod["visivel"] = ver
+            cancelar_timer_cod()
+            try:
+                if ver:
+                    oculto.pack_forget()
+                    barra_cod.pack(fill="x", pady=(0, 6))
+                    codigos.pack(fill="x")
+                    atualizar_pista_codigos()
+                    contar_codigos()
+                    bt_olho_cod.config(image=imagem_icone(self.root, "ocultar", C["prim_txt"], 18))
+                    reiniciar_timer_cod()
+                else:
+                    codigos.pack_forget()
+                    barra_cod.pack_forget()
+                    n = quantos_codigos()
+                    oculto.config(text=(f"••••••   {n} código(s) guardado(s)  —  clique no olho para ver ou editar"
+                                        if n else "Nenhum código ainda  —  clique no olho para preencher"))
+                    oculto.pack(anchor="w", pady=(2, 0))
+                    bt_olho_cod.config(image=imagem_icone(self.root, "ver", C["suave"], 18))
+            except tk.TclError:
+                return
+            if recalcular:
+                self._recalcular_dialogo(d)
+
+        def alternar_codigos():
+            """Clique no olho dos códigos."""
+            mostrar_codigos(not estado_cod["visivel"])
+            if estado_cod["visivel"]:
+                codigos.focus_set()
+
+        bt_olho_cod.config(command=alternar_codigos)
 
         def colar_varios():
             """Cola vários códigos de uma vez: separa por linha, vírgula ou ponto e vírgula, tira repetidos e
@@ -12212,53 +12337,199 @@ class App:
             except tk.TclError:
                 pass
             cont_cod.config(text=f"+{len(novos)} código(s) colado(s); área de transferência limpa")
+            reiniciar_timer_cod()
 
         ttk.Button(barra_cod, text="Colar vários códigos", style="Acao.TButton", command=colar_varios).pack(side="left")
         cont_cod.pack(side="left", padx=12)
         codigos.bind("<KeyRelease>", contar_codigos, add="+")
+        codigos.bind("<KeyPress>", reiniciar_timer_cod, add="+")
+        blocos["codigos"] = bloco_cod
+        for k_ in ("senha_extra", "pin", "chave", "numero_conta", "agencia"):
+            criar_bloco_secreto(k_)
+        campo_foco = {k: campos[k] for k in ("senha_extra", "pin", "chave", "numero_conta", "agencia")}
+        campo_foco["codigos"] = codigos
         contar_codigos()
-        oculto = ttk.Label(fc, text="••••••   (oculto — ligue Mostrar)" if (reg or {}).get("codigos")
-                           else "(vazio — ligue Mostrar para preencher)", style="S2.Fraco.TLabel")
-        oculto.pack(anchor="w", pady=(2, 0))
         if reg:
             codigos.insert("1.0", reg.get("codigos", ""))
             atualizar_pista_codigos()
+        for _k in ("senha_extra", "pin"):
+            campos[_k].event_generate("<<AtualizarJa>>")
 
-        timer_mostrar = {"t": None}
-
-        def alternar():
-            """Mostra ou oculta os campos secretos do formulário."""
-            if timer_mostrar["t"]:
-                try:
-                    d.after_cancel(timer_mostrar["t"])
-                except (tk.TclError, ValueError):
-                    pass
-                timer_mostrar["t"] = None
-            s = "" if mostrar.get() else "•"
-            for e in secretos:
-                e.config(show=s)
-            if mostrar.get():
-                oculto.pack_forget()
-                barra_cod.pack(fill="x", pady=(0, 6))
-                codigos.pack(fill="x")
-                atualizar_pista_codigos()
-                timer_mostrar["t"] = self._depois_do_widget(
-                    d, self.MOSTRAR_SENHA_MS, lambda: (mostrar.set(False), alternar()))   # volta a esconder
+        def reorganizar_botoes():
+            """Redistribui só os botões das credenciais que ainda NÃO foram adicionadas; sem sobra, a barra some."""
+            restantes = [k for k in ORDEM_EXTRA if k not in ativos]
+            for b in chips.values():
+                b.grid_forget()
+            for i, k in enumerate(restantes):
+                chips[k].grid(row=1 + i // 3, column=i % 3, sticky="ew", padx=(0 if i % 3 == 0 else 6, 0), pady=(6, 0))
+            dica_banco.grid_forget()
+            if restantes:
+                barra_add.pack(fill="x", pady=(14, 0), before=area_extras)
+                if banco_ativo[0] and not ({"numero_conta", "agencia"} & set(ativos)):
+                    dica_banco.grid(row=10, column=0, columnspan=3, sticky="w", pady=(8, 0))
             else:
-                codigos.pack_forget()
-                barra_cod.pack_forget()
-                oculto.pack(anchor="w", pady=(2, 0))
+                barra_add.pack_forget()
+
+        banco_ativo = [False]
+
+        def trazer_para_vista(widget):
+            """Se o campo novo ficou abaixo da área visível, rola o formulário até ele."""
+            try:
+                tela = fr.master                                  # o canvas rolável do diálogo
+                d.update_idletasks()
+                total, visivel = fr.winfo_height(), tela.winfo_height()
+                if total <= visivel:
+                    return
+                topo_w = widget.winfo_rooty() - fr.winfo_rooty()
+                base_w = topo_w + widget.winfo_height()
+                y0 = tela.canvasy(0)
+                if base_w > y0 + visivel:
+                    tela.yview_moveto(max(0.0, (base_w - visivel + _px(16)) / total))
+                elif topo_w < y0:
+                    tela.yview_moveto(max(0.0, topo_w / total))
+            except tk.TclError:
+                pass
+
+        def adicionar_credencial(chave, focar=True):
+            """UM clique: o campo aparece logo abaixo dos já adicionados, na ordem de chegada, em largura total."""
+            if chave in ativos:
+                return
+            blocos[chave].pack(fill="x", pady=(14, 0))
+            ativos.append(chave)
+            if chave == "codigos":
+                mostrar_codigos(True)
+            reorganizar_botoes()
+            self._recalcular_dialogo(d)
+            if focar:
+                try:
+                    campo_foco[chave].focus_set()
+                except tk.TclError:
+                    pass
+                self._depois_do_widget(d, 80, lambda: trazer_para_vista(blocos[chave]))
+
+        def remover_credencial(chave):
+            """Tira o campo do formulário. Com algo digitado, pergunta antes (o texto é apagado de verdade)."""
+            if chave == "codigos":
+                preenchido = bool(codigos.get("1.0", "end").strip())
+            else:
+                preenchido = bool(campos[chave].get())
+            if preenchido and not messagebox.askyesno(
+                    "Remover campo", f"Remover “{rotulos_extra[chave]}”?\n\nO que você digitou nele será apagado e não "
+                    "poderá ser recuperado.", parent=d, perigoso=True):
+                return
+            if chave == "codigos":
+                codigos.delete("1.0", "end")
+                cancelar_timer_cod()
+            else:
+                campos[chave].delete(0, "end")
+                getattr(campos[chave], "_pista_atualizar", lambda: None)()
+            blocos[chave].pack_forget()
+            if chave in ativos:
+                ativos.remove(chave)
+            reorganizar_botoes()
             self._recalcular_dialogo(d)
 
+        for k_ in ORDEM_EXTRA:                  # edição: só aparecem as credenciais que o item já tem
+            if reg and (reg.get(k_) or "").strip():
+                blocos[k_].pack(fill="x", pady=(14, 0))
+                ativos.append(k_)
+                if k_ == "codigos":
+                    mostrar_codigos(False, recalcular=False)       # códigos já guardados começam ocultos (olho próprio)
+        reorganizar_botoes()
+
+        # ---------- Notas ----------
+        extras_notas = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
+        extras_notas.pack(fill="x", pady=(12, 0))
         ttk.Label(extras_notas, text="NOTAS / OBSERVAÇÕES", style="C.Campo.TLabel").pack(anchor="w", pady=(2, 4))
-        notas = self._texto_multilinha(extras_notas, 2)
+        notas = self._texto_multilinha(extras_notas, 3)
         notas.pack(fill="x")
         atualizar_pista_notas = self._pista_texto(notas, "Anotações importantes sobre esta conta…")
         if reg:
             notas.insert("1.0", reg.get("notas", ""))
             atualizar_pista_notas()
 
-        def salvar():
+        # ---------- Alterações não salvas (comparação por impressão com chave aleatória: nenhum segredo é copiado) ----------
+        chave_impressao = os.urandom(16)
+
+        def impressao(sem_senha=False):
+            """Resumo (hash) de tudo o que está digitado; serve só para saber se algo mudou desde que abriu."""
+            h = hashlib.blake2b(key=chave_impressao, digest_size=16)
+            for k, e in campos.items():
+                if sem_senha and k == "senha":
+                    h.update(b"\x01")
+                    continue
+                h.update(e.get().encode("utf-8", "surrogatepass"))
+                h.update(b"\x00")
+            h.update(codigos.get("1.0", "end").encode("utf-8", "surrogatepass"))
+            h.update(b"\x00")
+            h.update(notas.get("1.0", "end").encode("utf-8", "surrogatepass"))
+            h.update(b"\x00")
+            h.update(cp.get().encode("utf-8", "surrogatepass"))
+            h.update(b"\x01" if status.get() else b"\x00")
+            return h.digest()
+
+        base_alteracoes = {"v": None}
+
+        def ha_alteracoes():
+            """True se há algo digitado/alterado que ainda não foi salvo."""
+            try:
+                return impressao() != base_alteracoes["v"]
+            except tk.TclError:
+                return False
+
+        def fechar_seguro(event=None):
+            """Cancelar, Esc e o X da janela: se há dados não salvos, pergunta antes de descartar."""
+            if ha_alteracoes() and not messagebox.askyesno(
+                    "Descartar alterações?", "Há dados digitados que ainda não foram salvos.\n\n"
+                    "Fechar e descartar o que foi digitado?", parent=d, perigoso=True):
+                return "break"
+            d.destroy()
+            return "break"
+
+        # ---------- Salvar ----------
+        def conferir_antes_de_salvar(dados):
+            """Avisos que NÃO impedem de salvar, mas merecem uma segunda olhada (duplicado, sem senha, fraca, repetida)."""
+            avisos = []
+            outros = [r for r in self.cofre.registros if not reg or r.get("id") != reg["id"]]
+            ch_serv, ch_login = dados["servico"].casefold(), dados["login"].casefold()
+            mudou_nome = not reg or (reg.get("servico", "").strip().casefold() != ch_serv
+                                     or (reg.get("login") or "").strip().casefold() != ch_login)
+            if mudou_nome and any((r.get("servico") or "").strip().casefold() == ch_serv
+                                  and (r.get("login") or "").strip().casefold() == ch_login for r in outros):
+                avisos.append(f"Já existe um item “{dados['servico']}” com este mesmo login."
+                              if ch_login else f"Já existe um item chamado “{dados['servico']}”.")
+            senha = dados.get("senha", "")
+            senha_mudou = not reg or senha != (reg.get("senha") or "")
+            if senha_mudou:
+                if not senha:
+                    if not any((dados.get(k) or "").strip() for k in ("senha_extra", "pin", "chave", "codigos")):
+                        avisos.append("O item está sem senha.")
+                else:
+                    if relatorio_forca(senha)[0] <= 1:
+                        avisos.append("A senha é fraca (fácil de descobrir). O botão “Gerar…” cria uma forte.")
+                    usada_em = sorted({(r.get("servico") or "").strip() for r in outros
+                                       if r.get("senha") and r.get("senha") == senha} - {""})
+                    if usada_em:
+                        avisos.append("A mesma senha já é usada em: " + ", ".join(usada_em[:3])
+                                      + (" e outros" if len(usada_em) > 3 else "") + ".")
+            return avisos
+
+        def mostrar_erro_servico(texto):
+            """Erro do nome da conta: texto + ícone junto ao rótulo e campo marcado (não só cor)."""
+            try:
+                erro_servico.config(text=("⚠ " + texto) if texto else "")
+                campos["servico"].state(["invalid"] if texto else ["!invalid"])
+            except tk.TclError:
+                pass
+
+        def limpar_erro_servico(event=None):
+            """Some com o erro assim que o nome da conta é preenchido."""
+            if campos["servico"].get().strip():
+                mostrar_erro_servico("")
+                erro_validacao.pack_forget()
+        campos["servico"].bind("<KeyRelease>", limpar_erro_servico, add="+")
+
+        def salvar(criar_outro=False):
             """Valida e grava o item (novo ou editado) numa transação e fecha o formulário."""
             dados = {k: _limpar_texto(e.get()).strip() if k in ("grupo", "servico", "login") else e.get()
                      for k, e in campos.items()}       # títulos sem controles/bidi (RLO forja nomes na lista)
@@ -12269,10 +12540,18 @@ class App:
             dados["pessoa"] = _limpar_texto(self._valor_pessoa(cp.get())).strip()
             dados["ativo"] = status.get()
             if not dados["servico"]:
+                mostrar_erro_servico("Obrigatório: informe o nome da conta ou app")
                 erro_validacao.pack(side="left")
                 campos["servico"].focus_set()
+                trazer_para_vista(campos["servico"])
                 return
             erro_validacao.pack_forget()
+            mostrar_erro_servico("")
+            avisos = conferir_antes_de_salvar(dados)
+            if avisos and not messagebox.askyesno(
+                    "Conferir antes de salvar", "Antes de salvar, confira:\n\n• " + "\n• ".join(avisos)
+                    + "\n\nSalvar mesmo assim?", parent=d, perigoso=True):
+                return
             if reg:
                 rid = reg["id"]
 
@@ -12290,8 +12569,10 @@ class App:
             if not reg:
                 self.tree.selection_set(item["id"])
             d.destroy()
+            if criar_outro and not reg:                # "Salvar e criar outro": abre um formulário novo, em branco
+                self.root.after(30, lambda: self.dialogo_registro(None))
 
-        ancora = ttk.Frame(fr, height=1)     # ponto de referência: campos extras entram antes dele
+        ancora = ttk.Frame(fr, height=1)     # ponto de referência
         ancora.pack(fill="x")
         extras_notas.pack(fill="x", before=ancora)
         ttk.Separator(rodape).pack(fill="x", pady=(0, 10))
@@ -12299,81 +12580,102 @@ class App:
         rod.pack(fill="x")
         erro_validacao = ttk.Label(rod, text="Informe o nome da Conta / App para salvar.", foreground=C["perigo"])
 
-        # ---- modo simples x completo (revelação progressiva) ----
-        def aplicar_campos():
-            """Atualiza a lista e a visibilidade das credenciais extras."""
-            for k, grupo in grupos_campo.items():
-                for w in grupo:
-                    try:
-                        w.grid() if tem[k].get() else w.grid_remove()
-                    except tk.TclError:
-                        pass
-            atualizar_seletor_credenciais()
-            extras.pack_forget()
-            if tem["codigos"].get():
-                extras.pack(fill="x")
-            self._recalcular_dialogo(d)
-
         ttk.Button(rod, text="Salvar item", command=salvar, style="Primario.TButton",
                    image=imagem_icone(self.root, "ok", "#ffffff"), compound="left").pack(side="right")
-        ttk.Button(rod, text="Cancelar", command=d.destroy).pack(side="right", padx=8)
+        if not reg:
+            bt_outro = ttk.Button(rod, text="Salvar e criar outro", command=lambda: salvar(criar_outro=True))
+            bt_outro.pack(side="right", padx=(0, 8))
+            self._dica(bt_outro, "Grava este item e já abre um formulário novo, em branco.")
+        ttk.Button(rod, text="Cancelar", command=fechar_seguro).pack(side="right", padx=8)
         campos["servico"].focus_set()
 
         def passeio_formulario():
             """Passeio guiado do formulário de item: o que escrever em cada campo."""
             passos = [
                 (lambda: campos["servico"], "Conta / App",
-                 "Nome do site, app ou cartão (ex.: Banco Azul). É o único campo obrigatório."),
+                 "Nome do site, app ou cartão (ex.: Banco Azul). É o único campo obrigatório. Ao digitar uma marca "
+                 "conhecida (Instagram, por exemplo), o Grupo é preenchido sozinho."),
                 (lambda: campos["grupo"], "Grupo (categoria)",
-                 "Escolha uma sugestão (Banco, Compras, Redes sociais...) ou DIGITE um nome novo: o grupo é criado "
-                 "sozinho. Serve para organizar a lista."),
+                 "Já vem sugerido pelo nome da conta. Troque quando quiser: escolha outro ou DIGITE um nome novo (o grupo "
+                 "é criado sozinho). Serve para organizar a lista."),
                 (lambda: campos["login"], "Login", "Usuário, e-mail ou número da conta."),
                 (lambda: cp, "Pessoa (perfil)",
                  "De quem é esta conta: 'Eu' ou outro perfil (Pai, Mãe...). Digite um nome novo para criar o perfil."),
                 (lambda: campos["senha"], "Senha",
-                 "Digite ou use o botão de gerar para criar uma senha forte. Enquanto você digita, a barra mostra a força "
-                 "e quanto tempo levaria para quebrar."),
-                (lambda: campos["numero_conta"], "Número da conta / Agência",
-                 "Dados bancários: ficam ocultos como senha e SEMPRE pedem a senha mestra de novo para ver, copiar "
-                 "ou editar -- mesmo com a proteção extra desligada para o resto do cofre."),
+                 "Digite ou use o botão de gerar (Ctrl+G) para criar uma senha forte. O olho ao lado mostra ou oculta só "
+                 "este campo. A barra mostra a força e quanto tempo levaria para quebrar."),
+                (lambda: campos["numero_conta"], "Mais credenciais",
+                 "Um clique em “＋ PIN”, “＋ Chave / token”, “＋ Nº da conta” e outros acrescenta o campo logo abaixo, cada "
+                 "um com o seu olho e o seu botão de remover. Dados bancários SEMPRE pedem a senha mestra de novo para "
+                 "ver, copiar ou editar."),
                 (lambda: fc, "Códigos de recuperação",
-                 "Guarde aqui os códigos de reserva do site (vários, um por linha). Ligue 'Mostrar' e use 'Colar vários "
-                 "códigos' para colar todos de uma vez."),
+                 "Guarde aqui os códigos de reserva do site (um por linha). Use 'Colar vários códigos' para colar todos "
+                 "de uma vez. O olho desta caixa é só dela."),
                 (lambda: notas, "Notas", "Qualquer observação: perguntas de segurança, endereço, número do cartão..."),
                 (lambda: rod, "Salvar",
-                 "Clique em Salvar para guardar (tudo fica criptografado). A proteção extra -- pedir a senha mestra "
-                 "de novo para ver ou copiar -- agora é um ajuste só, para o cofre todo: '⋯ → Segurança → Proteção "
-                 "extra'."),
+                 "Clique em Salvar (ou Ctrl+S) para guardar; tudo fica criptografado. Enter NÃO salva: só passa para o "
+                 "campo seguinte. A proteção extra -- pedir a senha mestra de novo para ver ou copiar -- é um ajuste só, "
+                 "para o cofre todo: '⋯ → Segurança → Proteção extra'."),
             ]
             TourGuiado(self, d, passos).iniciar()
+
         def passeio_com_tudo():
-            """O passeio fala de todos os campos: abre o modo completo antes de começar."""
-            for v_ in tem.values():
-                v_.set(True)
-            aplicar_campos()
+            """O passeio fala de todos os campos: abre todos os extras antes de começar."""
+            for k_ in ORDEM_EXTRA:
+                adicionar_credencial(k_, focar=False)
             passeio_formulario()
         bt_tour.config(command=passeio_com_tudo)
-        aplicar_campos()
 
         def ajustar_bancarios(event=None):
-            """Grupo de banco/financas: mostra Numero da conta e Agencia (como no modelo). Sair do grupo nao apaga nada."""
+            """Grupo de banco/finanças: SUGERE Número da conta e Agência (não abre nada sozinho)."""
             try:
                 nome_g = chave_ordem_alfabetica(cg.get())
             except tk.TclError:
                 return
-            if "banc" in nome_g or "financ" in nome_g:
-                mudou = False
-                for k_ in ("numero_conta", "agencia"):
-                    if not tem[k_].get():
-                        tem[k_].set(True)
-                        mudou = True
-                if mudou:
-                    aplicar_campos()
+            novo = "banc" in nome_g or "financ" in nome_g
+            if novo != banco_ativo[0]:
+                banco_ativo[0] = novo
+                reorganizar_botoes()
+                self._recalcular_dialogo(d)
         for seq_ in ("<KeyRelease>", "<<ComboboxSelected>>", "<FocusOut>"):
             cg.bind(seq_, ajustar_bancarios, add="+")
         ajustar_grupo_bancario[0] = ajustar_bancarios
-        d.bind("<Return>", lambda e: salvar() if e.widget.winfo_class() in ("TEntry", "Entry", "TCombobox") else None)
+        ajustar_bancarios()
+
+        # ---------- Teclado: Enter NUNCA salva ----------
+        def enter_vai_ao_proximo(e):
+            """Enter em campo de uma linha só passa para o próximo campo (não grava nada); em botão, aciona o botão."""
+            classe = e.widget.winfo_class()
+            if classe in ("TEntry", "Entry", "TCombobox"):
+                try:
+                    e.widget.tk_focusNext().focus_set()
+                except (tk.TclError, AttributeError):
+                    pass
+                return "break"
+            if classe == "TButton":
+                try:
+                    e.widget.invoke()
+                except tk.TclError:
+                    pass
+                return "break"
+            return None
+
+        def gerar_pela_tecla(event=None):
+            """Ctrl+G: abre o gerador para o campo Senha."""
+            self.dialogo_gerador(campos["senha"], "aleatoria", d)
+            return "break"
+        d.bind("<Return>", enter_vai_ao_proximo)
+        d.bind("<Control-Return>", lambda e: (salvar(), "break")[1])
+        for seq_ in ("<Control-s>", "<Control-S>"):
+            d.bind(seq_, lambda e: (salvar(), "break")[1])
+        for seq_ in ("<Control-g>", "<Control-G>"):
+            d.bind(seq_, gerar_pela_tecla)
+        d.bind("<Escape>", fechar_seguro)
+        d.protocol("WM_DELETE_WINDOW", fechar_seguro)
+        d.bind("<Destroy>", lambda e: (cancelar_timer_cod() if e.widget is d else None), add="+")
         d.bind("<Destroy>", lambda e: (self._tour.encerrar() if getattr(self, "_tour", None) and e.widget is d else None), add="+")
+        base_alteracoes["v"] = impressao(sem_senha=bool(senha_inicial and not reg))
+        self._recalcular_dialogo(d)
 
 
     # ---------- Senha mestra, chave de acesso e planilha-modelo ----------
@@ -13504,6 +13806,7 @@ class App:
         conf = ttk.Entry(fr, width=10, font="CofreMono")
         conf.pack(anchor="w")
         self._pista_entrada(conf, f"Bloco ({len(bloco_alvo)} caracteres)")
+        self._forcar_maiusculas(conf)
         msg = ttk.Label(fr, text="", foreground=CORES["perigo"])
         msg.pack(anchor="w", pady=(4, 0))
 

@@ -7,7 +7,7 @@ A) Regioes fixas: tamanho da janela, cabecalho, barra lateral, painel de detalhe
 B) Cortes: texto de botao/rotulo mais largo que o widget, rotulo com quebra de linha mais alto que o widget e widget
    saindo da janela. Verificado na tela principal em cada estado, no tamanho padrao e no minimo, em todos os temas.
 C) Dialogos: cada item do menu "..." abre sem cortes; o formulario Novo item mantem largura e posicao ao adicionar
-   credenciais e ao mostrar/ocultar segredos; "Aparencia e cores" nao muda de tamanho ao escolher outra opcao.
+   credenciais (botoes da faixa) e ao mostrar/ocultar cada segredo (olho proprio); "Aparencia e cores" nao muda de tamanho ao escolher outra opcao.
 """
 import os
 import sys
@@ -197,28 +197,35 @@ def principal():
             m0 = (d.winfo_width(), d.winfo_rootx(), d.winfo_rooty())
             h0 = d.winfo_height()
             cortes(d, "Novo item (inicial)")
-            combo = next((w for w in A.todos(d) if w.winfo_class() == "TCombobox" and str(w.cget("state")) == "readonly"), None)
-            botao = A.achar_botao(d, "+ Adicionar credencial")
-            etapas = ["Senha extra", "PIN numérico", "Chave / token", "Número da conta", "Agência", "Códigos de recuperação"]
-            if combo is not None and botao is not None:
-                for rotulo in etapas:
-                    combo.set(rotulo)
-                    botao.invoke()
-                    A.bombear(root, 0.3)
-                    m = (d.winfo_width(), d.winfo_rootx(), d.winfo_rooty())
-                    rel.verifica(m == m0, f"Novo item: adicionar '{rotulo}' nao muda largura nem posicao", f"{m0} -> {m}")
-                    cortes(d, f"Novo item + {rotulo}")
-                h1 = d.winfo_height()
-                if h1 != h0:
-                    rel.aviso(f"Novo item: a altura mudou de {h0} para {h1} ao adicionar credenciais")
-            mostrar = next((w for w in A.todos(d) if w.winfo_class() == "TCheckbutton" and A.texto_de(w) == "Mostrar"), None)
-            if mostrar is not None:
+            # credenciais extras: um clique em cada botao da faixa "ADICIONAR AO ITEM" (nao ha mais seletor nem "Mostrar" geral)
+            etapas = ["＋ Senha extra", "＋ PIN", "＋ Chave / token", "＋ Nº da conta", "＋ Agência", "＋ Códigos de recuperação"]
+            for rotulo in etapas:
+                botao = A.achar_botao(d, rotulo)
+                rel.verifica(botao is not None, f"Novo item: existe o botao '{rotulo}'")
+                if botao is None:
+                    continue
+                botao.invoke()
+                A.bombear(root, 0.3)
+                m = (d.winfo_width(), d.winfo_rootx(), d.winfo_rooty())
+                rel.verifica(m == m0, f"Novo item: adicionar '{rotulo}' nao muda largura nem posicao", f"{m0} -> {m}")
+                cortes(d, f"Novo item + {rotulo}")
+            h1 = d.winfo_height()
+            if h1 != h0:
+                rel.aviso(f"Novo item: a altura mudou de {h0} para {h1} ao adicionar credenciais (esperado: acompanha o conteudo)")
+            rel.verifica(d.winfo_width() <= root.winfo_width() and d.winfo_height() <= root.winfo_height(),
+                         "Novo item: com tudo aberto cabe dentro da janela principal",
+                         f"{d.winfo_width()}x{d.winfo_height()} / {root.winfo_width()}x{root.winfo_height()}")
+            rel.verifica(not any(w.winfo_class() == "TCheckbutton" and A.texto_de(w) == "Mostrar" for w in A.todos(d)),
+                         "Novo item: nao existe mais o 'Mostrar' geral (cada campo tem o seu olho)")
+            olhos = [w for w in A.todos(d) if w.winfo_class() == "TButton" and A.texto_de(w) == "👁" and w.winfo_ismapped()]
+            rel.verifica(len(olhos) >= 5, "Novo item: cada campo secreto tem o seu olho", str(len(olhos)))
+            for olho in olhos:
                 for _ in range(2):
-                    mostrar.invoke()
-                    A.bombear(root, 0.3)
+                    olho.invoke()
+                    A.bombear(root, 0.15)
                     m = (d.winfo_width(), d.winfo_rootx(), d.winfo_rooty())
-                    rel.verifica(m == m0, "Novo item: Mostrar/ocultar segredos nao mexe na janela", f"{m0} -> {m}")
-                    cortes(d, "Novo item com Mostrar")
+                    rel.verifica(m == m0, "Novo item: mostrar/ocultar um segredo nao mexe na janela", f"{m0} -> {m}")
+                    cortes(d, "Novo item com um campo a mostra")
             d.destroy()
         rel.verifica(not erros.pegar(), "nenhuma excecao do Tk no teste inteiro")
     finally:

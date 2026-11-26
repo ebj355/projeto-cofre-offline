@@ -209,14 +209,18 @@ def principal():
         f.fechar()
 
         # ---------------------------------------------------------------------------------------------- 4
-        rel.secao("4) Enter salva; Cancelar nao grava")
+        rel.secao("4) Enter NAO salva (vai ao proximo campo); Ctrl+S salva; Cancelar nao grava")
         antes = list(ids_atuais(app))
         f = Formulario(app)
-        f.preencher(servico="Salvo Pelo Enter", login="enter")
+        f.preencher(servico="Salvo Pelo Atalho", login="atalho")
         f.campos["servico"].focus_force()
         f.campos["servico"].event_generate("<Return>")
         A.bombear(root, 0.5)
-        rel.verifica(not f.aberto and len(ids_atuais(app)) == len(antes) + 1, "Enter no campo Conta salva o item")
+        rel.verifica(f.aberto and ids_atuais(app) == antes, "Enter no campo Conta NAO salva (so avanca)")
+        f.janela.focus_force()
+        f.janela.event_generate("<Control-s>")
+        A.bombear(root, 0.5)
+        rel.verifica(not f.aberto and len(ids_atuais(app)) == len(antes) + 1, "Ctrl+S salva o item")
         f.fechar()
         antes = list(ids_atuais(app))
         f = Formulario(app)
@@ -321,67 +325,57 @@ def principal():
             rel.verifica(False, "pulou editar: o item completo nao foi criado")
 
         # ---------------------------------------------------------------------------------------------- 8
-        rel.secao("8) credenciais extras: '+ Adicionar credencial' e 'x'")
+        rel.secao("8) credenciais extras: chips '+ ...' e '✕ Remover'")
+
+        def botao_com_texto(janela, texto):
+            return next((w for w in A.todos(janela) if w.winfo_class() == "TButton"
+                         and A.texto_de(w) == texto and w.winfo_ismapped()), None)
+
+        CHIPS = {"senha_extra": "Senha extra", "pin": "PIN", "chave": "Chave / token",
+                 "conta": "Nº da conta", "agencia": "Agência"}
         f = Formulario(app)
-        combo = next((w for w in A.todos(f.janela) if w.winfo_class() == "TCombobox" and str(w.cget("state")) == "readonly"), None)
-        botao = A.achar_botao(f.janela, "+ Adicionar credencial")
-        rel.verifica(combo is not None and botao is not None, "o seletor de credenciais e o botao '+ Adicionar' existem")
-        if combo is not None and botao is not None:
-            for chave, rotulo in ROTULO_EXTRA.items():
-                if chave == "codigos":
-                    continue
-                combo.set(rotulo)
-                botao.invoke()
-                A.bombear(root, 0.2)
-                rel.verifica(f.campos[chave].winfo_ismapped(), f"'{rotulo}': o campo aparece ao adicionar")
-            rel.verifica(str(botao.cget("state")) in ("normal",) or True, "seletor atualizado")
-            f.preencher(servico="Com Extras", pin="1111", senha_extra="extra-xyz")
-            # 'x' de um campo extra
-            xs = [w for w in A.todos(f.janela) if w.winfo_class() == "TButton" and A.texto_de(w) == "×" and w.winfo_ismapped()]
-            # diagnostico: se faltar botao, mostra TODOS os botoes com texto parecido com 'x' e se estao mapeados,
-            # para separar "o botao nao existe" de "existe mas nao esta visivel" de "o texto mudou"
-            if len(xs) < 5:
-                suspeitos = []
-                for w in A.todos(f.janela):
-                    if w.winfo_class() == "TButton":
-                        t = A.texto_de(w)
-                        if t is not None and (len(str(t)) <= 2) and str(t).strip():
-                            suspeitos.append((repr(t), "mapeado" if w.winfo_ismapped() else "NAO mapeado",
-                                              "pai mapeado" if w.master.winfo_ismapped() else "pai NAO mapeado",
-                                              w.winfo_manager() or "sem gerenciador"))
-                print("  (diagnostico) botoes de texto curto na janela:", suspeitos, flush=True)
-            rel.verifica(len(xs) >= 5, "cada credencial extra tem seu botao 'x'", str(len(xs)))
-            antes = set(ids_atuais(app))
-            f.v["tem"] = None
-            f.apertar_salvar()
-            novos = [i for i in ids_atuais(app) if i not in antes]
-            if novos:
-                confere(app, novos[0], dict(servico="Com Extras", pin="1111", senha_extra="extra-xyz"), "credenciais extras")
+        for chave, rotulo in CHIPS.items():
+            chip = botao_com_texto(f.janela, "＋ " + rotulo)
+            rel.verifica(chip is not None, f"existe o chip '＋ {rotulo}'")
+            if chip is None or chave not in f.campos:
+                continue
+            chip.invoke()
+            A.bombear(root, 0.2)
+            rel.verifica(f.campos[chave].winfo_ismapped(), f"'{rotulo}': o campo aparece ao clicar no chip")
+            rel.verifica(botao_com_texto(f.janela, "＋ " + rotulo) is None, f"'{rotulo}': o chip some depois de usado")
+        f.preencher(servico="Com Extras", pin="1111", senha_extra="extra-xyz")
+        removers = [w for w in A.todos(f.janela) if w.winfo_class() == "TButton"
+                    and A.texto_de(w) == "✕ Remover" and w.winfo_ismapped()]
+        rel.verifica(len(removers) >= 5, "cada credencial extra tem seu botao '✕ Remover'", str(len(removers)))
+        antes = set(ids_atuais(app))
+        f.apertar_salvar()
+        novos = [i for i in ids_atuais(app) if i not in antes]
+        if novos:
+            confere(app, novos[0], dict(servico="Com Extras", pin="1111", senha_extra="extra-xyz"), "credenciais extras")
         f.fechar()
-        # 'x' esconde o campo; o valor digitado nao deveria continuar sendo gravado escondido
+
+        # '✕ Remover' esconde o campo e o valor digitado nao pode continuar sendo gravado
         f = Formulario(app)
-        combo = next((w for w in A.todos(f.janela) if w.winfo_class() == "TCombobox" and str(w.cget("state")) == "readonly"), None)
-        botao = A.achar_botao(f.janela, "+ Adicionar credencial")
-        if combo is not None and botao is not None:
-            combo.set("PIN numérico")
-            botao.invoke()
+        chip = botao_com_texto(f.janela, "＋ PIN")
+        if chip is not None:
+            chip.invoke()
             A.bombear(root, 0.2)
             f.preencher(servico="Remove PIN", pin="999999")
-            x_pin = [w for w in A.todos(f.janela) if w.winfo_class() == "TButton" and A.texto_de(w) == "×"
-                     and w.winfo_ismapped() and w.master.winfo_ismapped()]
-            if x_pin:
-                x_pin[0].invoke()           # a ordem dos campos extras e fixa; o 1o 'x' visivel e o do PIN
-                A.bombear(root, 0.2)
+            rem = [w for w in A.todos(f.janela) if w.winfo_class() == "TButton"
+                   and A.texto_de(w) == "✕ Remover" and w.winfo_ismapped()]
+            if rem:
+                rem[0].invoke()      # campo preenchido: o programa pede confirmacao (askyesno) antes de remover
+                A.bombear(root, 0.3)
             antes = set(ids_atuais(app))
             f.apertar_salvar()
             novos = [i for i in ids_atuais(app) if i not in antes]
             if novos:
                 gravado = next(r for r in app.cofre.registros if r["id"] == novos[0])
                 if gravado.get("pin"):
-                    rel.aviso("campo removido com 'x' continuou sendo gravado com o texto que estava digitado "
-                              f"(pin={gravado['pin']!r}); o 'x' esconde mas nao limpa o valor")
+                    rel.aviso("campo removido continuou sendo gravado (pin=%r); se o stub de mensagens "
+                              "responde 'nao' ao askyesno, o campo nao foi removido de fato" % (gravado["pin"],))
                 else:
-                    rel.verifica(True, "campo removido com 'x' nao grava o valor escondido")
+                    rel.verifica(True, "campo removido nao grava o valor escondido")
         f.fechar()
 
         # ---------------------------------------------------------------------------------------------- 9

@@ -50,7 +50,13 @@ def cortados(topo, tol=3):
 
 W = tempfile.mkdtemp(prefix="rc_"); P = os.path.join(W, "t.dat"); SENHA = "cavalo azul come pizza na chuva"
 for geo in ("1366x768", "1024x640", "900x600"):
-    root = tk.Tk(); root.geometry(geo + "+0+0")
+    root = tk.Tk()
+    gw, gh = (int(x) for x in geo.split("x"))
+    if gw > root.winfo_screenwidth() or gh > root.winfo_screenheight():
+        print(f"  [PULADO] {geo}: maior que a tela ({root.winfo_screenwidth()}x{root.winfo_screenheight()})", flush=True)
+        root.destroy()
+        continue
+    root.geometry(geo + "+0+0")
     app = c.App(root, P); root.update()
     for p in (P, P + ".bak1"):
         if os.path.exists(p): os.remove(p)

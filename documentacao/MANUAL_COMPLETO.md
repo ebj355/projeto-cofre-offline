@@ -42,7 +42,7 @@
 | **Senha mestra** | Mínimo de 14 caracteres. Senhas só com números, sequências (123456, qwerty), senhas de listas vazadas e senhas que o medidor de entropia classifica como Fraca ou Muito fraca (ex.: `Corinthians2024!!`) são recusadas | Passa pelo Argon2id: cada tentativa custa 1 GiB de memória e alguns segundos |
 | **Chave de acesso (token)** | 160 bits aleatórios no formato `XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX` (os 2 últimos caracteres são de verificação: um erro de digitação é percebido **sem gastar tentativa**; chaves antigas de 32 caracteres continuam valendo). Pode ser digitada ou carregada de um arquivo `.key` | Aparece **uma única vez**, ao criar o cofre. Dá para salvar em `.key` ou anotar à mão. **Não é impressa**, para não passar pela fila de impressão do Windows |
 | **Chave FIDO2** (opcional) | Chave física USB/NFC (YubiKey 5, Feitian ePass FIDO2…) com PIN e toque | Aceita várias chaves (principal + reserva) e gera um **código de recuperação** em papel |
-| **Computador autorizado** (opcional) | O cofre só abre nos computadores da lista (até 8), reconhecidos pelo **MachineGuid do Windows + UUID da placa-mãe** (não pelo disco, placa de rede ou IP, que mudam) | Fator **a mais** (senha + chave FIDO + computador), nunca alternativa à chave FIDO. Em computador fora da lista o cofre recusa **sem gastar tentativa**; só o **código de recuperação** abre. Menu ⋯ › *Computadores autorizados…* |
+| **Computador autorizado** (ativado ao criar o cofre) | O cofre só abre nos computadores da lista (até 8), reconhecidos pelo **MachineGuid do Windows + UUID da placa-mãe** (não pelo disco, placa de rede ou IP, que mudam) | Fator **a mais** (senha + chave FIDO + computador), nunca alternativa à chave FIDO. Em computador fora da lista o cofre recusa **sem gastar tentativa**; só o **código de recuperação** abre. **Ao criar o cofre**, o programa autoriza o computador atual, mostra o código de recuperação e pergunta "Mais computadores?": SIM libera até 8; NÃO deixa o cofre preso a este. Se a autorização falhar ou o código não for confirmado, o cofre continua válido, sem a exigência. Menu ⋯ › *Computadores autorizados…* |
 
 **Modos de desbloqueio**, escolhidos ao criar o cofre:
 
@@ -314,7 +314,9 @@ O que **não** destrói o cofre, porque um byte ruim no pendrive não pode custa
 
 **Gravação segura no pendrive:** todo arquivo gravado pelo cofre (cofre, cópias, backup) vai primeiro para um `.tmp` na mesma pasta, é forçado ao disco (`fsync`), **relido e conferido por SHA-256** e só então trocado pelo definitivo (`os.replace`, atômico; no Windows tenta de novo por alguns segundos se o antivírus estiver segurando o arquivo). Se o pendrive sair, ficar cheio, protegido ou der erro no meio, o cofre anterior continua intacto, o `.tmp` é apagado e aparece uma mensagem clara (sem caminho de arquivo). Se o arquivo do cofre **sumir** com o cofre aberto (pendrive removido ou trocado), o programa se recusa a gravar, em vez de criar um cofre novo em outro pendrive. Dentro dos dados cifrados há ainda um **manifesto** (quantidade de itens e SHA-256 dos IDs): se não conferir, o cofre recusa abrir em vez de carregar um estado parcial.
 
-**Registro de diagnóstico (cifrado):** falhas do sistema (gravação, leitura, integridade, erro inesperado) viram **registros de 77 bytes com números** (código do evento, `errno`, linha do programa, versão, minuto), sem texto, caminho, hash ou memória, no arquivo `cofre.dat.diag`. Cada registro é selado com a chave pública do cofre (X25519 + ChaCha20-Poly1305), então dá para registrar até com o cofre trancado; a chave privada fica **dentro do cofre** e só ele, aberto, lê (menu ⋯ › **Diagnóstico**). Guarda no máximo 200 registros (mantém os 100 mais recentes ao rodar) e some junto na autodestruição. Registro adulterado é descartado e contado.
+**Verificação de integridade ao entrar:** logo depois de desbloquear, abre sozinha a tela *Verificar integridade do cofre*, com o estado do arquivo principal e de cada cópia `.bak`. Ela só lê: não grava nem altera nada, e uma falha na conferência nunca impede o uso do cofre. Também está em ⋯ › Segurança › *Verificar integridade do cofre*.
+
+**Registro de diagnóstico (cifrado):** falhas do sistema (gravação, leitura, integridade, erro inesperado) viram **registros cifrados de 157 bytes** (código do evento, `errno`, linha do programa, versão, minuto, tipo do erro e o nome das duas funções onde parou), sem texto livre, caminho, senha, hash ou memória, no arquivo `cofre.dat.diag`. Cada registro é selado com a chave pública do cofre (X25519 + ChaCha20-Poly1305), então dá para registrar até com o cofre trancado; a chave privada fica **dentro do cofre** e só ele, aberto, lê (menu ⋯ › **Diagnóstico**). Guarda no máximo 200 registros (mantém os 100 mais recentes ao rodar) e some junto na autodestruição. Registro adulterado é descartado e contado.
 
 Erros que **não** gastam tentativa:
 
@@ -510,7 +512,7 @@ CofreSenhas-Instalador/  (= cofre-de-senhas/ no GitHub)
 │   --- o que o usuário final realmente precisa (ver 5. e 7.) ---
 ├── README.md                              # guia único de entrada: uso, dependências, testes e estrutura
 ├── 1 - INSTALAR O COFRE - compila e instala.bat    # ÚNICO instalador: dois cliques (confere, registra e chama o instalar_cofre.ps1)
-├── 2 - TESTAR TUDO - roda todos os testes.bat      # roda as etapas 1 a 7
+├── 2 - TESTAR TUDO - roda todos os testes.bat      # roda as etapas 1 a 8
 ├── 3 - BAIXAR PACOTES - so para instalar sem internet.bat   # baixa (com hash conferido) as bibliotecas para pacotes\
 ├── cofre_senhas.py          # motor do cofre
 ├── icones_marcas.py         # marcas, ícones e autocompletar
@@ -519,6 +521,10 @@ CofreSenhas-Instalador/  (= cofre-de-senhas/ no GitHub)
 ├── requirements-test-direct.in     # dependencias diretas de teste, com versoes exatas
 ├── requirements-test-lock.txt    # lock gerado, com dependencias transitivas e hashes
 ├── baixar_pacotes_offline.ps1 # prepara o wheelhouse completo para testes e instalacao
+├── consolidar_logs_compilacao.ps1 # junta o log de cada compilação nos logs completos
+├── MARCA_ARCA.txt           # explica os marcadores internos de identificação (não é assinatura digital)
+├── LICENSE                  # licença de uso pessoal e estudo
+├── ruff.toml                # só a pasta de cache do Ruff
 ├── .gitignore
 ├── SECURITY.md              # limites de protecao e relato privado de problemas
 ├── .github/
@@ -533,6 +539,7 @@ CofreSenhas-Instalador/  (= cofre-de-senhas/ no GitHub)
 │                            #   1_TESTE_motor_do_cofre/ (sem tela), 2_TESTE_telas_e_botoes/ (Tk), 3_TESTE_ataques_simulados/ (pentest),
 │                            #   4_TESTE_so_no_windows/ (instalador/ACL no Windows real), 5_TESTE_ferramentas_externas/, 6_TESTE_ferramentas_dos_testes/,
 │                            #   7_TESTE_de_compilacao/ (opcional, depois de gerar o executável),
+│                            #   8_TESTE_extras_atalho_proprio/ (integridade ao entrar, visual bruto, cobertura opcional),
 │                            #   resultados/ (TUDO que os testes geram: resultado de cada teste, resumo, log de depuração)
 └── ferramentas_windows_opcionais/  # scripts OPCIONAIS que cuidam do seu PC (não do cofre): verificar/aplicar/desfazer segurança e procurar rootkit
 ```
@@ -571,7 +578,7 @@ No Windows, cada bateria tem sua própria pasta e seu próprio `.bat`, e **todo*
 - Para rodar a bateria de **interface** (os ~35 `2_TESTE_telas_e_botoes\teste_gui_*.py`), dê dois cliques em `testes\2_TESTE_telas_e_botoes\RODAR ESTA PASTA - testes das telas e botoes.bat` e leia `testes\resultados\resultado_teste_gui_windows.txt` que ele cria (cada janela abre e fecha sozinha por alguns segundos; é automático, não precisa clicar em nada).
 - Para rodar a bateria de **pentest** (injeção, força bruta/spraying, DoS, vazamento de memória, engenharia reversa, fuzzing adversarial, SAST, dependências, canal lateral de tempo, exfiltração pela rede, link simbólico — veja `testes\3_TESTE_ataques_simulados\` e o relatório `testes\resultados\relatorio_pentest.md`), dê dois cliques em `testes\3_TESTE_ataques_simulados\RODAR ESTA PASTA - testes de ataque simulado.bat` e leia `testes\resultados\resultado_pentest_windows.txt`.
 
-Para rodar as **sete etapas de uma vez só** (sem precisar abrir cada `.bat` manualmente), dê dois cliques em `testes\6_TESTE_ferramentas_dos_testes\rodar_todos_windows.bat` (ou `rodar_todos_windows.bat H` para incluir o pendrive H: no teste nativo) — ele chama núcleo, instalador, teste nativo, interface, pentest, ferramentas externas e compilação, nessa ordem. **Compile o CofreSenhas.exe primeiro** para validar a etapa 7; sem executável ou processo aberto, as verificações correspondentes serão `[PULADO]`. `POS-COMPILACAO` continua aceito por compatibilidade, mas não é necessário. Os resultados individuais ficam em `testes\resultados\`; os relatórios consolidados ficam em `testes\resultados\resultado completo\`. A pasta 7 também grava `resultado_cofre_compilado_windows.txt` junto aos resultados individuais.
+Para rodar **tudo de uma vez só** (sem precisar abrir cada `.bat` manualmente), dê dois cliques em `2 - TESTAR TUDO - roda todos os testes.bat` na raiz. Ele pergunta no início se deve testar também o `CofreSenhas.exe` compilado (`S`/`N`; `N` registra a etapa 7 como `[PULADO]`), chama `testes\6_TESTE_ferramentas_dos_testes\rodar_todos_windows.bat` (ou com `H` para incluir o pendrive H: no teste nativo), que roda núcleo, instalador, teste nativo, interface, pentest, ferramentas externas e compilação, nessa ordem, e por fim roda a bateria 8 (testes extras: integridade ao entrar e visual bruto; a cobertura de código, lenta, é opcional). **Compile o CofreSenhas.exe primeiro** para validar a etapa 7; sem executável ou processo aberto, as verificações correspondentes serão `[PULADO]`. `POS-COMPILACAO` continua aceito por compatibilidade, mas não é necessário. Os resultados individuais ficam em `testes\resultados\`; os relatórios consolidados ficam em `testes\resultados\resultados completos\`. A pasta 7 também grava `resultado_cofre_compilado_windows.txt` junto aos resultados individuais. A bateria 8 grava `resultado_testes_extras.txt` na pasta `resultado` dela, com cópia final em `resultados completos`.
 
 Os testes Windows criam ambientes Python **temporários** ao lado dos executores e os instalam somente do wheelhouse local (`--no-index`); a bateria de ferramentas externas mantém um ambiente local dentro de `testes\`. Rode a etapa 3 para preparar os pacotes e instale o Python do projeto se necessário. Os testes rodam em UTF-8 e **sem** o modo `-X dev` (uma sonda separada, dentro de `A - testar o instalador.bat`, mostra se o modo dev do Python do PC trava sozinho, sem o cofre). O `pip-audit` é empacotado, mas sua consulta é pulada offline por depender de dados de vulnerabilidade atuais; Nmap requer instalação manual do pacote local.
 
@@ -636,6 +643,9 @@ Os `teste_*.py` do núcleo (sem janela) listados abaixo ficam todos dentro de `t
 | `teste_severo_modificacoes.py` | Teste severo das modificações: impressão restrita (varredura do código + 208 títulos indevidos), 219 bytes invertidos/truncamentos/lixo no arquivo com o fator computador, tentativas e autodestruição, instalador (ordem das perguntas, ACL, sem atalhos, BOM/CRLF) e hashes dos pacotes offline |
 | `teste_desempenho_forca_bruta.py` | Desempenho e força bruta: custo do Argon2id por nível (≈1 s Alta, ≈6 s Máxima), 5000 itens, salvamentos repetidos sem crescer, 100 senhas erradas → autodestruição, senhas/campos absurdos sem travar, senha mínima também no núcleo |
 | `2_TESTE_telas_e_botoes/teste_gui_efeitos.py` | Animação e efeitos: troca de tela única, janela nunca transparente, aviso "Verificando…" só quando demora e sempre some, 60 trocas e 15 ciclos bloquear/desbloquear sem vazamento de janelas/widgets |
+| `8_TESTE_extras_atalho_proprio/teste_gui_integridade_ao_entrar.py` | A janela *Verificar integridade do cofre* abre sozinha ao desbloquear, só lê (o arquivo não muda), não abre com `COFRE_SEM_VERIFICACAO_INICIAL=1` e avisa de cópia `.bak` danificada sem derrubar o programa |
+| `8_TESTE_extras_atalho_proprio/teste_gui_visual_brutal.py` | Teste visual bruto: texto cortado, controle fora da janela ou sobreposto em todos os temas e 4 tamanhos; aperta todas as opções medindo travadas (reprova acima de 700 ms); tempestade de trocas; procura tela que pisca, quadro em branco, fantasma e resíduo. Só nesse processo de teste a proteção contra captura de tela é desligada |
+| `2_TESTE_telas_e_botoes/teste_gui_estabilidade_telas.py` | Tela que "pula" ao clicar: mede a geometria antes e em 5 instantes depois de cada opção; reprova se algo acima do clique mudar de lugar ou se um diálogo mudar de largura, andar ou encolher |
 | `2_TESTE_telas_e_botoes/teste_gui_computadores.py` | Janela *Computadores autorizados*, ranking +10 e desbloqueio em computador não autorizado (pede o código, sem gastar tentativa) |
 | `teste_ocultar_apoio.py` | Arquivos de apoio ocultos/somente leitura: lista exata (cofre, cópias, programa, hash, logs), `.bat` e arquivos do usuário intocados, revelar desfaz só a marca e preserva outros atributos, nada é escondido fora do programa compilado, cofre abre/salva/autodestrói normalmente (Windows simulado) |
 | `teste_patch_bypass.py` | Atacante que remenda o programa (todas as comparações forçadas a verdadeiro): senha errada ou chave errada continuam sem abrir (modos S, E e OU) e a tentativa continua contada |
@@ -689,7 +699,8 @@ O `.gitignore` já impede o envio de:
 Mesmo assim:
 
 - **Nunca** faça commit do seu `cofre.dat`, da chave de acesso, do código de recuperação FIDO ou de planilhas com senhas. Antes de cada commit, confira com `git status` o que vai subir.
-- Prefira um **repositório privado**. Publicar o código não enfraquece o cofre, porque a segurança está nas chaves e não no segredo do código. Mas não há motivo para expor o seu fluxo pessoal.
+- O repositório da Arca é **público**: nada pessoal pode subir nele. Para o seu fluxo pessoal, prefira um **repositório privado**. Publicar o código não enfraquece o cofre, porque a segurança está nas chaves e não no segredo do código.
+- O `ENVIAR PRO GITHUB.bat` não usa `git add .`: adiciona só uma lista fixa de arquivos, faz o commit, sincroniza com `pull --rebase` e envia. Arquivo novo fora da lista não sobe até ser incluído no `.bat`.
 - Para distribuir o programa compilado, publique também o **SHA-256** do `.exe`, para quem baixar poder conferir.
 
 ---
@@ -722,7 +733,7 @@ Não. O cofre não faz nenhuma conexão sozinho. Há **uma** função opcional q
 | Camada | O que é | Quando vale | Protege contra |
 |---|---|---|---|
 | **0. Meio físico** | **Pendrive com BitLocker To Go** (modo portátil) ou **pasta NTFS com ACL** (modo no computador) | sempre | pendrive roubado/perdido; outras contas do Windows |
-| **1. Computador autorizado** *(opcional, fator a mais)* | até 8 computadores (MachineGuid + UUID da placa-mãe), com **reforço DPAPI** | ativado em *Computadores autorizados…* | arquivo do cofre levado para outro computador |
+| **1. Computador autorizado** *(fator a mais, ativado ao criar o cofre)* | até 8 computadores (MachineGuid + UUID da placa-mãe), com **reforço DPAPI** | ativado na criação; gerenciado em *Computadores autorizados…* | arquivo do cofre levado para outro computador |
 | **2. Senha mestra + chave de acesso** | Argon2id (1 GiB) + chave de 160 bits (`.key`), modos **OU / E / S** | sempre | força bruta; cópia do arquivo |
 | **3. Chave FIDO2** *(opcional)* | segredo da chave física (hmac-secret/PRF) entra na chave dos dados | ativado em *Chaves FIDO* | senha vazada; teclado espionado |
 | **4. Código de recuperação** | um único código em papel para os fatores extras (FIDO e computadores); gerar outro invalida o anterior | emergência | perda da chave FIDO ou troca de computador |
@@ -752,6 +763,8 @@ Cada camada é **independente**: perder uma não abre o cofre (exceto o código 
 **Validação no Windows real (2026-11-20):** a bateria nativa registrou 39/39 verificações aprovadas; uma execução focada posterior do Pester passou 14/14. Isso cobre atributos, ACL (`icacls`), DPAPI, SMBIOS e funções auxiliares do instalador, mas **não** equivale a uma compilação/instalação ponta a ponta. A bateria completa anterior teve 9 relatórios com falha e não é Go.
 
 **Ainda não validado em Windows real:** instalação e compilação completas de ponta a ponta, assinatura digital opcional, chave FIDO2/PRF física e execução no Windows Sandbox. Build nativo ARM64 não é suportado.
+
+**Atualizado 2026-11-26:** a bateria completa mais recente (2026-11-21) teve 2.541 verificações `[OK]`, 6 `[PULADO]` (o `.exe` não foi localizado) e 2 relatórios com falha/interrupção; núcleo 60/60, pentest 18/18, nativo 39/39 e Pester do instalador 17/17. Continua No-Go até compilar o `.exe` e repetir a bateria. O `2 - TESTAR TUDO` passou a ter 8 baterias; o computador atual é autorizado na criação do cofre; abre a janela de integridade ao entrar; o registro de diagnóstico tem 157 bytes; o programa não cria exclusão WER (remove a antiga ao iniciar); `cryptography==50.0.2` vale em todas as arquiteturas. O programa está na versão `2026.11.22.2`, posterior a essa bateria.
 
 **Compatibilidade:** versões antigas do programa **não abrem** cofres com o fator *computador*; backups feitos antes de ativá-lo continuam abrindo em qualquer computador.
 

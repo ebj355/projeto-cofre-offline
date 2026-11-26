@@ -283,6 +283,10 @@ def filho(escala):
 
     def varrer_tamanhos(rotulo):
         for (w, h) in TAMANHOS:
+            if w > root.winfo_screenwidth() or h > root.winfo_screenheight():
+                relat("PULADO", f"[{int(escala*100)}%] {rotulo} {w}x{h}: maior que a tela "
+                                f"({root.winfo_screenwidth()}x{root.winfo_screenheight()})")
+                continue
             root.geometry(f"{w}x{h}+0+0")
             root.update()
             time.sleep(0.15)

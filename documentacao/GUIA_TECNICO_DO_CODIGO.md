@@ -28,7 +28,7 @@ Os títulos das seções no próprio `cofre_senhas.py` são os pontos de referê
 | Formato e criptografia | Versões do arquivo, parâmetros, derivação e combinação de chaves, cifragem e decifragem. | `MAGIC`, `HEADER_FMT5`, `derivar_chave()`, `_embrulhar()`, `_desembrulhar()`, `_subchaves()`, `_decifrar_dados()` |
 | Integridade e armazenamento | Leitura do cabeçalho, escrita atômica, travas, cópias de segurança, recuperação e erros de arquivo. | `_ler_cabecalho()`, `_gravar_atomico()`, `_trava_gravacao()`, `_rodar_copias()`, `restaurar_copia()` |
 | Proteções e fatores do Windows | Proteção do processo, identidade do computador, segredo local, FIDO2, impressão e área de transferência. | `blindar_processo()`, `identidades_do_pc()`, `segredo_local()`, `fido_obter()`, `copiar_seguro_windows()` |
-| Senhas e diagnósticos | Geração e avaliação de senhas, auditoria opcional, erros e diagnóstico cifrado. | `gerar_senha()`, `gerar_frase()`, `avaliar_forca()`, `auditar_cofre()`, `diag_registrar()` |
+| Senhas e diagnósticos | Geração e avaliação de senhas, auditoria opcional, erros e diagnóstico cifrado (registros de 157 bytes, selados com a chave pública do cofre). | `gerar_senha()`, `gerar_frase()`, `avaliar_forca()`, `auditar_cofre()`, `diag_registrar()`, `DIAG_REG`, `DIAG_MAX` |
 | Modelo dos itens e importação | Campos do registro, validação, leitura e conferência de CSV/Excel. | `CAMPOS`, `CAMPOS_SECRETOS`, `ROTULOS`, `novo_item()`, `ler_planilha()`, `sanear_registros()`, `classificar_importacao()` |
 | Objeto do cofre | Estado aberto em memória, fatores de desbloqueio, tentativas, transações e persistência. | `class Cofre`, `Cofre.criar()`, `Cofre.abrir()`, `Cofre.salvar()`, `Cofre.transacao()`, `Cofre.fechar()` |
 | Aparência e componentes | Tema, controles, lista de marcas, ícones locais e sugestões offline do campo Serviço. | `aplicar_tema()`, `_Tela`, `BarraLateral`, `ListaContas`, `PainelForca`, `icones_marcas.py` (`MARCAS`, `ALIASES`, `AutocompletarMarcas`) |
@@ -52,9 +52,13 @@ O fluxo normal de dados é: a interface solicita uma ação → o objeto `Cofre`
 
 `App.tela_criar()` coleta as escolhas na interface e chama `Cofre.criar()`. O objeto cria a chave interna, configura os fatores escolhidos e salva o primeiro arquivo. A persistência passa pelo mesmo caminho de cifragem e gravação usado nas alterações posteriores.
 
+Depois de mostrar a chave de acesso (quando existe) e abrir a tela principal, `App._autorizar_primeiro_pc_na_criacao()` autoriza o computador atual (`Cofre.pc_adicionar()`), pergunta se há mais computadores (`_perguntar_mais_computadores()` e `Cofre.definir_pcs_multiplos()`) e mostra o código de recuperação. Se algo falhar ou o código não for confirmado, a função desfaz a mudança (`restaurar_pc()`) e o cofre continua válido, sem a exigência. A variável de ambiente `COFRE_SEM_VERIFICACAO_INICIAL=1` pula esse passo e a verificação de integridade ao entrar; ela existe para os testes de interface.
+
 ### Abrir um cofre
 
 `App.tela_desbloqueio()` coleta os fatores e chama `Cofre.abrir()`. O método valida o formato e os fatores necessários, verifica o cabeçalho, deriva ou combina as chaves, abre a chave interna e decifra os dados. Em seguida, valida e prepara os registros para uso.
+
+Depois que a tela principal abre, `App.verificar_integridade_cofre(automatica=True)` mostra a tela de integridade do arquivo principal e das cópias `.bak` (dados vindos de `Cofre.verificar_estado_arquivos()`). Ela só lê; uma falha na conferência é registrada com `diag_registrar()` e nunca impede o uso. Em seguida roda `_alerta_invasao()`.
 
 Nem todo erro significa senha incorreta. O código distingue, entre outros casos, fator ausente ou malformado, computador não autorizado, memória insuficiente, arquivo danificado e senha incorreta. Ao alterar a lógica de tentativas ou recuperação, preserve essas distinções e confira os testes do motor.
 
@@ -72,7 +76,7 @@ As ações da interface usam `App._salvar()` ou `App._transacao()`. A transaçã
 - **Criptografia ou formato do arquivo:** siga as constantes de versão e os métodos de `Cofre`; mantenha compatibilidade e restauração de cópias testadas. Não altere o formato com base apenas na aparência do cabeçalho.
 - **Ação da interface:** mantenha validação e persistência no caminho existente (`Cofre` e helpers), com mensagens claras para falhas; não grave diretamente fora do fluxo de salvamento.
 - **Dependências:** confira os arquivos de requisitos e as instruções de instalação/teste antes de adicionar uma biblioteca.
-- **Regressão:** use `testes/COMO_RODAR_OS_TESTES.md` para selecionar a bateria apropriada. Comece pelos testes do motor para regras do cofre e pelos testes de telas para comportamento da interface.
+- **Regressão:** use `testes/COMO_RODAR_OS_TESTES.md` para selecionar a bateria apropriada. Comece pelos testes do motor para regras do cofre e pelos testes de telas para comportamento da interface. A pasta `8_TESTE_extras_atalho_proprio` reúne os testes de integridade ao entrar e o visual bruto, que o `2 - TESTAR TUDO` roda por último.
 
 Antes de editar uma função, leia sua docstring, os helpers chamados e os testes que a exercitam. Os nomes com `_` indicam detalhes internos por convenção, não uma API estável.
 
