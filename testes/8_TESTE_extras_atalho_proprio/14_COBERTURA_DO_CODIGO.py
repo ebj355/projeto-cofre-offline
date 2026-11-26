@@ -37,11 +37,14 @@ SAIDA = os.path.join(RAIZ, "testes", "resultados", "cobertura_codigo.txt")
 SAIDA_ERROS = os.path.join(RAIZ, "testes", "resultados", "cobertura_saida_testes.txt")
 LIMITE_POR_TESTE = 900      # segundos
 MAX_CHARS_ERRO = 6000       # guarda so o final da saida de cada teste que falhou
+# Testes que dependem de recursos que o Windows nao tem (teste_memoria le /proc/<pid>/mem, que so existe no Linux).
+# Aqui eles sao apenas registrados como "nao se aplica", sem contar como erro.
+SO_LINUX = {"teste_memoria.py"}
 
 
 def rodar(args, **k):
     return subprocess.run([sys.executable, "-m", "coverage"] + args, capture_output=True, text=True,
-                          errors="replace", cwd=RAIZ, **k)
+                          encoding="utf-8", errors="replace", cwd=RAIZ, **k)
 
 
 def _texto(valor):
@@ -70,11 +73,16 @@ def main():
         os.remove(SAIDA_ERROS)
     env = dict(os.environ, COVERAGE_FILE=os.path.join(TRABALHO, ".coverage"),
                COFRE_TESTE_SEM_JANELA_FATAL="1",                    # um aviso fatal nao pode prender a rodada esperando OK
+               PYTHONUTF8="1", PYTHONIOENCODING="utf-8",            # sem isso o Windows usa cp1252 e os testes quebram em setas, emoji e CJK
                PYTHONPATH=RAIZ + os.pathsep + os.environ.get("PYTHONPATH", ""))   # subprocessos dos testes acham os modulos
     linhas = [f"Cobertura de {os.path.basename(ALVO)} pelos testes do nucleo", time.strftime("%Y-%m-%d %H:%M:%S"), ""]
     falhos = 0
     for i, t in enumerate(testes, 1):
         nome = os.path.basename(t)
+        if os.name == "nt" and nome in SO_LINUX:
+            print(f"  [{i}/{len(testes)}] {nome}: nao se aplica no Windows (pulado)", flush=True)
+            linhas.append(f"{nome}: nao se aplica no Windows (pulado)")
+            continue
         ini = time.time()
         saida_texto = ""
         try:

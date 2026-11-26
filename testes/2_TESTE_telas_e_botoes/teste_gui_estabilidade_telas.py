@@ -44,6 +44,14 @@ from tkinter import ttk                         # noqa: E402
 
 import cofre_senhas as cs                       # noqa: E402
 
+# Este teste roda com a janela em SEGUNDO PLANO. Nessa situacao o proprio cofre cobre a janela com o aviso
+# "Conteudo oculto / clique para mostrar" (e depois se bloqueia). A capa e centralizada sobre a janela e "anda"
+# quando o dialogo cresce, o que reprovava o Gerador de senhas por um pulo que o usuario nunca ve (a janela dele
+# tem o foco). Aqui o foco do sistema nao e medido; so vale dentro deste processo de teste.
+cs.App._app_sem_foco = lambda self: False
+cs.BLOQUEIO_SEM_FOCO_S = 6 * 3600
+cs.App.INATIVIDADE_MS = 6 * 3600 * 1000
+
 VERBOSO = "-v" in sys.argv
 TOL = 1                                         # px de arredondamento tolerados
 INSTANTES_MS = (0, 40, 120, 300, 600)           # quando fotografar depois do clique

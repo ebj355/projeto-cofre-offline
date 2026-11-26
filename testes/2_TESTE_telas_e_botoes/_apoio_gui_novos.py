@@ -293,8 +293,10 @@ def chamar_e_fechar(app, funcao, esperar=0.6, durante=None):
     # (que leva ~0,5 s para aparecer) era destruido antes de ser visto e a lista de titulos vinha vazia.
     # Se a funcao ficar esperando (wait_window), estes mesmos timers a liberam, so um pouco mais tarde.
     base = int(esperar * 1000) + 250
-    for ms in (base, base + 600, base + 1500, base + 2700):
-        root.after(ms, lambda: fechar_toplevels_novos(root, antes))
+    # Guarda os ids dos timers: ao SAIR desta funcao os que ainda nao dispararam sao cancelados. Sem isto, os timers
+    # desta chamada continuavam vivos (ate base+2700 ms) e destruiam o dialogo aberto pela chamada SEGUINTE, porque
+    # ele nao esta em 'antes' desta chamada ("Editar abre o formulario": titulos=[] logo depois de "Novo item").
+    timers = [root.after(ms, lambda: fechar_toplevels_novos(root, antes)) for ms in (base, base + 600, base + 1500, base + 2700)]
     titulos, erro = [], None
     try:
         funcao()
@@ -306,6 +308,11 @@ def chamar_e_fechar(app, funcao, esperar=0.6, durante=None):
     except Exception as ex:                    # noqa: BLE001 - o teste quer ver QUALQUER falha
         erro = ex
     fechar_toplevels_novos(root, antes)
+    for tid in timers:
+        try:
+            root.after_cancel(tid)
+        except Exception:                      # noqa: BLE001 - janela/raiz ja destruida: nada a cancelar
+            pass
     bombear(root, 0.1)
     return titulos, erro
 

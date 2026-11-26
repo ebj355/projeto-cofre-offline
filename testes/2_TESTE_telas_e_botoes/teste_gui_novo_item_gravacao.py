@@ -29,6 +29,11 @@ import _apoio_gui_novos as A          # noqa: E402
 
 TMP = A.preparar("cofre_gui_novoitem_", limite_segundos=900)
 cs = A.importar_cofre()
+# Estes testes duram minutos e rodam com a janela em SEGUNDO PLANO. Sem isto o proprio cofre se bloqueia no meio do
+# teste (60 s com outro programa em primeiro plano, ou 3 min sem uso) e tudo que vem depois falha por "cofre bloqueado".
+# So vale dentro deste processo de teste; o programa real nao muda.
+cs.BLOQUEIO_SEM_FOCO_S = 6 * 3600
+cs.App.INATIVIDADE_MS = 6 * 3600 * 1000
 import tkinter as tk                  # noqa: E402,F401
 
 rel = A.Relatorio("Novo item: gravacao campo a campo (tela, memoria e disco)")
@@ -400,9 +405,18 @@ def principal():
         rel.secao("10) 15 itens em sequencia")
         antes = set(ids_atuais(app))
         for i in range(15):
-            f = Formulario(app)
-            f.preencher(servico=f"Sequencia {i:02d}", login=f"user{i}", senha=f"Senha-{i}-xYz!")
-            f.apertar_salvar()
+            f = None
+            try:
+                f = Formulario(app)
+                f.preencher(servico=f"Sequencia {i:02d}", login=f"user{i}", senha=f"Senha-{i}-xYz!")
+                f.apertar_salvar()
+            except (tk.TclError, KeyError) as ex:
+                # o formulario sumiu entre abrir e preencher: registra o estado em vez de derrubar o teste inteiro
+                rel.verifica(False, f"sequencia {i}: o formulario sumiu antes de gravar",
+                             f"{ex!r}; cofre_aberto={app.cofre is not None}; janelas_abertas={len(A.toplevels(root))}")
+                if f is not None:
+                    f.fechar()
+                continue
             if f.aberto:
                 rel.verifica(False, f"sequencia {i}: o formulario nao fechou")
                 f.fechar()

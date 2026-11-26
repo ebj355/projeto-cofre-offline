@@ -7032,7 +7032,6 @@ class BarraLateral(tk.Frame if tk else object):
             lic.pack(side="left", padx=(9, 6))
             ltxt = tk.Label(linha, text=e["texto"], bg=C["lateral"], fg=e.get("cor_txt") or C["lateral_txt"],
                             font="CofreTexto", anchor="w")
-            ltxt.pack(side="left", fill="x", expand=True)
             texto_cheio = e["texto"]
 
             def _ajustar_texto(_ev=None, lbl=ltxt, t=texto_cheio):
@@ -7050,6 +7049,9 @@ class BarraLateral(tk.Frame if tk else object):
             ln = tk.Label(linha, text=str(e.get("n", "")), bg=C["lateral"],
                           fg=e.get("cor_n") or C["fraco"], font="CofrePequeno", padx=10)
             ln.pack(side="right")
+            # o nome entra DEPOIS da contagem: o empacotador reparte o espaco na ordem em que os widgets sao
+            # empacotados, e um nome comprido (que ocupa tudo) deixava a contagem com ~5 px, cortada
+            ltxt.pack(side="left", fill="x", expand=True)
             if ESCALA >= 2.0:
                 linha.configure(height=max(altura_linha, ltxt.winfo_reqheight() + 4, ln.winfo_reqheight() + 4))
             item = {"linha": linha, "barra": barra, "partes": (linha, lic, ltxt, ln), "texto": ltxt,
@@ -12096,11 +12098,15 @@ class App:
             rot_c.pack(side="left")
             grupo_campo = []
             if chave != "senha":
+                # o "x" tira o campo do formulario E apaga o que foi digitado nele (senao o valor escondido seria gravado)
                 bt_remover = ttk.Button(cab_campo, text="×", style="Icone.TButton", width=2,
-                                        command=lambda k=chave: (tem[k].set(False), aplicar_campos()))
+                                        command=lambda k=chave: (campos[k].delete(0, "end"), tem[k].set(False),
+                                                                 aplicar_campos()))
                 bt_remover.pack(side="right")
-                grupo_campo.extend((cab_campo, bt_remover))
-                grupos_campo[chave].extend((cab_campo, bt_remover))
+                # so o quadro (cab_campo) entra no grupo mostrar/esconder: ele e gerenciado por grid, o "x" por pack
+                # (chamar grid()/grid_remove() num filho de pack dentro de um quadro com pack tirava o "x" da tela)
+                grupo_campo.append(cab_campo)
+                grupos_campo[chave].append(cab_campo)
             linha = ttk.Frame(grade, style="S2.TFrame")
             linha.grid(row=lin + 1, column=col, columnspan=vao, sticky="ew", padx=px, pady=(4, 0))
             if chave != "senha":

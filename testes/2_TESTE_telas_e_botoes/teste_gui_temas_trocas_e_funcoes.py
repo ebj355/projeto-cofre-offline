@@ -28,6 +28,11 @@ import _apoio_gui_novos as A          # noqa: E402
 
 TMP = A.preparar("cofre_gui_temas_", limite_segundos=1500)
 cs = A.importar_cofre()
+# Estes testes duram minutos e rodam com a janela em SEGUNDO PLANO. Sem isto o proprio cofre se bloqueia no meio do
+# teste (60 s com outro programa em primeiro plano, ou 3 min sem uso) e tudo que vem depois falha por "cofre bloqueado".
+# So vale dentro deste processo de teste; o programa real nao muda.
+cs.BLOQUEIO_SEM_FOCO_S = 6 * 3600
+cs.App.INATIVIDADE_MS = 6 * 3600 * 1000
 import tkinter as tk                  # noqa: E402
 import tkinter.ttk as ttk             # noqa: E402,F401
 
@@ -186,6 +191,11 @@ def sondar_leve(app, erros, msgs, rotulo, outros, nome):
     for nome_acao, funcao, titulo in (("Novo item", app._btn_novo.invoke, "Novo item"),
                                       ("Editar", app.editar, "Editar item")):
         achados_cor = []
+        # a acao anterior (abrir e fechar outro formulario) nao pode ter apagado a selecao da lista
+        if not app.tree.selection():
+            rel.aviso(f"{rotulo}: a selecao da lista se perdeu antes de '{nome_acao}'")
+        app.tree.selection_set(alvo["id"])
+        A.bombear(root, 0.2)
 
         def inspecionar(janelas, acumulador=achados_cor):
             for j in janelas:
@@ -204,7 +214,8 @@ def sondar_leve(app, erros, msgs, rotulo, outros, nome):
             if titulo in titulos:
                 rel.aviso(f"{rotulo}: '{nome_acao}' so abriu na 2a tentativa (>0,7 s): maquina lenta")
         rel.verifica(erro is None and titulo in titulos, f"{rotulo}: '{nome_acao}' abre o formulario '{titulo}'",
-                     f"titulos={titulos} erro={erro!r}")
+                     f"titulos={titulos} erro={erro!r} selecao={app.tree.selection()} "
+                     f"cofre_aberto={app.cofre is not None}")
         rel.verifica(not achados_cor, f"{rotulo}: formulario '{titulo}' sem cores de outro tema", "; ".join(achados_cor))
         A.bombear(root, 0.1)
     rel.verifica(not [t for t in A.toplevels(root)], f"{rotulo}: nenhum dialogo ficou aberto para tras")
@@ -249,9 +260,14 @@ def sondar_completo(app, erros, msgs, rotulo, outros, nome):
     for rot, _icone, func in rotulos_menu:
         achados_d = []
 
-        def inspecionar(janelas, acumulador=achados_d):
+        def inspecionar(janelas, acumulador=achados_d, rot_menu=rot):
             for j in janelas:
-                acumulador.extend(A.varrer_cores_antigas(cs, j, velhas_para(nome, outros)))
+                for achado in A.varrer_cores_antigas(cs, j, velhas_para(nome, outros)):
+                    # 'Aparencia e cores' desenha, de proposito, uma amostra com as cores de CADA tema:
+                    # esses quadradinhos (Canvas) nao sao sobra de tema antigo
+                    if "Apar" in rot_menu and achado.startswith("Canvas"):
+                        continue
+                    acumulador.append(achado)
         titulos, erro = A.chamar_e_fechar(app, func, 0.8, durante=inspecionar)
         rel.verifica(erro is None, f"{rotulo}: menu '{rot}' executa sem excecao", repr(erro))
         rel.verifica(not achados_d, f"{rotulo}: dialogo de '{rot}' sem cores de outro tema", "; ".join(achados_d))

@@ -24,10 +24,63 @@ function Testar-AcessoNegado($erro) {
     return $false
 }
 
+function Pedir-Fechamento([int]$ProcessoId) {
+    # Manda WM_CLOSE a todas as janelas do processo (o mesmo que clicar no X). Nao depende de permissao para
+    # ENCERRAR o processo, que o proprio cofre pode negar de proposito.
+    if (-not ('CofreRedeTeste.Janelas' -as [type])) {
+        Add-Type -Namespace CofreRedeTeste -Name Janelas -MemberDefinition @'
+public delegate bool EnumProc(IntPtr h, IntPtr l);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr l);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+public static void Fechar(uint alvo) {
+    EnumWindows(delegate(IntPtr h, IntPtr l) {
+        uint p; GetWindowThreadProcessId(h, out p);
+        if (p == alvo) { PostMessage(h, 0x0010, IntPtr.Zero, IntPtr.Zero); }
+        return true;
+    }, IntPtr.Zero);
+}
+'@
+    }
+    [CofreRedeTeste.Janelas]::Fechar([uint32]$ProcessoId)
+}
+
+function Encerrar-Processo([int]$ProcessoId) {
+    # Fecha pela janela; so forca se for preciso. Se o Windows negar, vira AVISO: o resultado do teste de rede
+    # (o que importa) ja foi decidido e nao pode ser trocado por um erro ao arrumar a casa.
+    $alvo = Get-Process -Id $ProcessoId -ErrorAction SilentlyContinue
+    if (-not $alvo -or $alvo.HasExited) { return }
+    try { [void]$alvo.CloseMainWindow() } catch { }
+    try { Pedir-Fechamento $ProcessoId } catch { }
+    if ($alvo.WaitForExit(10000)) { return }
+    try {
+        Stop-Process -Id $ProcessoId -Force -ErrorAction Stop
+    } catch {
+        & "$env:SystemRoot\System32\taskkill.exe" /PID $ProcessoId /T /F 2>&1 | Out-Null
+    }
+    $alvo.Refresh()
+    if (-not $alvo.HasExited -and -not $alvo.WaitForExit(5000)) {
+        Write-Output "[AVISO] Nao consegui encerrar o processo $ProcessoId (acesso negado). Feche-o pelo Gerenciador de Tarefas."
+    }
+}
+
+function Limpar-Sobras {
+    # Remove restos de rodadas anteriores deste teste: processos do cofre abertos com a pasta 'cofre_rede_teste_*'.
+    # So mexe no que foi aberto POR este teste (confere a linha de comando); o cofre de uso normal nunca e tocado.
+    $achados = @(Get-CimInstance -ClassName Win32_Process -Filter "Name like 'CofreSenhas%'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine -match 'cofre_rede_teste_' })
+    foreach ($p in $achados) {
+        & "$env:SystemRoot\System32\taskkill.exe" /PID $p.ProcessId /T /F 2>&1 | Out-Null
+        Write-Output "[INFO] Processo sobrado de teste anterior encerrado: PID $($p.ProcessId)"
+    }
+}
+
 if (-not (Test-Path -LiteralPath $Executavel -PathType Leaf)) {
     Write-Output "[FALHOU] Executavel inexistente: $Executavel"
     exit 1
 }
+
+try { Limpar-Sobras } catch { }
 
 $pasta = Join-Path $env:TEMP ("cofre_rede_teste_" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $pasta -ErrorAction Stop | Out-Null
@@ -107,13 +160,12 @@ try {
         $pids = @(Obter-ArvoreProcessos $processo.Id)
         [array]::Reverse($pids)
         foreach ($pidTeste in $pids) {
-            $alvo = Get-Process -Id $pidTeste -ErrorAction SilentlyContinue
-            if ($alvo -and -not $alvo.HasExited) {
-                [void]$alvo.CloseMainWindow()
-                if (-not $alvo.WaitForExit(10000)) {
-                    Stop-Process -Id $pidTeste -Force -ErrorAction Stop
-                }
-            }
+            try { Encerrar-Processo $pidTeste } catch { Write-Output "[AVISO] Falha ao encerrar o processo ${pidTeste}: $($_.Exception.Message)" }
+        }
+        # ultima garantia: encerra a arvore inteira pelo processo raiz (o filho pode negar o encerramento direto)
+        $raizVivo = Get-Process -Id $processo.Id -ErrorAction SilentlyContinue
+        if ($raizVivo -and -not $raizVivo.HasExited) {
+            & "$env:SystemRoot\System32\taskkill.exe" /PID $processo.Id /T /F 2>&1 | Out-Null
         }
     }
     if (Test-Path -LiteralPath $pasta) {

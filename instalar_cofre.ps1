@@ -24,7 +24,9 @@
 #  Carregar este arquivo com ". .\instalar_cofre.ps1" só define as funções; não instala nada.
 # ----------------------------------------------------------------------------
 function Confirmar-PalavraApagar([string]$valor) {
-    return $valor -ceq 'APAGAR'
+    # Vale SOMENTE a palavra APAGAR com maiusculas exatas (-ceq: "apagar" e "Apagar" NAO valem); espacos nas pontas sao ignorados.
+    # Qualquer outra palavra mantem o cofre.
+    return ([string]$valor).Trim() -ceq 'APAGAR'
 }
 
 function Test-PrefixoSha256([string]$hashCompleto, [string]$digitado) {

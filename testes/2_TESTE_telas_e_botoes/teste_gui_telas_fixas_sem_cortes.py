@@ -17,6 +17,11 @@ import _apoio_gui_novos as A          # noqa: E402
 
 TMP = A.preparar("cofre_gui_fixas_", limite_segundos=1200)
 cs = A.importar_cofre()
+# Estes testes duram minutos e rodam com a janela em SEGUNDO PLANO. Sem isto o proprio cofre se bloqueia no meio do
+# teste (60 s com outro programa em primeiro plano, ou 3 min sem uso) e tudo que vem depois falha por "cofre bloqueado".
+# So vale dentro deste processo de teste; o programa real nao muda.
+cs.BLOQUEIO_SEM_FOCO_S = 6 * 3600
+cs.App.INATIVIDADE_MS = 6 * 3600 * 1000
 import tkinter as tk                  # noqa: E402
 
 rel = A.Relatorio("Telas fixas: nada se mexe, nada fica cortado")
@@ -73,7 +78,7 @@ def cortes(raiz, rotulo, limite=8):
                 except (tk.TclError, ValueError):
                     wrap = 0
                 if not wrap and w.winfo_width() + 1 < w.winfo_reqwidth():
-                    achados.append(f"{cls} {texto[:28]!r} largura {w.winfo_width()} < {w.winfo_reqwidth()}")
+                    achados.append(f"{cls} {texto[:28]!r} largura {w.winfo_width()} < {w.winfo_reqwidth()} [{str(w)[-70:]}]")
                 if wrap and w.winfo_height() + 1 < w.winfo_reqheight():
                     achados.append(f"{cls} {texto[:28]!r} altura {w.winfo_height()} < {w.winfo_reqheight()} (quebra de linha cortada)")
             if cls in ("Button", "TButton", "Label", "TLabel", "TEntry", "TCombobox") and w.winfo_viewable():
@@ -187,7 +192,7 @@ def principal():
         app.novo()
         A.bombear(root, 0.6)
         d = next((t for t in A.toplevels(root) if t not in antes), None)
-        rel.verifica(d is not None, "Novo item abre")
+        rel.verifica(d is not None, "Novo item abre", f"cofre_aberto={app.cofre is not None}")
         if d is not None:
             m0 = (d.winfo_width(), d.winfo_rootx(), d.winfo_rooty())
             h0 = d.winfo_height()

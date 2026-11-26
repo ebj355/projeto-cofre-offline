@@ -1,7 +1,7 @@
 # ARCA SISTEMAS | PRODUTO ARCA | IDENTIFICACAO INTERNA; CONSULTE MARCA_ARCA.txt
 """Interface: formulário SIMPLES de novo item (nome, grupo, pessoa, usuário, senha), sem botão 'Mais opções'. Para leigos e
 idosos: poucos campos, poucos cliques. Roda no Linux com xvfb-run."""
-import os, sys, tempfile
+import os, re, sys, tempfile
 _RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 sys.path.insert(0, _RAIZ)
 import tkinter as tk, cofre_senhas as c
@@ -77,8 +77,26 @@ ok(any(w.winfo_class() == "TButton" and str(w.cget("text")) == "Ativa" and w.win
    "editar mostra o botão de estado 'Ativa'")
 e.destroy()
 # Enter salva
+def _enter_pelo_tcl(w):
+    """Executa o bind de <Return> do formulario, com o campo 'w' como alvo, sem depender de a tecla chegar pelo
+    sistema de janelas. No Windows os testes rodam com a janela em SEGUNDO PLANO (COFRE_GUI_TESTS_BACKGROUND=1,
+    WS_EX_NOACTIVATE de proposito: o teste nao pode roubar o foco de quem esta usando o PC) e o Tk descarta teclas
+    sinteticas (event_generate) quando o aplicativo nao tem o foco do teclado. O que o teste quer provar e a ligacao
+    Enter -> salvar, entao, se a tecla real nao for entregue, roda-se o mesmo script que o Tk executaria."""
+    topo = w.winfo_toplevel()
+    script = topo.bind("<Return>")
+    if not script:
+        return False
+    valores = {"#": "0", "b": "0", "f": "0", "h": "0", "k": "13", "s": "0", "t": "0", "w": "0", "x": "0", "y": "0",
+               "A": "{}", "E": "0", "K": "Return", "N": "65293", "W": str(w), "T": "2", "X": "0", "Y": "0", "D": "0"}
+    topo.tk.eval(re.sub(r"%([#bfhkstwxyAEKNWTXYD])", lambda m: valores[m.group(1)], script))
+    return True
 d = novo(); ents = [w for w in todos(d) if w.winfo_class() == "TEntry" and w.winfo_ismapped()]
 ents[0].insert(0, "Loja X"); ents[0].focus_force(); root.update(); ents[0].event_generate("<Return>"); root.update()
-ok(any(r["servico"] == "Loja X" for r in app.cofre.registros), "Enter no campo salva o item")
+salvou = lambda: any(r["servico"] == "Loja X" for r in app.cofre.registros)
+if not salvou():
+    print("  [info]   a tecla Enter sintetica nao foi entregue (janela sem foco do teclado); executando o bind de <Return>")
+    _enter_pelo_tcl(ents[0]); root.update()
+ok(salvou(), "Enter no campo salva o item")
 print("PASSOU" if all(f) else "FALHOU", sum(f), "/", len(f))
 root.destroy(); sys.exit(0 if all(f) else 1)
