@@ -88,35 +88,35 @@ ok(len(cand) == 1, "a senha gerada já vem preenchida no Novo item")
 
 # ---- Novo item: credenciais sob demanda e grupo
 def adicionar_credencial(d_, nome):
-    seletor = next((w for w in todos(d_) if w.winfo_class() == "TCombobox"
-                    and nome in list(w.cget("values"))), None)
-    if seletor is None:
+    """Um clique no chip '＋ ...' da faixa 'Adicionar ao item' (o seletor com '+ Adicionar' nao existe mais)."""
+    chip = {"PIN numérico": "PIN"}.get(nome, nome)
+    bt = next((w for w in todos(d_) if w.winfo_class() == "TButton"
+               and str(w.cget("text")) == "＋ " + chip and w.winfo_ismapped()), None)
+    if bt is None:
         return False
-    seletor.set(nome)
-    next(w for w in todos(d_) if w.winfo_class() == "TButton"
-         and str(w.cget("text")).startswith("+ Adicionar")).invoke()
+    bt.invoke()
     d_.update()
     return True
 
 vis = lambda: [t.upper() for t in textos(nd)]
-ok(not any(t in ("PIN", "SENHA EXTRA", "CÓDIGOS DE RECUPERAÇÃO") for t in vis()), "PIN, senha extra e códigos de recuperação escondidos por padrão")
+ok(not any(t in ("PIN", "PIN NUMÉRICO", "SENHA EXTRA", "CÓDIGOS DE RECUPERAÇÃO") for t in vis()), "PIN, senha extra e códigos de recuperação escondidos por padrão")
 ok(adicionar_credencial(nd, "Senha extra") and "SENHA EXTRA" in vis(),
    "adicionar 'Senha extra' mostra o campo")
-ok(adicionar_credencial(nd, "PIN numérico") and "PIN" in vis(), "adicionar 'PIN' mostra o campo")
+ok(adicionar_credencial(nd, "PIN numérico") and "PIN NUMÉRICO" in vis(), "adicionar 'PIN' mostra o campo")
 ok(adicionar_credencial(nd, "Códigos de recuperação") and "CÓDIGOS DE RECUPERAÇÃO" in vis(),
    "adicionar códigos de recuperação mostra a caixa")
 ok(all(w.cget("show") == "•" for w in todos(nd) if w.winfo_class() == "TEntry" and str(w.cget("show"))) and
    any(w.winfo_class() == "TEntry" and str(w.cget("show")) == "•" for w in todos(nd)),
    "adicionar credenciais NÃO revela nenhuma senha (continuam em bolinhas)")
-pin_label = next(w for w in todos(nd) if w.winfo_class() == "TLabel" and str(w.cget("text")) == "PIN")
+pin_label = next(w for w in todos(nd) if w.winfo_class() == "TLabel" and str(w.cget("text")) == "PIN NUMÉRICO")
 next(w for w in pin_label.master.winfo_children() if w.winfo_class() == "TButton").invoke()
 root.update()
-ok("PIN" not in vis(), "remover uma credencial oculta seu campo")
+ok("PIN NUMÉRICO" not in vis(), "remover uma credencial oculta seu campo")
 cg = [w for w in todos(nd) if w.winfo_class() == "TCombobox" and w.winfo_ismapped()]
 ok(len(cg) >= 1 and "＋ Criar novo grupo…" in list(cg[0].cget("values")), "grupo visível, com a opção '＋ Criar novo grupo…'")
 cg[0].set("＋ Criar novo grupo…"); cg[0].event_generate("<<ComboboxSelected>>"); root.update()
 ok(cg[0].get() == "", "criar novo grupo limpa o campo para o usuário escrever o nome que quiser")
-ok(not any(w.winfo_class() == "TButton" and str(w.cget("text")) in ("Ativa", "Desativada") and w.winfo_ismapped()
+ok(not any(w.winfo_class() == "TButton" and str(w.cget("text")) in ("Ativa", "Desativada", "Status: Ativa", "Status: Desativada") and w.winfo_ismapped()
            for w in todos(nd)), "item NOVO nasce Ativa, sem botão de estado (só a edição permite desativar)")
 servico = next(w for w in todos(nd) if w.winfo_class() == "TEntry" and w.winfo_ismapped())
 servico.insert(0, "Item desativado de teste")
@@ -127,11 +127,11 @@ ok(salvo is not None and salvo.get("ativo") is not False, "item novo é gravado 
 # editar: aqui o botão de estado existe (Ativa <-> Desativada)
 app.dialogo_registro(salvo); root.update(); root.update()
 ed = tops(root)[-1]
-status_bt = next((w for w in todos(ed) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Ativa" and w.winfo_ismapped()), None)
+status_bt = next((w for w in todos(ed) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Status: Ativa" and w.winfo_ismapped()), None)
 ok(status_bt is not None, "na edição aparece o botão de estado 'Ativa'")
 if status_bt is not None:
     status_bt.invoke(); root.update()
-ok(status_bt is not None and str(status_bt.cget("text")) == "Desativada", "estado Ativa/Desativada pode ser alternado")
+ok(status_bt is not None and str(status_bt.cget("text")) == "Status: Desativada", "estado Ativa/Desativada pode ser alternado")
 next(w for w in todos(ed) if w.winfo_class() == "TButton" and str(w.cget("text")) == "Salvar item").invoke()
 root.update()
 salvo = next((r for r in app.cofre.registros if r.get("servico") == "Item desativado de teste"), None)

@@ -38,13 +38,11 @@ ok("numero_conta" in c.CAMPOS and "agencia" in c.CAMPOS, "numero_conta/agencia e
 ok("numero_conta" in c.CAMPOS_SECRETOS and "agencia" in c.CAMPOS_SECRETOS, "numero_conta/agencia são CAMPOS_SECRETOS")
 
 d = novo()
-for rot in ("Número da conta", "Agência"):
-    seletor = next((w for w in todos(d) if w.winfo_class() == "TCombobox"
-                    and rot in list(w.cget("values"))), None)
-    ok(seletor is not None, f"credencial '{rot}' está disponível para adicionar")
-    if seletor is not None:
-        seletor.set(rot)
-        achar(d, "+ Adicionar").invoke()
+for rot, chip_txt in (("Número da conta", "＋ Nº da conta"), ("Agência", "＋ Agência")):
+    chip = achar(d, chip_txt)
+    ok(chip is not None, f"credencial '{rot}' está disponível para adicionar (chip '{chip_txt}')")
+    if chip is not None:
+        chip.invoke()
         root.update()
 v = " | ".join(str(w.cget("text")) for w in todos(d) if w.winfo_class() == "TLabel" and w.winfo_ismapped())
 ok("NÚMERO DA CONTA" in v and "AGÊNCIA" in v, "campos Número da conta / Agência aparecem marcados")

@@ -20,6 +20,7 @@ Cenarios:
  11) formulario com o cofre bloqueado nao abre nem cai.
 """
 import copy
+import re
 import os
 import sys
 from contextlib import contextmanager
@@ -29,6 +30,21 @@ import _apoio_gui_novos as A          # noqa: E402
 
 TMP = A.preparar("cofre_gui_novoitem_", limite_segundos=900)
 cs = A.importar_cofre()
+
+
+def disparar(w, sequencia):
+    """Executa o bind do formulario sem depender do foco do teclado (a janela do CI nao tem foco e o Tk descarta
+    teclas sinteticas): mesmo metodo dos outros testes de Novo item."""
+    script = w.bind(sequencia) or w.winfo_toplevel().bind(sequencia)
+    if not script:
+        return False
+    valores = {"#": "0", "b": "0", "f": "0", "h": "0", "k": "83", "s": "0", "t": "0", "w": "0", "x": "0", "y": "0",
+               "A": "{}", "E": "0", "K": "s", "N": "115", "W": str(w), "T": "2", "X": "0", "Y": "0", "D": "0"}
+    try:
+        w.tk.eval(re.sub(r"%([#bfhkstwxyAEKNWTXYD])", lambda m: valores[m.group(1)], script))
+    except Exception:                      # bind que devolve "break": o efeito ja aconteceu
+        pass
+    return True
 # Estes testes duram minutos e rodam com a janela em SEGUNDO PLANO. Sem isto o proprio cofre se bloqueia no meio do
 # teste (60 s com outro programa em primeiro plano, ou 3 min sem uso) e tudo que vem depois falha por "cofre bloqueado".
 # So vale dentro deste processo de teste; o programa real nao muda.
@@ -217,8 +233,7 @@ def principal():
         f.campos["servico"].event_generate("<Return>")
         A.bombear(root, 0.5)
         rel.verifica(f.aberto and ids_atuais(app) == antes, "Enter no campo Conta NAO salva (so avanca)")
-        f.janela.focus_force()
-        f.janela.event_generate("<Control-s>")
+        disparar(f.campos["servico"], "<Control-s>")
         A.bombear(root, 0.5)
         rel.verifica(not f.aberto and len(ids_atuais(app)) == len(antes) + 1, "Ctrl+S salva o item")
         f.fechar()
@@ -309,17 +324,17 @@ def principal():
             # ativo / desativado
             reg = next(r for r in app.cofre.registros if r["id"] == guardado_completo)
             f = Formulario(app, reg)
-            bt = A.achar_botao(f.janela, "Ativa")
-            rel.verifica(bt is not None, "item ativo mostra o botao 'Ativa'")
+            bt = A.achar_botao(f.janela, "Status: Ativa")
+            rel.verifica(bt is not None, "item ativo mostra o botao 'Status: Ativa'")
             if bt is not None:
                 bt.invoke()
                 A.bombear(root, 0.2)
-                rel.verifica(A.achar_botao(f.janela, "Desativada") is not None, "o botao vira 'Desativada'")
+                rel.verifica(A.achar_botao(f.janela, "Status: Desativada") is not None, "o botao vira 'Desativada'")
             f.apertar_salvar()
             confere(app, guardado_completo, dict(nova, ativo=False), "item desativado", campos=("ativo", "servico", "senha"))
             reg = next(r for r in app.cofre.registros if r["id"] == guardado_completo)
             f = Formulario(app, reg)
-            rel.verifica(A.achar_botao(f.janela, "Desativada") is not None, "reabrir mostra 'Desativada' (estado gravado)")
+            rel.verifica(A.achar_botao(f.janela, "Status: Desativada") is not None, "reabrir mostra 'Desativada' (estado gravado)")
             f.fechar()
         else:
             rel.verifica(False, "pulou editar: o item completo nao foi criado")

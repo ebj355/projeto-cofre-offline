@@ -8771,7 +8771,7 @@ class App:
                      "Alternativa para pouca memória.")
         proximo_fr = ttk.Frame(dir_, style="C.TFrame")
         proximo_fr.pack(fill="x", pady=(_px(6), 0))
-        proximo = ttk.Label(proximo_fr, text="", style="C.Suave.TLabel", wraplength=_px(420), justify="left")
+        proximo = ttk.Label(proximo_fr, text="", style="C.Suave.TLabel", wraplength=_px(340), justify="left")
         proximo.pack(anchor="w")
         # Reserva a altura do MAIOR texto possivel: trocar de opcao nao muda mais a altura da tela.
         modo_orig, fido_orig, altura_max = modo.get(), usar_fido.get(), 0
@@ -10642,7 +10642,7 @@ class App:
                  font="CofreTexto").pack(anchor="w")
 
         busca_fr = tk.Frame(cab, bg=C["fundo"])
-        busca_fr.pack(side="left", padx=(36, 0))
+        # a busca é empacotada DEPOIS dos botões da direita (ver abaixo): em janela estreita ela encolhe, os botões não
         self.campo_busca = ttk.Entry(busca_fr, textvariable=self.busca, width=34, style="Busca.TEntry")
         self.campo_busca.pack(side="left")
         lupa = tk.Label(self.campo_busca, image=imagem_icone(self.root, "busca", C["fraco"], 16), bg=C["campo"],
@@ -10711,6 +10711,7 @@ class App:
         self._btn_novo = bt("Novo item", "novo", self.novo, "Primario.TButton", C["prim_fg"],
                             "Adicionar conta (Ctrl+N)")
         self._btn_mais = bmais
+        busca_fr.pack(side="left", padx=(_px(20), 0))
         tk.Frame(f, bg=C["borda"], height=1).pack(fill="x")
 
         # ----- Rodapé (barra de status) -----
@@ -12141,7 +12142,7 @@ class App:
         # ---------- Senha e credenciais (cada campo secreto tem o PRÓPRIO olho; não existe "Mostrar" geral) ----------
         credenciais = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
         credenciais.pack(fill="x", pady=(12, 0))
-        ttk.Label(credenciais, text="SENHA", style="C.Campo.TLabel").pack(anchor="w", pady=(0, 6))
+        ttk.Label(credenciais, text="SENHA", style="S2.Campo.TLabel").pack(anchor="w", pady=(0, 6))
         ORDEM_EXTRA = ("senha_extra", "pin", "chave", "numero_conta", "agencia", "codigos")
         rotulos_extra = {
             "codigos": "Códigos de recuperação",
@@ -12221,8 +12222,7 @@ class App:
             chips[chave] = ttk.Button(barra_add, text="＋ " + nomes_botao[chave], style="Pequeno.TButton",
                                       command=lambda k=chave: adicionar_credencial(k))
         dica_banco = ttk.Label(barra_add, style="S2.Fraco.TLabel", wraplength=_px(620), justify="left",
-                               text="Conta de banco? Use “Nº da conta” e “Agência” para guardar os dados bancários "
-                                    "(ficam protegidos pela senha mestra).")
+                               text="Conta de banco? Use “Nº da conta” e “Agência” (protegidos pela senha mestra).")
         # criada DEPOIS da senha e da barra: o Tab segue a ordem de criação (Senha → botões → campos extras → Notas)
         area_extras = ttk.Frame(credenciais, style="S2.TFrame")
         area_extras.pack(fill="x")
