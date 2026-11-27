@@ -134,7 +134,7 @@ def main():
             print("AVISO: sem tela e sem xvfb-run: testes de interface pulados.")
         else:
             for f in sorted(glob.glob(os.path.join(RAIZ_TESTES, "2_TESTE_telas_e_botoes", "teste_*.py"))):
-                tarefas.append(("gui/" + os.path.basename(f), xv + [pg] + ([] if (a.sem_dev or os.name == "nt" or "soak" in os.path.basename(f)) else ["-X", "dev"]) + [f], os.path.dirname(f), 900 if "soak" in os.path.basename(f) else 400))   # Windows/dev e soak: sem modo dev (lento/incompatível) e com mais tempo
+                tarefas.append(("gui/" + os.path.basename(f), xv + [pg] + ([] if (a.sem_dev or os.name == "nt" or "soak" in os.path.basename(f)) else ["-X", "dev"]) + [f], os.path.dirname(f), 900 if "soak" in os.path.basename(f) else (1500 if "temas_trocas" in os.path.basename(f) else 400)))   # Windows/dev e soak: sem modo dev (lento/incompatível) e com mais tempo; temas_trocas faz centenas de trocas de tema (mais de 7 min no Windows): 1500 s
     tarefas = [t for t in tarefas if a.filtro in t[0]]
     falhas = pulados = 0
     for nome, cmd, cwd, lim in tarefas:

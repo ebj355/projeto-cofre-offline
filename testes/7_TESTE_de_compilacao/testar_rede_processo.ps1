@@ -108,21 +108,34 @@ try {
         }
     }
     if ($processo) {
-        $fim = (Get-Date).AddSeconds(60)
+        # O onefile se descompacta antes de iniciar o processo da aplicacao; em pendrive lento (e com o Defender varrendo)
+        # isso leva mais de 60 s (o smoke visual mediu 59 s ate a janela). Em vez de esperar um tempo fixo, espera
+        # ATE o processo-filho aparecer (limite de 240 s) e depois mais alguns segundos para a aplicacao montar a tela.
+        $inicioEspera = Get-Date
+        $fim = $inicioEspera.AddSeconds(240)
+        $pids = @($processo.Id)
         do {
-            Start-Sleep -Milliseconds 250
+            Start-Sleep -Milliseconds 500
             $processo.Refresh()
-        } while (-not $processo.HasExited -and (Get-Date) -lt $fim)
+            if ($processo.HasExited) { break }
+            $pids = @(Obter-ArvoreProcessos $processo.Id)
+        } while ($pids.Count -le 1 -and (Get-Date) -lt $fim)
+        if (-not $processo.HasExited -and $pids.Count -gt 1) {
+            Start-Sleep -Seconds 10          # deixa a janela abrir; conexao de rede indevida apareceria nesse intervalo
+            $processo.Refresh()
+            if (-not $processo.HasExited) { $pids = @(Obter-ArvoreProcessos $processo.Id) }
+        }
+        $esperouS = [int]((Get-Date) - $inicioEspera).TotalSeconds
 
         if ($processo.HasExited) {
             Write-Output "[FALHOU] CofreSenhas.exe encerrou antes da verificacao (codigo $($processo.ExitCode))."
             $codigo = 1
         } else {
-            $pids = @(Obter-ArvoreProcessos $processo.Id)
             if ($pids.Count -le 1) {
-                Write-Output '[PULADO] O executavel onefile nao iniciou o processo da aplicacao; conexoes nao foram verificadas.'
+                Write-Output "[PULADO] O executavel onefile nao iniciou o processo da aplicacao em $esperouS s; conexoes nao foram verificadas."
                 $codigo = 9
             } else {
+                Write-Output "[INFO] Processo da aplicacao apareceu apos ~$esperouS s (inclui os 10 s finais de espera)."
                 $tcp = @()
                 $udp = @()
                 foreach ($pidTeste in $pids) {

@@ -53,6 +53,18 @@ def assinatura(app):
     return sig
 
 
+def mesmo_lugar(d, m0, m):
+    """m0/m = (largura, x, y) do dialogo antes e depois. O formulario cresce PARA BAIXO e fica onde esta (o programa nao
+    recentraliza); a unica exceção legitima e subir o MINIMO quando o fundo passaria da borda da tela (_manter_no_lugar).
+    Entao: largura e x iguais sempre; y igual, ou y menor so se o fundo do dialogo esta colado no fim da tela."""
+    if m[0] != m0[0] or m[1] != m0[1]:
+        return False
+    if m[2] == m0[2]:
+        return True
+    fundo = m[2] + d.winfo_height()
+    return m[2] < m0[2] and fundo >= d.winfo_screenheight() - 140
+
+
 def comparar(app, base, rotulo):
     atual = assinatura(app)
     mudou = [f"{k}: {base[k]} -> {atual[k]}" for k in base if base[k] != atual[k]]
@@ -207,7 +219,7 @@ def principal():
                 botao.invoke()
                 A.bombear(root, 0.3)
                 m = (d.winfo_width(), d.winfo_rootx(), d.winfo_rooty())
-                rel.verifica(m == m0, f"Novo item: adicionar '{rotulo}' nao muda largura nem posicao", f"{m0} -> {m}")
+                rel.verifica(mesmo_lugar(d, m0, m), f"Novo item: adicionar '{rotulo}' nao muda largura nem posicao", f"{m0} -> {m}")
                 cortes(d, f"Novo item + {rotulo}")
             h1 = d.winfo_height()
             if h1 != h0:
@@ -217,6 +229,7 @@ def principal():
                          f"{d.winfo_width()}x{d.winfo_height()} / {root.winfo_width()}x{root.winfo_height()}")
             rel.verifica(not any(w.winfo_class() == "TCheckbutton" and A.texto_de(w) == "Mostrar" for w in A.todos(d)),
                          "Novo item: nao existe mais o 'Mostrar' geral (cada campo tem o seu olho)")
+            m_final = (d.winfo_width(), d.winfo_rootx(), d.winfo_rooty())   # tamanho/posicao com tudo aberto: o olho nao pode muda-los
             olhos = [w for w in A.todos(d) if w.winfo_class() == "TButton" and A.texto_de(w) == "👁" and w.winfo_ismapped()]
             rel.verifica(len(olhos) >= 5, "Novo item: cada campo secreto tem o seu olho", str(len(olhos)))
             for olho in olhos:
@@ -224,7 +237,7 @@ def principal():
                     olho.invoke()
                     A.bombear(root, 0.15)
                     m = (d.winfo_width(), d.winfo_rootx(), d.winfo_rooty())
-                    rel.verifica(m == m0, "Novo item: mostrar/ocultar um segredo nao mexe na janela", f"{m0} -> {m}")
+                    rel.verifica(mesmo_lugar(d, m0, m) or m == m_final, "Novo item: mostrar/ocultar um segredo nao mexe na janela", f"{m0} -> {m}")
                     cortes(d, "Novo item com um campo a mostra")
             d.destroy()
         rel.verifica(not erros.pegar(), "nenhuma excecao do Tk no teste inteiro")

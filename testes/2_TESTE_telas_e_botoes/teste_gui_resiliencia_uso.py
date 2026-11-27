@@ -101,6 +101,10 @@ cortado = c._cortar("x" * 2000, fonte, 80)
 ok(cortado == "x" * 79 + "…" and fonte.chamadas <= 14,
    f"texto longo truncado com busca limitada ({fonte.chamadas} medições)")
 estranhos = ["x" * 5000, "🔐🗝️" * 500, "שלום עולם مرحبا " * 50, "linha1\nlinha2\ttab", "‮evil‬", "nulo\x00no meio", "ç~´`^ ÀÉÎÕÜ" * 100]
+# Texto estranho vira senha "fraca": o cofre pergunta "Salvar mesmo assim?". Aqui o usuario responde SIM (o que se mede e
+# se a interface aguenta o texto, nao a politica de senha fraca); o mock volta a "Nao" logo depois do bloco B.
+_resposta_anterior = messagebox.askyesno
+messagebox.askyesno = lambda *a, **k: True
 for i, texto in enumerate(estranhos):
     renova()
     if app.cofre is None:
@@ -110,6 +114,7 @@ for i, texto in enumerate(estranhos):
         achar(d, "Salvar").invoke(); root.update()
     except Exception as ex:
         ok(False, f"texto estranho #{i} derrubou a interface: {type(ex).__name__}: {ex}")
+messagebox.askyesno = _resposta_anterior
 ok(sum(1 for r in app.cofre.registros if r["servico"].startswith("Fuzz ")) == len(estranhos), "todos os itens com texto estranho foram salvos")
 ok(not erros, "nenhuma mensagem de erro com texto estranho")
 app.cofre.salvar(); app.cofre.fechar()

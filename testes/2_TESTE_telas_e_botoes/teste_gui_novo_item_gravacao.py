@@ -347,7 +347,7 @@ def principal():
                          and A.texto_de(w) == texto and w.winfo_ismapped()), None)
 
         CHIPS = {"senha_extra": "Senha extra", "pin": "PIN", "chave": "Chave / token",
-                 "conta": "Nº da conta", "agencia": "Agência"}
+                 "numero_conta": "Nº da conta", "agencia": "Agência"}
         f = Formulario(app)
         for chave, rotulo in CHIPS.items():
             chip = botao_com_texto(f.janela, "＋ " + rotulo)

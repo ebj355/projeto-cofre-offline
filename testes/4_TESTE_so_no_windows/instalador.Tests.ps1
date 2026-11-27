@@ -11,9 +11,11 @@ Describe 'instalar_cofre.ps1: funções auxiliares' {
         . $script:instalador      # só define as funções: o arquivo não instala nada quando é carregado assim
     }
 
-    It 'Confirmar-PalavraApagar exige APAGAR em maiusculas exatas' {
+    It 'Confirmar-PalavraApagar exige APAGAR em maiusculas exatas (espaços nas pontas são ignorados)' {
         if (-not (Confirmar-PalavraApagar 'APAGAR')) { throw "devia aceitar APAGAR" }
-        foreach ($valor in '', 'apagar', 'ApAgAr', 'APAGA', 'APAGAR ') {
+        # o instalador faz Trim() de propósito (ver comentário em Confirmar-PalavraApagar): espaço nas pontas não invalida
+        if (-not (Confirmar-PalavraApagar '  APAGAR ')) { throw "devia aceitar APAGAR com espaços nas pontas" }
+        foreach ($valor in '', 'apagar', 'ApAgAr', 'APAGA', 'APAGAR!', 'APA GAR') {
             if (Confirmar-PalavraApagar $valor) { throw "devia recusar: '$valor'" }
         }
     }

@@ -35,8 +35,8 @@ ok(str(rotulo_ident.cget("style")) == "C.Campo.TLabel",
    "rótulos de identificação usam o fundo do cartão, sem faixa escura")
 rotulo_senha = next(w for w in todos(d) if w.winfo_class() == "TLabel"
                      and str(w.cget("text")) == "SENHA")
-ok(str(rotulo_senha.cget("style")) == "S2.Campo.TLabel",
-   "rótulos das credenciais usam o fundo do painel")
+ok(str(rotulo_senha.cget("style")) == "C.Campo.TLabel",
+   "rótulo SENHA usa o fundo do cartão onde está (Card.TFrame)")
 status = next((w for w in todos(d) if w.winfo_class() == "TButton"
                and str(w.cget("text")) in ("Status: Ativa", "Status: Desativada") and w.winfo_ismapped()), None)
 ok(status is None, "item NOVO não mostra botão de estado (nasce Ativa; só a edição permite desativar)")
@@ -87,7 +87,11 @@ def _disparar(w, sequencia, keysym="Return", keycode="13"):
         return False
     valores = {"#": "0", "b": "0", "f": "0", "h": "0", "k": keycode, "s": "0", "t": "0", "w": "0", "x": "0", "y": "0",
                "A": "{}", "E": "0", "K": keysym, "N": "65293", "W": str(w), "T": "2", "X": "0", "Y": "0", "D": "0"}
-    topo.tk.eval(re.sub(r"%([#bfhkstwxyAEKNWTXYD])", lambda m: valores[m.group(1)], script))
+    try:
+        topo.tk.eval(re.sub(r"%([#bfhkstwxyAEKNWTXYD])", lambda m: valores[m.group(1)], script))
+    except tk.TclError as ex:
+        if "break" not in str(ex):          # o handler devolve 'break' para barrar a tecla: isso e esperado
+            raise
     return True
 d = novo(); ents = [w for w in todos(d) if w.winfo_class() == "TEntry" and w.winfo_ismapped()]
 ents[0].insert(0, "Loja X"); ents[1].insert(0, "loja@x.com"); ents[2].insert(0, c.gerar_senha(20, True, True)); root.update()

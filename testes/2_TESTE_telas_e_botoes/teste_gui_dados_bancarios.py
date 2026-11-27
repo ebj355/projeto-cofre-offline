@@ -50,18 +50,18 @@ ok("NÚMERO DA CONTA" in v and "AGÊNCIA" in v, "campos Número da conta / Agên
 topo_ents = [w for w in todos(d) if w.winfo_class() == "TEntry" and w.winfo_ismapped()]
 topo_ents[0].insert(0, "Banco Azul")     # servico
 topo_ents[1].insert(0, "123.456-7")      # login
-# a grade de segredos tem um rótulo (TLabel) na linha N e o campo (dentro de um Frame) na linha N+1,
-# na MESMA coluna e no MESMO pai (grade) -- acha o campo de cada rótulo pela posição no grid, não pelo
-# texto (vários campos compartilham o mesmo pai "grade").
+# cada campo secreto e um bloco: bloco > cabecalho(rotulo) e bloco > linha(campo). Acha o campo de cada rotulo
+# subindo do rotulo ate o bloco e pegando o primeiro TEntry (o rotulo "SENHA" aparece 2x: titulo do cartao e do bloco).
 def campo_por_rotulo(rot):
-    lbl = next(w for w in todos(d) if w.winfo_class() == "TLabel" and str(w.cget("text")) == rot)
-    cabecalho = lbl.master
-    pai = cabecalho.master
-    info = cabecalho.grid_info()
-    lin, col = int(info["row"]), int(info["column"])
-    linha_w = next(w for w in pai.winfo_children()
-                   if w.grid_info().get("row") == lin + 1 and w.grid_info().get("column") == col)
-    return next(w for w in todos(linha_w) if w.winfo_class() == "TEntry")
+    melhor = None
+    for lbl in [w for w in todos(d) if w.winfo_class() == "TLabel" and str(w.cget("text")) == rot]:
+        bloco = lbl.master.master
+        ents_b = [w for w in todos(bloco) if w.winfo_class() == "TEntry"]
+        if ents_b and (melhor is None or len(ents_b) < len(melhor)):
+            melhor = ents_b          # o bloco do proprio campo tem UM so TEntry; o titulo do cartao engloba varios
+    if melhor is None:
+        raise AssertionError(f"campo do rotulo {rot!r} nao encontrado")
+    return melhor[0]
 e_senha = campo_por_rotulo("SENHA")
 e_conta = campo_por_rotulo("NÚMERO DA CONTA")
 e_agencia = campo_por_rotulo("AGÊNCIA")

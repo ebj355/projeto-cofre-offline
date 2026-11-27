@@ -129,7 +129,7 @@ botao(d, "Cancelar").invoke(); ap.bombear(root, 0.1)
 rel.verifica(existe(d) and len(perguntas("Descartar alterações?")) == 1,
              "Cancelar COM dados pergunta e, respondendo Nao, o formulario continua aberto")
 rel.verifica(entradas(d)[0].get() == "Rascunho", "o texto digitado continua la depois de responder Nao")
-disparar(entradas(d)[0], "<Escape>", "Escape", "27")
+disparar(d, "<Escape>", "Escape", "27")
 rel.verifica(existe(d) and len(perguntas("Descartar alterações?")) == 2, "Esc COM dados pergunta (e Nao mantem aberto)")
 protocolo = d.protocol("WM_DELETE_WINDOW")
 try:
@@ -229,16 +229,18 @@ rel.verifica(rot_chave is not None and rot_pin is not None and rot_chave.winfo_r
 rel.verifica(len(olhos()) == 3, "cada campo secreto novo traz o seu olho", str(len(olhos())))
 rel.verifica(botao(d, "＋ PIN", visivel=True) is None and botao(d, "＋ Chave / token", visivel=True) is None,
              "os botoes ja usados saem da faixa")
-campo_pin = entradas(d)[4]
+bloco_pin = rot_pin.master.master            # bloco do PIN: cabecalho (rotulo + Remover) e linha do campo
+campo_pin = next(w for w in ap.todos(bloco_pin) if w.winfo_class() == "TEntry")
 campo_pin.insert(0, "4821")
 msgs.chamadas.clear(); msgs.resposta = False
 rems = [w for w in ap.todos(d) if w.winfo_class() == "TButton" and ap.texto_de(w) == "✕ Remover" and w.winfo_ismapped()]
 rel.verifica(len(rems) == 2, "cada credencial extra tem o seu 'Remover'", str(len(rems)))
-rems[1].invoke(); ap.bombear(root, 0.2)
+rem_pin = next(w for w in ap.todos(bloco_pin) if w.winfo_class() == "TButton" and ap.texto_de(w) == "✕ Remover")
+rem_pin.invoke(); ap.bombear(root, 0.2)      # o do PIN, nao "o segundo da lista" (a lista segue a ordem de criacao, nao a de chegada)
 rel.verifica(len(perguntas("Remover campo")) == 1 and campo_pin.winfo_ismapped() and campo_pin.get() == "4821",
              "Remover com dado digitado pergunta e, respondendo Nao, mantem o campo e o texto")
 msgs.resposta = True
-rems[1].invoke(); ap.bombear(root, 0.2)
+rem_pin.invoke(); ap.bombear(root, 0.2)
 rel.verifica(not campo_pin.winfo_ismapped() and campo_pin.get() == "",
              "respondendo Sim, o campo some e o texto digitado e apagado")
 rel.verifica(botao(d, "＋ PIN") is not None, "o botao '＋ PIN' volta para a faixa")

@@ -6906,9 +6906,13 @@ class BarraLateral(tk.Frame if tk else object):
     """Lista paginada de grupos à esquerda (ícone, nome e contagem), sem rolagem.
     Oferece os mesmos métodos do Treeview que o resto do programa usa."""
 
-    def __init__(self, mestre, max_linhas=8, **kw):
-        """Cria a lista compacta de grupos/pessoas com a mesma interface de um Treeview."""
+    def __init__(self, mestre, max_linhas=8, secoes=2, **kw):
+        """Cria a lista compacta de grupos/pessoas com a mesma interface de um Treeview.
+        'secoes' = quantos títulos de seção cabem, no máximo, numa mesma página (entra no cálculo da altura fixa)."""
         super().__init__(mestre, bg=CORES["lateral"], **kw)
+        self._secoes = max(0, int(secoes))
+        self._altura_alvo = 0                # altura reservada da lista: só cresce, nunca encolhe (ver _reservar_altura)
+        self._enchimento = tk.Frame(self, bg=CORES["lateral"], height=1, bd=0, highlightthickness=0)
         self._itens = {}
         self._ordem = []
         self._sel = None
@@ -7000,6 +7004,7 @@ class BarraLateral(tk.Frame if tk else object):
         for iid in {antiga, nova}:
             self._pintar(iid)
         self._atualizar_paginacao()
+        self._reservar_altura()
 
     def _atualizar_paginacao(self):
         """Mostra controles apenas quando há mais de uma página."""
@@ -7023,8 +7028,9 @@ class BarraLateral(tk.Frame if tk else object):
     def _desenhar(self):
         """Desenha somente a página atual."""
         for w in self.winfo_children():
-            if w is not self._nav:
+            if w is not self._nav and w is not self._enchimento:
                 w.destroy()
+        self._enchimento.pack_forget()
         self._itens.clear()
         C = CORES
         inicio = self._pagina * self._max_linhas
@@ -7053,7 +7059,8 @@ class BarraLateral(tk.Frame if tk else object):
                 ic = imagem_icone(self, e.get("icone", "grupo"), e.get("cor_icone") or C["suave"], 16)
             lic = tk.Label(linha, image=ic, bg=C["lateral"], width=22)
             lic.pack(side="left", padx=(9, 6))
-            ltxt = tk.Label(linha, text=e["texto"], bg=C["lateral"], fg=e.get("cor_txt") or C["lateral_txt"],
+            _t0 = e["texto"] if len(e["texto"]) <= 28 else e["texto"][:27].rstrip() + "…"   # já nasce curto; o ajuste fino vem no <Configure>
+            ltxt = tk.Label(linha, text=_t0, bg=C["lateral"], fg=e.get("cor_txt") or C["lateral_txt"],
                             font="CofreTexto", anchor="w")
             texto_cheio = e["texto"]
 
@@ -7091,8 +7098,40 @@ class BarraLateral(tk.Frame if tk else object):
                 w.bind("<Enter>", lambda ev, i=e["iid"]: self._pintar(i, hover=True))
                 w.bind("<Leave>", lambda ev, i=e["iid"]: self._pintar(i))
         self._atualizar_paginacao()
+        self._reservar_altura()
         for iid in self._itens:
             self._pintar(iid)
+
+    def _reservar_altura(self):
+        """ALTURA FIXA: a lista ocupa sempre o espaço de uma página cheia (linhas, títulos de seção e botões de
+        página), com um enchimento invisível no fim quando há poucos itens. Assim escolher uma pessoa, buscar ou
+        apagar a busca nunca encolhe nem sobe a lista (nem empurra a lista que vem logo abaixo). O valor só cresce."""
+        try:
+            self._enchimento.pack_forget()
+            self.update_idletasks()
+            conteudo = self.winfo_reqheight()
+            # medidas de referência tiradas de widgets de verdade (não de estimativa por fonte)
+            sonda_t = tk.Label(self, text="Xg", font="CofreTexto", bd=0)
+            sonda_r = tk.Label(self, text="XG", font="CofreRotulo", bd=0)
+            sonda_n = tk.Label(self, text="1", font="CofrePequeno", bd=0, padx=10)
+            try:
+                if ESCALA >= 2.0:
+                    linha = max(36, sonda_t.winfo_reqheight() + 4, sonda_n.winfo_reqheight() + 4) + 2
+                else:
+                    linha = _px(36) + 2
+                titulo = sonda_r.winfo_reqheight() + 24
+            finally:
+                for sonda in (sonda_t, sonda_r, sonda_n):
+                    sonda.destroy()
+            pagina = (self._max_linhas * linha + self._secoes * titulo
+                      + self._nav.winfo_reqheight() + 6)
+            self._altura_alvo = max(self._altura_alvo, pagina, conteudo)
+            falta = self._altura_alvo - conteudo
+            if falta > 0:
+                self._enchimento.configure(height=falta)
+                self._enchimento.pack(side="top", fill="x")
+        except (tk.TclError, KeyError):
+            pass
 
     def item_em(self, x_root, y_root):
         """Id da linha que está sob o ponto (coordenadas da tela) ou None. Usado ao soltar uma conta arrastada."""
@@ -8771,7 +8810,7 @@ class App:
                      "Alternativa para pouca memória.")
         proximo_fr = ttk.Frame(dir_, style="C.TFrame")
         proximo_fr.pack(fill="x", pady=(_px(6), 0))
-        proximo = ttk.Label(proximo_fr, text="", style="C.Suave.TLabel", wraplength=_px(340), justify="left")
+        proximo = ttk.Label(proximo_fr, text="", style="C.Suave.TLabel", wraplength=_px(420), justify="left")
         proximo.pack(anchor="w")
         # Reserva a altura do MAIOR texto possivel: trocar de opcao nao muda mais a altura da tela.
         modo_orig, fido_orig, altura_max = modo.get(), usar_fido.get(), 0
@@ -10112,6 +10151,11 @@ class App:
         fr = ttk.Frame(canvas, padding=padding)
         janela = canvas.create_window((0, 0), window=fr, anchor="nw")
         canvas.pack(side="left", fill="both", expand=True)
+        # A faixa da barra de rolagem fica RESERVADA desde o início (vazia enquanto não há rolagem): quando a barra
+        # surge, ela só ocupa o lugar da faixa e o conteúdo não estreita nem anda para a esquerda.
+        largura_barra = max(1, barra.winfo_reqwidth())
+        reserva = tk.Frame(area, width=largura_barra, bg=CORES["fundo"], bd=0, highlightthickness=0)
+        reserva.pack(side="right", fill="y")
         estado = {"pos": False, "pendente": None, "aplicado": None, "rolagem": False, "lmax": 0, "amax": 0}
 
         def ajustar_largura(event):
@@ -10122,9 +10166,9 @@ class App:
             estado["pendente"] = None
             try:
                 d.update_idletasks()
-                w = fr.winfo_reqwidth()
+                w = fr.winfo_reqwidth() + largura_barra          # + a faixa reservada da barra de rolagem
                 h = fr.winfo_reqheight()
-                reserva = rodape.winfo_reqheight() if rodape is not None else 0
+                reserva_rodape = rodape.winfo_reqheight() if rodape is not None else 0
                 sw, sh = d.winfo_screenwidth(), d.winfo_screenheight()
                 if rodape is not None:
                     w = max(w, rodape.winfo_reqwidth())
@@ -10140,22 +10184,24 @@ class App:
                         pass
                 largura = min(max(w, getattr(d, "_largura_padrao", None) or _px(860)), teto_l)
                 piso = getattr(d, "_altura_padrao", None) or _px(520)
-                altura = min(max(h + reserva, piso), teto_a)
+                altura = min(max(h + reserva_rodape, piso), teto_a)
                 # O dialogo so CRESCE (nunca encolhe) enquanto aberto: abrir/fechar "detalhes" ou trocar de opcao
                 # nao faz a janela ficar mudando de tamanho e de posicao.
                 largura = max(largura, estado["lmax"])
                 altura = max(altura, estado["amax"])
                 estado["lmax"], estado["amax"] = largura, altura
                 d._tam_corpo = (largura, altura)      # tamanho DECIDIDO: _centralizar usa este (a janela ainda pode estar escondida)
-                corpo_altura = max(1, altura - reserva)
-                # A barra de rolagem, uma vez que apareceu, FICA (mesmo que depois o conteúdo caiba): aparecer e sumir a
-                # cada troca de opção estreitava e alargava o conteúdo em ~12 px, e a tela "tremia".
+                corpo_altura = max(1, altura - reserva_rodape)
+                # A barra de rolagem, uma vez que apareceu, FICA (mesmo que depois o conteúdo caiba). O lugar dela já
+                # está reservado (faixa vazia), então nem a primeira aparição altera a largura do conteúdo.
                 rolagem = h > corpo_altura or estado["rolagem"]
                 if rolagem != estado["rolagem"]:
                     if rolagem:
-                        barra.pack(side="right", fill="y")
+                        reserva.pack_forget()
+                        barra.pack(side="right", fill="y")      # ocupa exatamente o lugar da faixa reservada
                     else:
                         barra.pack_forget()
+                        reserva.pack(side="right", fill="y")
                     estado["rolagem"] = rolagem
                     d.update_idletasks()
                 canvas.configure(height=corpo_altura, scrollregion=canvas.bbox("all"))
@@ -10736,10 +10782,10 @@ class App:
         self._painel_seg.pack(side="bottom", fill="x", padx=12, pady=12)
         interno = tk.Frame(lat, bg=C["lateral"])
         interno.pack(fill="both", expand=True)
-        self.lateral_pessoas = BarraLateral(interno, max_linhas=4)
+        self.lateral_pessoas = BarraLateral(interno, max_linhas=4, secoes=1)
         self.lateral_pessoas.pack(fill="x", pady=(8, 0))
         self.lateral_pessoas.bind("<<TreeviewSelect>>", self._ao_escolher_pessoa)
-        self.lateral = BarraLateral(interno, max_linhas=8)
+        self.lateral = BarraLateral(interno, max_linhas=8, secoes=2)
         self.lateral.pack(fill="x")
         self.lateral.bind("<<TreeviewSelect>>", self._ao_escolher_grupo)
         tk.Frame(corpo, bg=C["borda"], width=1).pack(side="left", fill="y")
@@ -10755,15 +10801,16 @@ class App:
         meio.pack(side="left", fill="both", expand=True)
         topo_lista = tk.Frame(meio, bg=C["fundo"])
         topo_lista.pack(fill="x", padx=(14, 16), pady=(16, 6))
+        self.ordem_az = True                                # padrão: ordem alfabética (A → Z)
+        # o botão de ordem é empacotado ANTES do título: um nome de grupo comprido nunca o espreme nem o move
+        self._btn_ordem = ttk.Button(topo_lista, text="A → Z", style="Acao.TButton", width=7,
+                                     command=self._alternar_ordem)
+        self._btn_ordem.pack(side="right")
         self._titulo_lista = tk.Label(topo_lista, text="Todas as contas", bg=C["fundo"], fg=C["texto"],
                                       font="CofreSub", anchor="w")
         self._titulo_lista.pack(side="left")
         self._conta_lista = tk.Label(topo_lista, text="", bg=C["fundo"], fg=C["fraco"], font="CofreTexto")
         self._conta_lista.pack(side="left", padx=(10, 0), pady=(3, 0))
-        self.ordem_az = True                                # padrão: ordem alfabética (A → Z)
-        self._btn_ordem = ttk.Button(topo_lista, text="A → Z", style="Acao.TButton", width=7,
-                                     command=self._alternar_ordem)
-        self._btn_ordem.pack(side="right")
         self._dica(self._btn_ordem, "Troca a ordem da lista: A → Z (alfabética) ou Z → A.")
         self.tree = ListaContas(meio)
         self.tree.pack(fill="both", expand=True, padx=(6, 0))
@@ -11052,6 +11099,8 @@ class App:
                       }.get(filtro, filtro)
             if varias and fp != "*":
                 titulo = f"{self._nome_pessoa(fp)}  ·  {titulo}"
+            if len(titulo) > 28:
+                titulo = titulo[:27].rstrip() + "…"
             self._titulo_lista.config(text=titulo)
             self._conta_lista.config(text=f"{len(visiveis)}")
             self._montar_detalhe()
@@ -11146,7 +11195,8 @@ class App:
                       image=imagem_icone(self.root, "pessoa", C["prim_txt"], 14),
                       compound="left", style="C.Suave.TLabel").pack(side="left", padx=(0, 12))
         if r.get("grupo"):
-            ttk.Label(chips, text=" " + r["grupo"], image=_ponto_img(self.root, tom_para(r["grupo"]), 8),
+            _g = r["grupo"] if len(r["grupo"]) <= 20 else r["grupo"][:19].rstrip() + "…"   # nome comprido não estoura o painel
+            ttk.Label(chips, text=" " + _g, image=_ponto_img(self.root, tom_para(r["grupo"]), 8),
                       compound="left", style="C.Suave.TLabel").pack(side="left", padx=(0, 12))
         ttk.Label(chips, text="Ativa" if _item_ativo(r) else "Desativada",
                   style="C.TLabel", foreground=C["ok"] if _item_ativo(r) else C["fraco"]).pack(
@@ -11157,21 +11207,21 @@ class App:
 
         # ações (embaixo)
         acoes = ttk.Frame(d, style="C.TFrame")
-        acoes.pack(side="bottom", fill="x", pady=(12, 0))
+        acoes.pack(side="bottom", fill="x", pady=(8, 0))
         ttk.Button(acoes, text="Editar", style="C.Primario.TButton", command=self.editar,
                    image=imagem_icone(self.root, "editar", "#ffffff"), compound="left").pack(side="left")
         ttk.Button(acoes, text="Excluir", style="C.Perigo.TButton", command=self.excluir,
                    image=imagem_icone(self.root, "excluir", C["perigo"]), compound="left").pack(side="right")
 
         campos = ttk.Frame(d, style="C.TFrame")
-        campos.pack(fill="both", expand=True, pady=(18, 0))
+        campos.pack(fill="both", expand=True, pady=(12, 0))
         primeiro = True
         for campo in ("login",) + CAMPOS_SECRETOS:
             valor = r.get(campo, "")
             if not valor:
                 continue
             if not primeiro:
-                ttk.Separator(campos).pack(fill="x", pady=10)
+                ttk.Separator(campos).pack(fill="x", pady=6)
             primeiro = False
             secreto = campo in CAMPOS_SECRETOS
             chave = (r["id"], campo)
@@ -11221,13 +11271,13 @@ class App:
                 nota, rot, bits, _ = avaliar_forca(valor)
                 ttk.Label(bloco, text="  " + rot, image=self._barra_forca(nota, 56), compound="left",
                           foreground=self._CORES_FORCA[nota], style="C.TLabel", font="CofrePequeno").pack(
-                    anchor="w", pady=(4, 0))
+                    anchor="w", pady=(2, 0))
             elif campo == "pin" and pin_obvio(valor):
                 ttk.Label(bloco, text="  PIN fácil de adivinhar", image=self._barra_forca(0, 56), compound="left",
-                          foreground=C["perigo"], style="C.TLabel", font="CofrePequeno").pack(anchor="w", pady=(4, 0))
+                          foreground=C["perigo"], style="C.TLabel", font="CofrePequeno").pack(anchor="w", pady=(2, 0))
         if r.get("notas"):
             if not primeiro:
-                ttk.Separator(campos).pack(fill="x", pady=10)
+                ttk.Separator(campos).pack(fill="x", pady=6)
             ttk.Label(campos, text="NOTAS", style="C.Campo.TLabel").pack(anchor="w")
             ttk.Label(campos, text=r["notas"], style="C.Suave.TLabel", wraplength=_px(350), justify="left").pack(
                 anchor="w", pady=(3, 0))
@@ -12142,7 +12192,7 @@ class App:
         # ---------- Senha e credenciais (cada campo secreto tem o PRÓPRIO olho; não existe "Mostrar" geral) ----------
         credenciais = ttk.Frame(fr, style="Card.TFrame", padding=(_px(14), _px(12)))
         credenciais.pack(fill="x", pady=(12, 0))
-        ttk.Label(credenciais, text="SENHA", style="S2.Campo.TLabel").pack(anchor="w", pady=(0, 6))
+        ttk.Label(credenciais, text="SENHA", style="C.Campo.TLabel").pack(anchor="w", pady=(0, 6))
         ORDEM_EXTRA = ("senha_extra", "pin", "chave", "numero_conta", "agencia", "codigos")
         rotulos_extra = {
             "codigos": "Códigos de recuperação",
