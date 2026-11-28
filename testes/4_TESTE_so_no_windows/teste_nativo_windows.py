@@ -216,7 +216,17 @@ def fido():
         ver("Windows oferece WebAuthn (chave FIDO2)", WindowsClient.is_available(), f"API v{WEBAUTHN_API_VERSION} (>= 4 recomendado para PRF)")
     except Exception as ex:
         ver("biblioteca fido2 carrega", False, f"{type(ex).__name__}: {str(ex)[:80]}")
-    ver("hibernação lida do registro (somente leitura)", isinstance(c.hibernacao_ligada(), bool), str(c.hibernacao_ligada()))
+    hib = c.hibernacao_ligada()
+    if isinstance(hib, bool):
+        ver("hibernação lida do registro (somente leitura)", True, str(hib))
+    else:
+        # None = o valor não existe/não respondeu. Em VM (ex.: runner do GitHub Actions) o Windows não tem hibernação e a
+        # chave HibernateEnabled nem existe: isso não é erro do programa. Confirma com o próprio Windows antes de aceitar.
+        cod, saida = sh(["reg", "query", r"HKLM\SYSTEM\CurrentControlSet\Control\Power", "/v", "HibernateEnabled"])
+        if cod != 0:
+            info("este Windows não tem o valor HibernateEnabled (típico de VM/CI): a hibernação não se aplica; o programa trata como 'não sei'")
+        else:
+            ver("hibernação lida do registro (somente leitura)", False, "o valor existe, mas o programa não conseguiu lê-lo")
 print("\n[7] FIDO2 e registro")
 seguro("FIDO", fido)
 

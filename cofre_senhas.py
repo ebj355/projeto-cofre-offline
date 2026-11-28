@@ -919,7 +919,7 @@ def _achar_g(pc):
 def _dv_chave(b):
     """2 caracteres de verificação (10 bits): um erro de digitação é percebido SEM gastar tentativa."""
     d = hashlib.sha256(b"cofre-dv" + b).digest()
-    alfabeto = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    alfabeto = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"  # pragma: allowlist secret
     return alfabeto[d[0] & 31] + alfabeto[d[1] & 31]
 
 
@@ -4953,7 +4953,7 @@ def criar_modelo_planilha(destino, selo=None):
                                width=260, height=90)
     exemplos = (
         ("EXEMPLO - Banco Azul", "joao.silva", "MinhaSenha#2026", "Senha6dig", "0123", "",
-         "abcd-1234-efgh\nijkl-5678-mnop\nqrst-9012-uvwx", "Linhas EXEMPLO são ignoradas pelo cofre", "Banco", "Eu"),
+         "abcd-1234-efgh\nijkl-5678-mnop\nqrst-9012-uvwx", "Linhas EXEMPLO são ignoradas pelo cofre", "Banco", "Eu"),  # pragma: allowlist secret
         ("EXEMPLO - Loja Online", "joao@email.com", "OutraSenha#77", "", "", "", "", "", "Compras", "Eu"),
         ("EXEMPLO - Conta Google", "joao@gmail.com", "Terceira#Senha9", "", "", "", "", "", "Google", "Eu"),
         ("EXEMPLO - Sistema da Empresa", "joao.trab", "Trab#Senha55", "", "", "", "", "", "Trabalho", "Eu - Trabalho"),
@@ -6909,6 +6909,9 @@ class BarraLateral(tk.Frame if tk else object):
     def __init__(self, mestre, max_linhas=8, **kw):
         """Cria a lista compacta de grupos/pessoas com a mesma interface de um Treeview."""
         super().__init__(mestre, bg=CORES["lateral"], **kw)
+        self._referencia = None              # lista MAIOR possível (ex.: todos os grupos) que serve de base da altura fixa
+        self._altura_alvo = 0                # altura reservada da lista: só cresce, nunca encolhe (ver _reservar_altura)
+        self._enchimento = tk.Frame(self, bg=CORES["lateral"], height=1, bd=0, highlightthickness=0)
         self._itens = {}
         self._ordem = []
         self._sel = None
@@ -6975,9 +6978,12 @@ class BarraLateral(tk.Frame if tk else object):
         return super().bind(seq, func, add)
 
     # montagem
-    def definir(self, entradas, selecionado=None):
+    def definir(self, entradas, selecionado=None, referencia=None):
         """entradas: lista de dicts com iid, texto, n, e 'icone' (nome) ou 'cor' (bolinha);
-        'secao' cria um título antes do item; 'cor_txt' muda a cor do texto. Linhas demais são paginadas."""
+        'secao' cria um título antes do item; 'cor_txt' muda a cor do texto. Linhas demais são paginadas.
+        referencia: a MAIOR variação possível desta lista (ex.: os grupos de todas as pessoas juntas); a altura
+        reservada acompanha o maior entre as entradas atuais e ela, para a lista não mudar de tamanho ao trocar."""
+        self._referencia = list(referencia) if referencia is not None else self._referencia
         assinatura = tuple((e["iid"], e.get("secao"), e["texto"], str(e.get("n", "")), e.get("icone"), e.get("cor"),
                             e.get("cor_txt"), e.get("cor_icone"), e.get("cor_n")) for e in entradas)
         mesma = assinatura == self._assinatura
@@ -7000,6 +7006,7 @@ class BarraLateral(tk.Frame if tk else object):
         for iid in {antiga, nova}:
             self._pintar(iid)
         self._atualizar_paginacao()
+        self._reservar_altura()
 
     def _atualizar_paginacao(self):
         """Mostra controles apenas quando há mais de uma página."""
@@ -7023,8 +7030,9 @@ class BarraLateral(tk.Frame if tk else object):
     def _desenhar(self):
         """Desenha somente a página atual."""
         for w in self.winfo_children():
-            if w is not self._nav:
+            if w is not self._nav and w is not self._enchimento:
                 w.destroy()
+        self._enchimento.pack_forget()
         self._itens.clear()
         C = CORES
         inicio = self._pagina * self._max_linhas
@@ -7092,8 +7100,60 @@ class BarraLateral(tk.Frame if tk else object):
                 w.bind("<Enter>", lambda ev, i=e["iid"]: self._pintar(i, hover=True))
                 w.bind("<Leave>", lambda ev, i=e["iid"]: self._pintar(i))
         self._atualizar_paginacao()
+        self._reservar_altura()
         for iid in self._itens:
             self._pintar(iid)
+
+    def _altura_de(self, entradas, linha, titulo, nav):
+        """Altura da MAIOR página que estas entradas ocupariam (linhas, títulos de seção e botões de página)."""
+        total = len(entradas)
+        if total == 0:
+            return 0
+        paginas = (total + self._max_linhas - 1) // self._max_linhas
+        melhor, secao_atual = 0, ""
+        for pg in range(paginas):
+            ini, fim = pg * self._max_linhas, min(total, (pg + 1) * self._max_linhas)
+            titulos = sum(1 for e in entradas[ini:fim] if e.get("secao"))
+            if ini and not entradas[ini].get("secao") and secao_atual:
+                titulos += 1                                     # título repetido no começo da página
+            for e in entradas[ini:fim]:
+                if e.get("secao"):
+                    secao_atual = e["secao"]
+            melhor = max(melhor, (fim - ini) * linha + titulos * titulo + (nav if paginas > 1 else 0))
+        return melhor
+
+    def _reservar_altura(self):
+        """ALTURA FIXA: a lista reserva o espaço do MAIOR conteúdo que ela pode ter com estes dados (as entradas atuais
+        ou a 'referencia', o que for maior), com um enchimento invisível no fim quando há menos itens. Assim escolher uma
+        pessoa, buscar ou apagar a busca nunca encolhe nem sobe a lista (nem empurra a que vem logo abaixo). Não reserva
+        a 'capacidade' de uma página cheia: isso tomaria a altura de janelas pequenas. O valor só cresce."""
+        try:
+            self._enchimento.pack_forget()
+            self.update_idletasks()
+            conteudo = self.winfo_reqheight()
+            # medidas de referência tiradas de widgets de verdade (não de estimativa por fonte)
+            sonda_t = tk.Label(self, text="Xg", font="CofreTexto", bd=0)
+            sonda_r = tk.Label(self, text="XG", font="CofreRotulo", bd=0)
+            sonda_n = tk.Label(self, text="1", font="CofrePequeno", bd=0, padx=10)
+            try:
+                if ESCALA >= 2.0:
+                    linha = max(36, sonda_t.winfo_reqheight() + 4, sonda_n.winfo_reqheight() + 4) + 2
+                else:
+                    linha = _px(36) + 2
+                titulo = sonda_r.winfo_reqheight() + 24
+            finally:
+                for sonda in (sonda_t, sonda_r, sonda_n):
+                    sonda.destroy()
+            nav = self._nav.winfo_reqheight() + 6
+            previsto = max(self._altura_de(self._entradas, linha, titulo, nav),
+                           self._altura_de(self._referencia or [], linha, titulo, nav))
+            self._altura_alvo = max(self._altura_alvo, previsto, conteudo)
+            falta = self._altura_alvo - conteudo
+            if falta > 0:
+                self._enchimento.configure(height=falta)
+                self._enchimento.pack(side="top", fill="x")
+        except (tk.TclError, KeyError):
+            pass
 
     def item_em(self, x_root, y_root):
         """Id da linha que está sob o ponto (coordenadas da tela) ou None. Usado ao soltar uma conta arrastada."""
@@ -8622,7 +8682,7 @@ class App:
                     + os.path.abspath(self.caminho), CORES["fundo"]).pack(side="left", padx=(8, 0))
         ttk.Label(tt, text="Defina a senha e a forma de abrir o cofre.",
                   style="C.Suave.TLabel").pack(anchor="w")
-        ttk.Separator(f).pack(fill="x", pady=(10, 8))
+        ttk.Separator(f).pack(fill="x", pady=(6, 5))
 
         colunas = ttk.Frame(f, style="C.TFrame")
         colunas.pack(fill="x")
@@ -8706,8 +8766,8 @@ class App:
             cartao = tk.Frame(pai, bg=C["sup2"], bd=0, cursor="hand2",
                               highlightbackground=C["borda"], highlightcolor=C["prim"],
                               highlightthickness=_px(2))
-            cartao.pack(fill="x", pady=(_px(3), 0))
-            corpo = ttk.Frame(cartao, style="Card2.TFrame", padding=(_px(8), _px(4)))
+            cartao.pack(fill="x", pady=(_px(2), 0))
+            corpo = ttk.Frame(cartao, style="Card2.TFrame", padding=(_px(8), _px(2)))
             corpo.pack(fill="both", expand=True)
 
             def mudou():
@@ -8744,15 +8804,15 @@ class App:
                      "Qualquer uma abre; oferece menos proteção.",
                      atualizar_proximo)
 
-        fido = ttk.Frame(dir_, style="Card2.TFrame", padding=(_px(8), _px(4)))
-        fido.pack(fill="x", pady=(_px(4), 0))
+        fido = ttk.Frame(dir_, style="Card2.TFrame", padding=(_px(8), _px(2)))
+        fido.pack(fill="x", pady=(_px(3), 0))
         ttk.Checkbutton(fido, text="Exigir também a chave FIDO", variable=usar_fido,
                         style="S2.TCheckbutton", command=atualizar_proximo).pack(anchor="w")
         ttk.Label(fido, text="Opcional: chave física USB/NFC; cadastro após criar.",
                   style="S2.Suave.TLabel", wraplength=_px(420), justify="left").pack(
                       anchor="w", padx=(_px(28), 0))
 
-        ttk.Separator(dir_).pack(fill="x", pady=(_px(8), _px(6)))
+        ttk.Separator(dir_).pack(fill="x", pady=(_px(5), _px(4)))
         nivel = tk.StringVar(value=nivel_recomendado())      # PC com pouca RAM livre começa em "Alta" (sem paginação)
         cab_nivel = ttk.Frame(dir_, style="C.TFrame")
         cab_nivel.pack(anchor="w", fill="x")
@@ -8771,7 +8831,7 @@ class App:
         opcao_cartao(dir_, nivel, "alto", "Alta — 256 MB por tentativa",
                      "Alternativa para pouca memória.")
         proximo_fr = ttk.Frame(dir_, style="C.TFrame")
-        proximo_fr.pack(fill="x", pady=(_px(6), 0))
+        proximo_fr.pack(fill="x", pady=(_px(4), 0))
         proximo = ttk.Label(proximo_fr, text="", style="C.Suave.TLabel", wraplength=_px(420), justify="left")
         proximo.pack(anchor="w")
         # Reserva a altura do MAIOR texto possivel: trocar de opcao nao muda mais a altura da tela.
@@ -10113,10 +10173,11 @@ class App:
         fr = ttk.Frame(canvas, padding=padding)
         janela = canvas.create_window((0, 0), window=fr, anchor="nw")
         canvas.pack(side="left", fill="both", expand=True)
-        # Calha da barra de rolagem RESERVADA desde o início (frame vazio com a largura da barra): quando a barra precisa
-        # aparecer ela só ocupa esse lugar, e o conteúdo não anda ~12 px para a esquerda nem encolhe.
-        calha_vazia = ttk.Frame(area, width=max(1, barra.winfo_reqwidth()))
-        calha_vazia.pack(side="right", fill="y")
+        # A faixa da barra de rolagem fica RESERVADA desde o início (vazia enquanto não há rolagem): quando a barra
+        # surge, ela só ocupa o lugar da faixa e o conteúdo não estreita nem anda para a esquerda.
+        largura_barra = max(1, barra.winfo_reqwidth())
+        reserva = tk.Frame(area, width=largura_barra, bg=CORES["fundo"], bd=0, highlightthickness=0)
+        reserva.pack(side="right", fill="y")
         estado = {"pos": False, "pendente": None, "aplicado": None, "rolagem": False, "lmax": 0, "amax": 0}
 
         def ajustar_largura(event):
@@ -10127,9 +10188,9 @@ class App:
             estado["pendente"] = None
             try:
                 d.update_idletasks()
-                w = fr.winfo_reqwidth()
+                w = fr.winfo_reqwidth() + largura_barra          # + a faixa reservada da barra de rolagem
                 h = fr.winfo_reqheight()
-                reserva = rodape.winfo_reqheight() if rodape is not None else 0
+                reserva_rodape = rodape.winfo_reqheight() if rodape is not None else 0
                 sw, sh = d.winfo_screenwidth(), d.winfo_screenheight()
                 if rodape is not None:
                     w = max(w, rodape.winfo_reqwidth())
@@ -10145,24 +10206,24 @@ class App:
                         pass
                 largura = min(max(w, getattr(d, "_largura_padrao", None) or _px(860)), teto_l)
                 piso = getattr(d, "_altura_padrao", None) or _px(520)
-                altura = min(max(h + reserva, piso), teto_a)
+                altura = min(max(h + reserva_rodape, piso), teto_a)
                 # O dialogo so CRESCE (nunca encolhe) enquanto aberto: abrir/fechar "detalhes" ou trocar de opcao
                 # nao faz a janela ficar mudando de tamanho e de posicao.
                 largura = max(largura, estado["lmax"])
                 altura = max(altura, estado["amax"])
                 estado["lmax"], estado["amax"] = largura, altura
                 d._tam_corpo = (largura, altura)      # tamanho DECIDIDO: _centralizar usa este (a janela ainda pode estar escondida)
-                corpo_altura = max(1, altura - reserva)
-                # A barra de rolagem, uma vez que apareceu, FICA (mesmo que depois o conteúdo caiba): aparecer e sumir a
-                # cada troca de opção estreitava e alargava o conteúdo em ~12 px, e a tela "tremia".
+                corpo_altura = max(1, altura - reserva_rodape)
+                # A barra de rolagem, uma vez que apareceu, FICA (mesmo que depois o conteúdo caiba). O lugar dela já
+                # está reservado (faixa vazia), então nem a primeira aparição altera a largura do conteúdo.
                 rolagem = h > corpo_altura or estado["rolagem"]
                 if rolagem != estado["rolagem"]:
                     if rolagem:
-                        calha_vazia.pack_forget()
-                        barra.pack(side="right", fill="y")
+                        reserva.pack_forget()
+                        barra.pack(side="right", fill="y")      # ocupa exatamente o lugar da faixa reservada
                     else:
                         barra.pack_forget()
-                        calha_vazia.pack(side="right", fill="y")
+                        reserva.pack(side="right", fill="y")
                     estado["rolagem"] = rolagem
                     d.update_idletasks()
                 canvas.configure(height=corpo_altura, scrollregion=canvas.bbox("all"))
@@ -11004,35 +11065,43 @@ class App:
                              "cor_txt": C["fraco"], "acao": self._adicionar_pessoa})
                 self.lateral_pessoas.definir(entp, ("p:" + fp) if varias else "p:")
                 # contas e grupos da pessoa escolhida
-                alerta_p = alerta & {r["id"] for r in da_pessoa}
-                ent = [{"iid": "__todos__", "texto": "Todas as contas", "n": len(da_pessoa), "icone": "todos",
-                        "secao": "Contas"}]
-                if alerta_p:
-                    ent.append({"iid": "__atencao__", "texto": "Atenção", "n": len(alerta_p), "icone": "alerta",
-                                "cor_icone": C["alerta"], "cor_n": C["alerta"]})
-                grupos = sorted(({(r.get("grupo") or "").strip() for r in da_pessoa}
-                                 | set(self._grupos_vazios(None if fp == "*" else fp))) - {""},
-                                key=chave_ordem_alfabetica)
-                rot_grupos = f"Grupos de {self._nome_pessoa(fp)}" if (varias and fp != "*") else "Grupos"
-                for i, g in enumerate(grupos):
-                    n = sum(1 for r in da_pessoa if (r.get("grupo") or "").strip() == g)
-                    nome = g if len(g) <= 24 else g[:23] + "…"
-                    ent.append({"iid": "g:" + g, "texto": nome, "n": n, "cor": tom_para(g),
-                                "secao": rot_grupos if i == 0 else None,
-                                "menu": lambda ev, g=g: self._menu_grupo(ev, g)})
-                sem = sum(1 for r in da_pessoa if not (r.get("grupo") or "").strip())
-                if sem and grupos:
-                    ent.append({"iid": "__sem__", "texto": "Sem grupo", "n": sem, "cor": C["fraco"]})
-                ent.append({"iid": "__novo_grupo__", "texto": "Novo grupo", "n": "", "icone": "novo",
-                            "cor_txt": C["fraco"], "acao": self._novo_grupo,
-                            "secao": rot_grupos if not grupos else None})
+                def monta_grupos(da_pes, fpx):
+                    """Linhas da lista de grupos para um conjunto de contas (da pessoa escolhida ou de todas)."""
+                    alerta_p = alerta & {r["id"] for r in da_pes}
+                    ent = [{"iid": "__todos__", "texto": "Todas as contas", "n": len(da_pes), "icone": "todos",
+                            "secao": "Contas"}]
+                    if alerta_p:
+                        ent.append({"iid": "__atencao__", "texto": "Atenção", "n": len(alerta_p), "icone": "alerta",
+                                    "cor_icone": C["alerta"], "cor_n": C["alerta"]})
+                    grupos = sorted(({(r.get("grupo") or "").strip() for r in da_pes}
+                                     | set(self._grupos_vazios(None if fpx == "*" else fpx))) - {""},
+                                    key=chave_ordem_alfabetica)
+                    rot_grupos = f"Grupos de {self._nome_pessoa(fpx)}" if (varias and fpx != "*") else "Grupos"
+                    for i, g in enumerate(grupos):
+                        n = sum(1 for r in da_pes if (r.get("grupo") or "").strip() == g)
+                        nome = g if len(g) <= 24 else g[:23] + "…"
+                        ent.append({"iid": "g:" + g, "texto": nome, "n": n, "cor": tom_para(g),
+                                    "secao": rot_grupos if i == 0 else None,
+                                    "menu": lambda ev, g=g: self._menu_grupo(ev, g)})
+                    sem = sum(1 for r in da_pes if not (r.get("grupo") or "").strip())
+                    if sem and grupos:
+                        ent.append({"iid": "__sem__", "texto": "Sem grupo", "n": sem, "cor": C["fraco"]})
+                    ent.append({"iid": "__novo_grupo__", "texto": "Novo grupo", "n": "", "icone": "novo",
+                                "cor_txt": C["fraco"], "acao": self._novo_grupo,
+                                "secao": rot_grupos if not grupos else None})
+                    return ent
+
+                ent = monta_grupos(da_pessoa, fp)
+                # a MAIOR variação (todas as pessoas juntas) fixa a altura da lista: ela não muda ao escolher pessoa
+                ent_ref = monta_grupos(regs, "*") if (varias and fp != "*") else None
+
                 iid = {"Todos": "__todos__", "(sem grupo)": "__sem__", "⚠ Atenção": "__atencao__"}.get(
                     filtro, "g:" + filtro)
                 if not any(e["iid"] == iid for e in ent):
                     iid = "__todos__"
                     self.filtro_grupo.set("Todos")
                     filtro = "Todos"
-                self.lateral.definir(ent, iid)
+                self.lateral.definir(ent, iid, referencia=ent_ref)
             linhas = []
             for r in visiveis:
                 segredos = [ROTULOS[c] for c in CAMPOS_SECRETOS if r.get(c)]
@@ -11168,21 +11237,21 @@ class App:
 
         # ações (embaixo)
         acoes = ttk.Frame(d, style="C.TFrame")
-        acoes.pack(side="bottom", fill="x", pady=(12, 0))
+        acoes.pack(side="bottom", fill="x", pady=(8, 0))
         ttk.Button(acoes, text="Editar", style="C.Primario.TButton", command=self.editar,
                    image=imagem_icone(self.root, "editar", "#ffffff"), compound="left").pack(side="left")
         ttk.Button(acoes, text="Excluir", style="C.Perigo.TButton", command=self.excluir,
                    image=imagem_icone(self.root, "excluir", C["perigo"]), compound="left").pack(side="right")
 
         campos = ttk.Frame(d, style="C.TFrame")
-        campos.pack(fill="both", expand=True, pady=(18, 0))
+        campos.pack(fill="both", expand=True, pady=(12, 0))
         primeiro = True
         for campo in ("login",) + CAMPOS_SECRETOS:
             valor = r.get(campo, "")
             if not valor:
                 continue
             if not primeiro:
-                ttk.Separator(campos).pack(fill="x", pady=10)
+                ttk.Separator(campos).pack(fill="x", pady=6)
             primeiro = False
             secreto = campo in CAMPOS_SECRETOS
             chave = (r["id"], campo)
@@ -11225,20 +11294,27 @@ class App:
                     ttk.Label(lc, text=cod, style="C.Valor.TLabel", font="CofreMono", wraplength=_px(190),
                               justify="left").pack(side="left", anchor="w", fill="x", expand=True)
             else:
-                ttk.Label(linha, text=mostra, style="C.Valor.TLabel" if secreto else "C.TLabel",
-                          font="CofreMono" if secreto else "CofreTexto", wraplength=_px(250), justify="left").pack(
-                    side="left", anchor="w")
+                texto_valor = mostra
+                if not secreto:
+                    # Valor longo (ex.: login enorme) numa linha só, com '…': quebrado em várias linhas ele pedia mais
+                    # altura do que o painel tem na janela mínima e ficava cortado. O texto inteiro vai no balão.
+                    texto_valor = _cortar(" ".join(str(mostra).split()), tkfont.nametofont("CofreTexto"), _px(250))
+                lbl_valor = ttk.Label(linha, text=texto_valor, style="C.Valor.TLabel" if secreto else "C.TLabel",
+                                      font="CofreMono" if secreto else "CofreTexto", wraplength=_px(250), justify="left")
+                lbl_valor.pack(side="left", anchor="w")
+                if texto_valor != mostra:
+                    self._dica(lbl_valor, str(mostra))
             if campo in ("senha", "senha_extra"):
                 nota, rot, bits, _ = avaliar_forca(valor)
                 ttk.Label(bloco, text="  " + rot, image=self._barra_forca(nota, 56), compound="left",
                           foreground=self._CORES_FORCA[nota], style="C.TLabel", font="CofrePequeno").pack(
-                    anchor="w", pady=(4, 0))
+                    anchor="w", pady=(2, 0))
             elif campo == "pin" and pin_obvio(valor):
                 ttk.Label(bloco, text="  PIN fácil de adivinhar", image=self._barra_forca(0, 56), compound="left",
-                          foreground=C["perigo"], style="C.TLabel", font="CofrePequeno").pack(anchor="w", pady=(4, 0))
+                          foreground=C["perigo"], style="C.TLabel", font="CofrePequeno").pack(anchor="w", pady=(2, 0))
         if r.get("notas"):
             if not primeiro:
-                ttk.Separator(campos).pack(fill="x", pady=10)
+                ttk.Separator(campos).pack(fill="x", pady=6)
             ttk.Label(campos, text="NOTAS", style="C.Campo.TLabel").pack(anchor="w")
             ttk.Label(campos, text=r["notas"], style="C.Suave.TLabel", wraplength=_px(350), justify="left").pack(
                 anchor="w", pady=(3, 0))

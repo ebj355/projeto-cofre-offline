@@ -22,6 +22,18 @@ def todos(w):
         try: yield x; yield from todos(x)
         except tk.TclError: pass
 CLASSES = ("TLabel", "Label", "TButton", "Button", "TCheckbutton", "TRadiobutton", "TEntry", "Entry", "TCombobox")
+def em_area_rolavel(w):
+    """True se o widget está dentro de um Canvas que tem uma barra de rolagem VISÍVEL ao lado (ex.: o diálogo 'Novo item'
+    quando a janela é pequena): o que está fora da vista não é texto cortado, é conteúdo que se alcança rolando."""
+    p = w.master
+    while p is not None:
+        if isinstance(p, tk.Canvas):
+            try:
+                return any(x.winfo_class() == "TScrollbar" and x.winfo_ismapped() for x in p.master.winfo_children())
+            except tk.TclError:
+                return False
+        p = getattr(p, "master", None)
+    return False
 def cortados(topo, tol=3):
     """Widgets visíveis cujo tamanho real é menor que o pedido (texto cortado) ou que passam da borda da janela."""
     ruins = []
@@ -42,7 +54,8 @@ def cortados(topo, tol=3):
                 ruins.append(f"{nome} largura {w.winfo_width()} < {w.winfo_reqwidth()}")
             if w.winfo_height() + tol < w.winfo_reqheight():
                 ruins.append(f"{nome} altura {w.winfo_height()} < {w.winfo_reqheight()}")
-            if w.winfo_rootx() + w.winfo_width() > tx1 + tol or w.winfo_rooty() + w.winfo_height() > ty1 + tol:
+            if (w.winfo_rootx() + w.winfo_width() > tx1 + tol or w.winfo_rooty() + w.winfo_height() > ty1 + tol) \
+                    and not em_area_rolavel(w):
                 ruins.append(f"{nome} passa da borda da janela")
         except tk.TclError:
             continue
