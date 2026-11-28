@@ -55,10 +55,13 @@ jobs:
       - name: Run core and UI tests
         run: python .\testes\6_TESTE_ferramentas_dos_testes\rodar_todos.py
       - name: Run Windows-native tests
+        if: ${{ !cancelled() }}   # roda mesmo se a etapa anterior falhou, para ver TODOS os resultados numa so rodada
         run: python .\testes\4_TESTE_so_no_windows\teste_nativo_windows.py
       - name: Run penetration-test suite
+        if: ${{ !cancelled() }}   # roda mesmo se a etapa anterior falhou, para ver TODOS os resultados numa so rodada
         run: python .\testes\3_TESTE_ataques_simulados\rodar_pentest.py
       - name: Check repository integrity and secrets
+        if: ${{ !cancelled() }}   # roda mesmo se a etapa anterior falhou, para ver TODOS os resultados numa so rodada
         shell: pwsh
         run: |
           python .\testes\5_TESTE_ferramentas_externas\verificar_integridade_repositorio.py

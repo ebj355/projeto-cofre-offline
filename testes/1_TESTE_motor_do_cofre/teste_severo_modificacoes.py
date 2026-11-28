@@ -137,7 +137,11 @@ if os.path.exists(sh):
     linhas = [l.split() for l in open(sh, encoding="utf-8") if len(l.split()) == 2 and len(l.split()[0]) == 64]
     ruim = [n for h, n in linhas if not os.path.exists(os.path.join(pac, n.lstrip("*"))) or
             hashlib.sha256(open(os.path.join(pac, n.lstrip("*")), "rb").read()).hexdigest() != h]
-    ok(len(linhas) >= 10 and not ruim, f"pacotes offline: {len(linhas)} arquivos, todos com SHA-256 conferido ({ruim[:2]})")
+    # No PC do usuario a pasta tem o conjunto COMPLETO (>= 10 arquivos). No GitHub Actions o workflow baixa de proposito so o
+    # wheel do cryptography (para as verificacoes de integridade), entao la o minimo e 1; o que importa nos dois casos e
+    # que TODO arquivo listado exista e tenha o SHA-256 certo.
+    minimo = 1 if os.environ.get("GITHUB_ACTIONS") else 10
+    ok(len(linhas) >= minimo and not ruim, f"pacotes offline: {len(linhas)} arquivos (minimo {minimo}), todos com SHA-256 conferido ({ruim[:2]})")
     # cada hash dos pacotes tem de constar nos requisitos com hash do instalador
     ok(all(h in t or True for h, n in linhas), "hashes presentes (informativo)")
 else:
